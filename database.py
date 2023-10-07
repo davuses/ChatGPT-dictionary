@@ -1,3 +1,5 @@
+from argparse import ArgumentParser
+
 from sqlalchemy import (
     Boolean,
     ForeignKey,
@@ -13,7 +15,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from mappings import meanings_mapping
+from mappings import get_question_answer_mappings
 
 engine = create_engine(
     "sqlite:///dictionary.db",
@@ -53,7 +55,7 @@ class Answer(Base):
     text: Mapped[str] = mapped_column(String, nullable=False)
 
     # Establish a many-to-one relationship with the Question table
-    question_id = mapped_column(Integer, ForeignKey("question.id"))
+    question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"))
     question: Mapped[Question] = relationship(
         Question, back_populates="answers"
     )
@@ -71,6 +73,7 @@ def create_tables():
 
 def insert_questions_and_answers():
     with Session(engine) as session:
+        meanings_mapping = get_question_answer_mappings()
         for k in meanings_mapping:
             question = Question(text=k)
             if session.query(Question).filter(Question.text == k).first():
@@ -83,13 +86,13 @@ def insert_questions_and_answers():
         session.commit()
 
 
-def get_all_question():
+def db_get_all_question():
     with Session(engine) as session:
         questions = session.query(Question).all()
         return questions
 
 
-def get_question_by_id(id: int):
+def db_get_question_by_id(id: int):
     with Session(engine) as session:
         query = session.query(Question).filter(Question.id == id).first()
         if question := query:
@@ -98,16 +101,7 @@ def get_question_by_id(id: int):
             print("No such question")
 
 
-def delete_question(id: int):
-    with Session(engine) as session:
-        # session.query(Question).filter(Question.id == id).delete()
-        question = session.query(Question).filter(Question.id == id).first()
-        if question:
-            question.is_hidden = True
-            session.commit()
-
-
-def get_question_by_text(question_text: str):
+def db_get_question_by_text(question_text: str):
     with Session(engine) as session:
         query = (
             session.query(Question)
@@ -120,7 +114,70 @@ def get_question_by_text(question_text: str):
             print("No such question")
 
 
+def db_delete_question(id: int):
+    with Session(engine) as session:
+        # session.query(Question).filter(Question.id == id).delete()
+        question = session.query(Question).filter(Question.id == id).first()
+        if question:
+            question.is_hidden = True
+            session.commit()
+
+
+def db_update_question_text(id: int, text: str):
+    with Session(engine) as session:
+        question = session.query(Question).filter(Question.id == id).first()
+        if question:
+            question_id = question.id
+            question.text = text
+            session.commit()
+            return question_id
+
+
+def db_delete_answer(id: int):
+    with Session(engine) as session:
+        answer = session.query(Answer).filter(Answer.id == id).first()
+        if answer:
+            question_id = answer.question_id
+            session.query(Answer).filter(Answer.id == id).delete()
+            session.commit()
+            return question_id
+
+
+def db_update_answer_text(id: int, markdown_text: str):
+    with Session(engine) as session:
+        answer = session.query(Answer).filter(Answer.id == id).first()
+        if answer:
+            question_id = answer.question_id
+            answer.text = markdown_text
+            session.commit()
+            return question_id
+
+
+def main():
+    parser = ArgumentParser(description="Your program's description")
+
+    subparsers = parser.add_subparsers(dest="mode", help="Mode selection")
+
+    create_table_parser = subparsers.add_parser("create-table")
+
+    insert_parser = subparsers.add_parser("insert")
+
+    question_parser = subparsers.add_parser("question")
+    question_parser.add_argument(
+        "--question", required=True, help="Specify the question"
+    )
+
+    args = parser.parse_args()
+
+    print("Mode:", args.mode)
+    if args.mode == "question":
+        print("Question:", args.question)
+        db_get_question_by_text(args.question)
+    if args.mode == "create-table":
+        create_tables()
+    if args.mode == "insert":
+        insert_questions_and_answers()
+
+
 if __name__ == "__main__":
-    # create_tables()
-    insert_questions_and_answers()
-    # get_question_by_text("meek")
+    main()

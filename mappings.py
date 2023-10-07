@@ -1,11 +1,5 @@
 import json
 
-conversations_file = "new_conversations.json"
-
-conversations = json.load(open(conversations_file, "r", encoding="utf-8"))
-
-meanings_mapping: dict[str, list[str]] = {}
-
 
 def parse_message(message):
     parts = message["content"]["parts"]
@@ -13,10 +7,8 @@ def parse_message(message):
     return content
 
 
-question_count = 0
-
-
-def parse_conv(conv):
+def parse_conv(conv, meanings_mapping):
+    question_count = 0
     chat_nodes = conv["mapping"]
     for node in chat_nodes.values():
         if message := node["message"]:
@@ -24,7 +16,6 @@ def parse_conv(conv):
             if role == "user":
                 parts = message["content"]["parts"]
                 question: str = parts[0]
-                global question_count
                 question_count = question_count + 1
                 children_id = node["children"]
                 answers = []
@@ -39,9 +30,16 @@ def parse_conv(conv):
                     old_answers[:] = list(set(old_answers))
                 else:
                     meanings_mapping[question.lower()] = answers
+    print(question_count)
 
 
-for conv in conversations:
-    parse_conv(conv)
+def get_question_answer_mappings(file="new_conversations.json"):
+    conversations_file = file
 
-print(question_count)
+    conversations = json.load(open(conversations_file, "r", encoding="utf-8"))
+
+    question_answer_mappings: dict[str, list[str]] = {}
+    for conv in conversations:
+        parse_conv(conv, question_answer_mappings)
+
+    return question_answer_mappings
