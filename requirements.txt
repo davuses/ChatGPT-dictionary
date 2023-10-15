@@ -2,3 +2,4 @@ SQLAlchemy==2.0.19
 fastapi
 uvicorn[standard]
 markdown2
+python-multipart
