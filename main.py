@@ -63,7 +63,7 @@ async def root(request: Request):
     script_html = """\
         <script>
             function deleteQuestion(button, questionId) {
-            if (confirm("Are you sure you want to delete this answer?")) {
+            if (confirm("Are you sure you want to delete this question?")) {
                 fetch("/delete_question/" + questionId).then((Response) => {
                 if (Response.ok) {
                     var row = button.parentNode.parentNode;
@@ -151,7 +151,7 @@ async def get_question(question_id: int):
             f"<li>{markdown2.markdown(a.text)}"
             f"""<button onclick="location.href='/edit_answer/{a.id}'" type="button">Edit</button>"""
             "&nbsp&nbsp&nbsp"
-            '<button onclick="confirmDeletion(this,'
+            '<button onclick="deleteAnswer(this,'
             f' {a.id})">Delete</button></li>'
             # '<a href="javascript:void(0);"'
             # f' onclick="confirmDeletion({a.id})">Delete</a>'
@@ -160,9 +160,15 @@ async def get_question(question_id: int):
     )
     script_html = """
         <script>
-            function confirmDeletion(answerId) {
+            function deleteAnswer(button, answerId) {
                 if (confirm("Are you sure you want to delete this answer?")) {
-                    window.location.href = "/delete_answer/" + answerId;
+                    fetch("/delete_answer/" + answerId).then((Response) => {
+                    if (Response.ok) {
+                        var a_li = button.parentNode;
+                        var a_ul = a_li.parentNode;
+                        a_ul.removeChild(a_li);
+                    }
+                    });
                 }
             }
         </script>
