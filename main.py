@@ -2,11 +2,13 @@ import markdown2
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from database import (
     db_delete_answer,
     db_delete_question,
     db_get_all_question,
+    db_get_answer_by_id,
     db_get_question_by_id,
     db_update_answer_text,
     db_update_question_text,
@@ -104,14 +106,9 @@ async def edit_question_page(question_id: int):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
-    question = {
-        "id": question_id,
-        "text": question.text,
-    }  # Mock data for demonstration
-
     form_html = f"""\
     <form method="post" action="/edit_question/{question_id}">
-        <textarea name="question_text" rows="4" cols="50">{question['text']}</textarea><br>
+        <textarea name="question_text" rows="4" cols="50">{question.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -137,8 +134,11 @@ async def edit_question(
     form_data: EditQuestionForm = Depends(EditQuestionForm.as_form),
 ):
     updated_text = form_data.question_text
-    if q_id := db_update_question_text(question_id, updated_text):
-        return RedirectResponse(url=f"/question/{q_id}", status_code=303)
+    try:
+        if q_id := db_update_question_text(question_id, updated_text):
+            return RedirectResponse(url=f"/question/{q_id}", status_code=303)
+    except IntegrityError:
+        return "Question text UNIQUE constraint failed"
 
 
 @app.get("/question/{question_id}", response_class=HTMLResponse)
@@ -206,14 +206,12 @@ async def delete_question(question_id: int):
 @app.get("/edit_answer/{answer_id}", response_class=HTMLResponse)
 async def edit_answer_page(answer_id: int):
     # Replace this with your actual function to fetch answer by ID
-    answer = {
-        "id": answer_id,
-        "text": "Sample Answer Text",
-    }  # Mock data for demonstration
-
+    answer = db_get_answer_by_id(answer_id)
+    if not answer:
+        return "404"
     form_html = f"""\
     <form method="post" action="/edit_answer/{answer_id}">
-        <textarea name="answer_text" rows="4" cols="50">{answer['text']}</textarea><br>
+        <textarea name="answer_text" rows="4" cols="50">{answer.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
