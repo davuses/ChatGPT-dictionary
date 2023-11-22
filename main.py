@@ -44,6 +44,7 @@ def shorten_string(s, max_length=180):
 async def root(request: Request):
     questions = db_get_all_question()
     questions = [q for q in questions if not q.is_hidden]
+    questions_count = len(questions)
     trs = []
     if request.query_params.get("sort") == "length":
         questions = sorted(questions, key=lambda q: len(q.text))
@@ -84,7 +85,7 @@ async def root(request: Request):
             <title>Questions Table</title>
         </head>
         <body>
-            <h1>Questions</h1>
+            <h1>{questions_count} Questions</h1>
             <p>{sort_link}</p>
             <table border="1">
             <tr>
