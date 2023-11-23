@@ -116,11 +116,7 @@ def db_get_question_by_text(question_text: str):
 
 def db_delete_question(id: int):
     with Session(engine) as session:
-        # session.query(Question).filter(Question.id == id).delete()
-        question = session.query(Question).filter(Question.id == id).first()
-        if question:
-            question.is_hidden = True
-            session.commit()
+        session.query(Question).filter(Question.id == id).delete()
 
 
 def db_update_question_text(id: int, text: str):
