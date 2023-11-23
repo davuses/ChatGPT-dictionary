@@ -17,6 +17,17 @@ from database import (
 app = FastAPI()
 FAVICON_PATH = "./static/favicon.ico"
 
+MOBILE_STYLE_SNIPPET = """\
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @media only screen and (max-width: 600px) {
+            body {
+                font-size: 20px;
+            }
+        }
+    </style>
+        """
+
 
 class EditAnswerForm(BaseModel):
     answer_text: str
@@ -88,8 +99,9 @@ async def root(request: Request):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Questions Table</title>
+            <title>Dictionary</title>
             <link rel="icon" type="image/x-icon" href="/favicon.ico">
+            {MOBILE_STYLE_SNIPPET}
         </head>
         <body>
             <h1>{questions_count} Questions</h1>
@@ -126,6 +138,7 @@ async def edit_question_page(question_id: int):
     <html>
     <head>
         <title>Edit Question</title>
+        {MOBILE_STYLE_SNIPPET}
     </head>
     <body>
         <h1>Edit Question</h1>
@@ -185,7 +198,8 @@ async def get_question(question_id: int):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Question Page</title>
+            <title>Definition</title>
+            {MOBILE_STYLE_SNIPPET}
             {script_html}
         </head>
         <body>
@@ -229,6 +243,7 @@ async def edit_answer_page(answer_id: int):
     <html>
     <head>
         <title>Edit Answer</title>
+        {MOBILE_STYLE_SNIPPET}
     </head>
     <body>
         <h1>Edit Answer</h1>
