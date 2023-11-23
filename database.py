@@ -74,12 +74,12 @@ def create_tables():
 def insert_questions_and_answers():
     with Session(engine) as session:
         meanings_mapping = get_question_answer_mappings()
-        for k in meanings_mapping:
+        for k, answers in meanings_mapping.items():
             question = Question(text=k)
             if session.query(Question).filter(Question.text == k).first():
                 continue
             session.add(question)
-            answers = meanings_mapping[k]
+            # answers = meanings_mapping[k]
             for answer_text in answers:
                 answer = Answer(text=answer_text, question=question)
                 session.add(answer)
@@ -127,6 +127,15 @@ def db_update_question_text(id: int, text: str):
             question.text = text
             session.commit()
             return question_id
+
+
+def db_get_answer_by_id(id: int):
+    with Session(engine) as session:
+        query = session.query(Answer).filter(Answer.id == id).first()
+        if answer := query:
+            return answer
+        else:
+            print("No such answer")
 
 
 def db_delete_answer(id: int):

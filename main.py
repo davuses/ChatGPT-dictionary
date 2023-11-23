@@ -2,11 +2,13 @@ import markdown2
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from database import (
     db_delete_answer,
     db_delete_question,
     db_get_all_question,
+    db_get_answer_by_id,
     db_get_question_by_id,
     db_update_answer_text,
     db_update_question_text,
@@ -42,6 +44,7 @@ def shorten_string(s, max_length=180):
 async def root(request: Request):
     questions = db_get_all_question()
     questions = [q for q in questions if not q.is_hidden]
+    questions_count = len(questions)
     trs = []
     if request.query_params.get("sort") == "length":
         questions = sorted(questions, key=lambda q: len(q.text))
@@ -63,7 +66,7 @@ async def root(request: Request):
     script_html = """\
         <script>
             function deleteQuestion(button, questionId) {
-            if (confirm("Are you sure you want to delete this answer?")) {
+            if (confirm("Are you sure you want to delete this question?")) {
                 fetch("/delete_question/" + questionId).then((Response) => {
                 if (Response.ok) {
                     var row = button.parentNode.parentNode;
@@ -82,7 +85,7 @@ async def root(request: Request):
             <title>Questions Table</title>
         </head>
         <body>
-            <h1>Questions</h1>
+            <h1>{questions_count} Questions</h1>
             <p>{sort_link}</p>
             <table border="1">
             <tr>
@@ -104,14 +107,9 @@ async def edit_question_page(question_id: int):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
-    question = {
-        "id": question_id,
-        "text": question.text,
-    }  # Mock data for demonstration
-
     form_html = f"""\
     <form method="post" action="/edit_question/{question_id}">
-        <textarea name="question_text" rows="4" cols="50">{question['text']}</textarea><br>
+        <textarea name="question_text" rows="4" cols="50">{question.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -137,8 +135,11 @@ async def edit_question(
     form_data: EditQuestionForm = Depends(EditQuestionForm.as_form),
 ):
     updated_text = form_data.question_text
-    if q_id := db_update_question_text(question_id, updated_text):
-        return RedirectResponse(url=f"/question/{q_id}", status_code=303)
+    try:
+        if q_id := db_update_question_text(question_id, updated_text):
+            return RedirectResponse(url=f"/question/{q_id}", status_code=303)
+    except IntegrityError:
+        return "Question text UNIQUE constraint failed"
 
 
 @app.get("/question/{question_id}", response_class=HTMLResponse)
@@ -151,7 +152,7 @@ async def get_question(question_id: int):
             f"<li>{markdown2.markdown(a.text)}"
             f"""<button onclick="location.href='/edit_answer/{a.id}'" type="button">Edit</button>"""
             "&nbsp&nbsp&nbsp"
-            '<button onclick="confirmDeletion(this,'
+            '<button onclick="deleteAnswer(this,'
             f' {a.id})">Delete</button></li>'
             # '<a href="javascript:void(0);"'
             # f' onclick="confirmDeletion({a.id})">Delete</a>'
@@ -160,9 +161,15 @@ async def get_question(question_id: int):
     )
     script_html = """
         <script>
-            function confirmDeletion(answerId) {
+            function deleteAnswer(button, answerId) {
                 if (confirm("Are you sure you want to delete this answer?")) {
-                    window.location.href = "/delete_answer/" + answerId;
+                    fetch("/delete_answer/" + answerId).then((Response) => {
+                    if (Response.ok) {
+                        var a_li = button.parentNode;
+                        var a_ul = a_li.parentNode;
+                        a_ul.removeChild(a_li);
+                    }
+                    });
                 }
             }
         </script>
@@ -200,14 +207,12 @@ async def delete_question(question_id: int):
 @app.get("/edit_answer/{answer_id}", response_class=HTMLResponse)
 async def edit_answer_page(answer_id: int):
     # Replace this with your actual function to fetch answer by ID
-    answer = {
-        "id": answer_id,
-        "text": "Sample Answer Text",
-    }  # Mock data for demonstration
-
+    answer = db_get_answer_by_id(answer_id)
+    if not answer:
+        return "404"
     form_html = f"""\
     <form method="post" action="/edit_answer/{answer_id}">
-        <textarea name="answer_text" rows="4" cols="50">{answer['text']}</textarea><br>
+        <textarea name="answer_text" rows="4" cols="50">{answer.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
