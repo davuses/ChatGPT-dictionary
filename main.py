@@ -1,6 +1,6 @@
 import markdown2
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
@@ -15,6 +15,7 @@ from database import (
 )
 
 app = FastAPI()
+FAVICON_PATH = "./static/favicon.ico"
 
 
 class EditAnswerForm(BaseModel):
@@ -38,6 +39,11 @@ def shorten_string(s, max_length=180):
         return s
     else:
         return s[: max_length - 3] + "..."
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(FAVICON_PATH)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -83,6 +89,7 @@ async def root(request: Request):
         <html>
         <head>
             <title>Questions Table</title>
+            <link rel="icon" type="image/x-icon" href="/favicon.ico">
         </head>
         <body>
             <h1>{questions_count} Questions</h1>
