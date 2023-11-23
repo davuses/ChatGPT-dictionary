@@ -22,7 +22,7 @@ MOBILE_STYLE_SNIPPET = """\
     <style>
         @media only screen and (max-width: 600px) {
             body {
-                font-size: 20px;
+                font-size: 17px;
             }
         }
     </style>
@@ -76,7 +76,7 @@ async def root(request: Request):
     trs_html = "".join(trs)
     sort_link_url = "/?sort=length"
     sort_link = (
-        '<a href="/" style="text-decoration: none";>Sort by Date</a>'
+        '<a href="#bottom"  style="text-decoration: none;">Go to Bottom</a>'
         f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{sort_link_url}"'
         ' style="text-decoration: none;">Sort by Length</a>'
     )
@@ -104,7 +104,7 @@ async def root(request: Request):
             {MOBILE_STYLE_SNIPPET}
         </head>
         <body>
-            <h1>{questions_count} Questions</h1>
+            <h1><a href="/" style="text-decoration: none";>{questions_count} Questions</a></h1>
             <p>{sort_link}</p>
             <table border="1">
             <tr>
@@ -115,6 +115,7 @@ async def root(request: Request):
             <!-- Add more questions as needed -->
             </table>
             {script_html}
+            <div id="bottom"></div>
         </body>
         </html>
         """
