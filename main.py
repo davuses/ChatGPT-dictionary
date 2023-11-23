@@ -20,11 +20,17 @@ FAVICON_PATH = "./static/favicon.ico"
 MOBILE_STYLE_SNIPPET = """\
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        body {
+            font-size: 19px;
+            font-family: sans-serif;
+        }
         @media only screen and (max-width: 600px) {
             body {
                 font-size: 17px;
+                font-family: sans-serif;
             }
         }
+        button {font-size: 15px;}
     </style>
         """
 
@@ -104,7 +110,7 @@ async def root(request: Request):
             {MOBILE_STYLE_SNIPPET}
         </head>
         <body>
-            <h1><a href="/" style="text-decoration: none";>{questions_count} Questions</a></h1>
+            <h1 id="top"><a href="/" style="text-decoration: none";>{questions_count} Questions</a></h1>
             <p>{sort_link}</p>
             <table border="1">
             <tr>
@@ -115,7 +121,9 @@ async def root(request: Request):
             <!-- Add more questions as needed -->
             </table>
             {script_html}
-            <div id="bottom"></div>
+            <div id="bottom">
+                <p><a href="#top"  style="text-decoration: none;">Go to Top</a></p>
+            </div>
         </body>
         </html>
         """
