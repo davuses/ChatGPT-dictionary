@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from database import (
+    db_add_answer,
+    db_add_question,
     db_delete_answer,
     db_delete_question,
     db_get_all_question,
@@ -51,6 +53,25 @@ class EditQuestionForm(BaseModel):
         return cls(question_text=question_text)
 
 
+class AddQuestionForm(BaseModel):
+    question_text: str
+
+    @classmethod
+    def as_form(cls, question_text: str = Form(...)):
+        return cls(question_text=question_text)
+
+
+class AddAnswerForm(BaseModel):
+    answer_text: str
+    question_id: int
+
+    @classmethod
+    def as_form(
+        cls, answer_text: str = Form(...), question_id: int = Form(...)
+    ):
+        return cls(answer_text=answer_text, question_id=question_id)
+
+
 def shorten_string(s, max_length=180):
     if len(s) <= max_length:
         return s
@@ -86,6 +107,10 @@ async def root(request: Request):
         f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{sort_link_url}"'
         ' style="text-decoration: none;">Sort by Length</a>'
     )
+    add_question_link = (
+        '<a href="/add_question" style="text-decoration: none;">Add'
+        " Question</a>"
+    )
     script_html = """\
         <script>
             function deleteQuestion(button, questionId) {
@@ -112,6 +137,7 @@ async def root(request: Request):
         <body>
             <h1 id="top"><a href="/" style="text-decoration: none";>{questions_count} Questions</a></h1>
             <p>{sort_link}</p>
+            <p>{add_question_link}</p>
             <table border="1">
             <tr>
                 <th>Question</th>
@@ -172,7 +198,7 @@ async def edit_question(
 
 
 @app.get("/question/{question_id}", response_class=HTMLResponse)
-async def get_question(question_id: int):
+async def question_page(question_id: int):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
@@ -219,6 +245,7 @@ async def get_question(question_id: int):
             <p id="question">{question.text}</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
             <h2>Answers:</h2>
+            <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
             <ul>
                 {answers_li_html}
             </ul>
@@ -276,3 +303,79 @@ async def edit_answer(
 async def delete_answer(answer_id: int):
     if question_id := db_delete_answer(answer_id):
         return RedirectResponse(url=f"/question/{question_id}", status_code=303)
+
+
+@app.get("/add_question", response_class=HTMLResponse)
+async def add_question_page():
+    form_html = f"""\
+    <form method="post" action="/add_question">
+        <textarea name="question_text" rows="4" cols="50"></textarea><br>
+        <input type="submit" value="Submit">
+    </form>
+    """
+
+    html = f"""\
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Add Question</title>
+        {MOBILE_STYLE_SNIPPET}
+    </head>
+    <body>
+        <h1>Add Question</h1>
+        {form_html}
+    </body>
+    </html>
+    """
+    return html
+
+
+@app.post("/add_question", response_class=HTMLResponse)
+async def add_question(
+    form_data: AddQuestionForm = Depends(AddQuestionForm.as_form),
+):
+    updated_text = form_data.question_text
+    try:
+        if q_id := db_add_question(updated_text):
+            return RedirectResponse(url=f"/question/{q_id}", status_code=303)
+    except IntegrityError:
+        return "Question text UNIQUE constraint failed"
+
+
+@app.get("/add_answer", response_class=HTMLResponse)
+async def add_answer_page(qid: int):
+    # Replace this with your actual function to fetch answer by ID
+    form_html = f"""\
+    <form method="post" action="/add_answer">
+        <textarea name="answer_text" rows="4" cols="50"></textarea><br>
+        <input value="{qid}" name="question_id" type="hidden">
+        <input type="submit" value="Submit">
+    </form>
+    """
+
+    html = f"""\
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Edit Answer</title>
+        {MOBILE_STYLE_SNIPPET}
+    </head>
+    <body>
+        <h1>Edit Answer</h1>
+        {form_html}
+    </body>
+    </html>
+    """
+    return html
+
+
+@app.post("/add_answer", response_class=HTMLResponse)
+async def add_answer(
+    form_data: AddAnswerForm = Depends(AddAnswerForm.as_form),
+):
+    updated_text = form_data.answer_text
+    qid = form_data.question_id
+    if question := db_get_question_by_id(qid):
+        db_add_answer(updated_text, question=question)
+        return RedirectResponse(url=f"/question/{qid}", status_code=303)
+    return "Question doesn't exist"

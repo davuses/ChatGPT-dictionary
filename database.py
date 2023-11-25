@@ -130,6 +130,14 @@ def db_update_question_text(id: int, text: str):
             return question_id
 
 
+def db_add_question(text: str):
+    with Session(engine) as session:
+        question = Question(text=text)
+        session.add(question)
+        session.commit()
+        return question.id
+
+
 def db_get_answer_by_id(id: int):
     with Session(engine) as session:
         query = session.query(Answer).filter(Answer.id == id).first()
@@ -157,6 +165,14 @@ def db_update_answer_text(id: int, markdown_text: str):
             answer.text = markdown_text
             session.commit()
             return question_id
+
+
+def db_add_answer(text: str, question: Question):
+    with Session(engine) as session:
+        answer = Answer(text=text, question=question)
+        session.add(answer)
+        session.commit()
+        return answer.id
 
 
 def main():
