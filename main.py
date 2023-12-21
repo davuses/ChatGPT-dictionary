@@ -18,6 +18,7 @@ from database import (
 
 app = FastAPI()
 FAVICON_PATH = "./static/favicon.ico"
+MANIFEST_PATH = "./static/manifest.ico"
 
 MOBILE_STYLE_SNIPPET = """\
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -82,6 +83,11 @@ def shorten_string(s, max_length=180):
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse(FAVICON_PATH)
+
+
+@app.get("/manifest.json", include_in_schema=False)
+async def manifest():
+    return FileResponse(MANIFEST_PATH)
 
 
 @app.get("/", response_class=HTMLResponse)

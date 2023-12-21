@@ -72,6 +72,7 @@ def create_tables():
 
 
 def insert_questions_and_answers():
+    inserted_question_count = 0
     with Session(engine) as session:
         meanings_mapping = get_question_answer_mappings()
         for k, answers in meanings_mapping.items():
@@ -79,11 +80,12 @@ def insert_questions_and_answers():
             if session.query(Question).filter(Question.text == k).first():
                 continue
             session.add(question)
-            # answers = meanings_mapping[k]
+            inserted_question_count += 1
             for answer_text in answers:
                 answer = Answer(text=answer_text, question=question)
                 session.add(answer)
         session.commit()
+    print("Inserted questions count:", inserted_question_count)
 
 
 def db_get_all_question():
