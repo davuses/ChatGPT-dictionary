@@ -1,7 +1,10 @@
+from typing import Optional
+
 import markdown2
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
 from database import (
@@ -13,12 +16,15 @@ from database import (
     db_get_answer_by_id,
     db_get_question_by_id,
     db_update_answer_text,
+    db_update_example,
     db_update_question_text,
 )
 
 app = FastAPI()
+
 FAVICON_PATH = "./static/favicon.ico"
 MANIFEST_PATH = "./static/manifest.ico"
+SCRIPT_PATH = "./static/script.js"
 
 MOBILE_STYLE_SNIPPET = """\
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -35,7 +41,9 @@ MOBILE_STYLE_SNIPPET = """\
         }
         button {font-size: 15px;}
     </style>
+    <script src="/script.js"></script>
         """
+app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
 
 
 class EditAnswerForm(BaseModel):
@@ -54,6 +62,14 @@ class EditQuestionForm(BaseModel):
         return cls(question_text=question_text)
 
 
+class EditExampleForm(BaseModel):
+    example_text: Optional[str] = Field(default="", description="Example text")
+
+    @classmethod
+    def as_form(cls, example_text: str = Form(None)):
+        return cls(example_text=example_text)
+    
+    
 class AddQuestionForm(BaseModel):
     question_text: str
 
@@ -81,17 +97,27 @@ def shorten_string(s, max_length=180):
 
 
 @app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+async def favicon_file():
     return FileResponse(FAVICON_PATH)
 
 
 @app.get("/manifest.json", include_in_schema=False)
-async def manifest():
+async def manifest_file():
     return FileResponse(MANIFEST_PATH)
 
 
+@app.get("/script.js", include_in_schema=False)
+async def script_file():
+    return FileResponse(SCRIPT_PATH)
+
+
+@app.get("/audio/{file_name}")
+async def get_audio(file_name: str):
+    return FileResponse(f"./audio/{file_name}")
+
+
 @app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
+async def root_page(request: Request):
     questions = db_get_all_question()
     questions = [q for q in questions if not q.is_hidden]
     questions_count = len(questions)
@@ -99,11 +125,12 @@ async def root(request: Request):
     if request.query_params.get("sort") == "length":
         questions = sorted(questions, key=lambda q: len(q.text))
     for question in questions:
+        audio_src = f"/audio/{question.id}.wav"
         tr = (
             '<tr><td><a style="text-decoration: none;"'
-            f' href="/question/{question.id}">{shorten_string(question.text)} </a></td><td><button'
-            ' onclick="deleteQuestion(this,'
-            f' {question.id})">Delete</button></td></tr>'
+            f' href="/question/{question.id}">{shorten_string(question.text)} </a></td>'
+            f'<td><button play-id="{question.id}" class="playButton">Listen</button></td>'
+            f'<td><button onclick="deleteQuestionMainPage(this, {question.id})">Delete</button></td></tr>'
         )
         trs.append(tr)
     trs_html = "".join(trs)
@@ -117,20 +144,6 @@ async def root(request: Request):
         '<a href="/add_question" style="text-decoration: none;">Add'
         " Question</a>"
     )
-    script_html = """\
-        <script>
-            function deleteQuestion(button, questionId) {
-            if (confirm("Are you sure you want to delete this question?")) {
-                fetch("/delete_question/" + questionId).then((Response) => {
-                if (Response.ok) {
-                    var row = button.parentNode.parentNode;
-                    row.parentNode.removeChild(row);
-                }
-                });
-            }
-            }
-        </script>
-        """
 
     html = f"""\
         <!DOCTYPE html>
@@ -152,7 +165,6 @@ async def root(request: Request):
                 {trs_html}
             <!-- Add more questions as needed -->
             </table>
-            {script_html}
             <div id="bottom">
                 <p><a href="#top"  style="text-decoration: none;">Go to Top</a></p>
             </div>
@@ -215,33 +227,17 @@ async def question_page(question_id: int):
             "&nbsp&nbsp&nbsp"
             '<button onclick="deleteAnswer(this,'
             f' {a.id})">Delete</button></li>'
-            # '<a href="javascript:void(0);"'
-            # f' onclick="confirmDeletion({a.id})">Delete</a>'
             for a in question.answers
         ]
     )
-    script_html = """
-        <script>
-            function deleteAnswer(button, answerId) {
-                if (confirm("Are you sure you want to delete this answer?")) {
-                    fetch("/delete_answer/" + answerId).then((Response) => {
-                    if (Response.ok) {
-                        var a_li = button.parentNode;
-                        var a_ul = a_li.parentNode;
-                        a_ul.removeChild(a_li);
-                    }
-                    });
-                }
-            }
-        </script>
-        """
+    audio_src = f"/audio/{question_id}.wav"
+
     html = f"""\
         <!DOCTYPE html>
         <html>
         <head>
             <title>Definition</title>
             {MOBILE_STYLE_SNIPPET}
-            {script_html}
         </head>
         <body>
             <a href="/">Back to Questions</a>
@@ -250,11 +246,20 @@ async def question_page(question_id: int):
             <h2>Question:</h2>
             <p id="question">{question.text}</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
+            <button onclick="deleteQuestion({question_id})" type="button">Delete</button>
+            <div>
+            <audio controls>
+                <source src="{audio_src}" type="audio/wav">
+            </audio>
+            </div>
             <h2>Answers:</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
             <ul>
                 {answers_li_html}
             </ul>
+            <h2>Example:</h2>
+            <button onclick="location.href='/edit_example/{question_id}'" type="button">Edit example</button>
+            <p>{markdown2.markdown(question.example or "")}</p>
         </body>
         </html>
         """
@@ -304,6 +309,44 @@ async def edit_answer(
     if question_id := db_update_answer_text(answer_id, updated_text):
         return RedirectResponse(url=f"/question/{question_id}", status_code=303)
 
+
+
+@app.get("/edit_example/{question_id}", response_class=HTMLResponse)
+async def edit_example_page(question_id: int):
+    question = db_get_question_by_id(question_id)
+    if not question:
+        return "404"
+    form_html = f"""\
+    <form method="post" action="/edit_example/{question_id}">
+        <textarea name="example_text" rows="4" cols="50">{question.example or ""}</textarea><br>
+        <input type="submit" value="Submit">
+    </form>
+    """
+
+    html = f"""\
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Edit Example</title>
+        {MOBILE_STYLE_SNIPPET}
+    </head>
+    <body>
+        <h1>Edit Example</h1>
+        {form_html}
+    </body>
+    </html>
+    """
+    return html
+
+
+@app.post("/edit_example/{question_id}", response_class=HTMLResponse)
+async def edit_example(
+    question_id: int, form_data: EditExampleForm = Depends(EditExampleForm.as_form)):
+    print(form_data.example_text)
+    if not (updated_text := form_data.example_text):
+        updated_text = ""
+    if returned_qid := db_update_example(question_id, updated_text):
+        return RedirectResponse(url=f"/question/{returned_qid}", status_code=303)
 
 @app.get("/delete_answer/{answer_id}", response_class=HTMLResponse)
 async def delete_answer(answer_id: int):

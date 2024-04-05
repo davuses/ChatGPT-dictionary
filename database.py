@@ -37,6 +37,7 @@ class Question(Base):
     answers: Mapped[list["Answer"]] = relationship(
         "Answer", back_populates="question", lazy="joined"
     )
+    example: Mapped[str] = mapped_column(String, nullable=True)
     is_hidden: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
@@ -45,6 +46,7 @@ class Question(Base):
         return (
             f'Question(id={self.id}, text="{self.text}",'
             f" answers={[str(a) for a in self.answers]})"
+            f" example: {self.example}"
         )
 
 
@@ -61,7 +63,7 @@ class Answer(Base):
     )
 
     def __str__(self) -> str:
-        return f'Answers(id={self.id}, text="{self.text}"'
+        return f'Answer(id={self.id}, text="{self.text}"'
 
 
 # Emit CREATE TABLE DDL
@@ -132,6 +134,16 @@ def db_update_question_text(id: int, text: str):
             return question_id
 
 
+def db_update_example(question_id: int, example_text: str):
+    with Session(engine) as session:
+        question = session.query(Question).filter(Question.id == question_id).first()
+        if question:
+            question_id = question.id
+            question.example = example_text
+            session.commit()
+            return question_id
+        
+        
 def db_add_question(text: str):
     with Session(engine) as session:
         question = Question(text=text)
