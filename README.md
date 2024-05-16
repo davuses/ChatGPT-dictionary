@@ -1,10 +1,13 @@
-## The issues I meet
+## Changes to tts library
 
-1. **Input should be a valid dictionary or object to extract fields from**
+Switch to nltk to split sentences.
 
-https://github.com/tiangolo/fastapi/issues/4555
+skip sentences that are too short or long
 
-solution:
-
-https://stackoverflow.com/questions/60127234/how-to-use-a-pydantic-model-with-form-data-in-fastapi
-
+synthesizer.py
+"""
+sens = self.split_into_sentences(text)
+sens = [sen for sen in sens if (len(sen) >= 30 and len(sen) <= 250)]
+if len(sens) >= 5:
+    sens = sens[:5]
+"""

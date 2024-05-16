@@ -4,6 +4,7 @@ import markdown2
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
@@ -19,8 +20,13 @@ from database import (
     db_update_example,
     db_update_question_text,
 )
+from utils import delete_audio_file
 
 app = FastAPI()
+
+app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
+
+templates = Jinja2Templates(directory="templates")
 
 FAVICON_PATH = "./static/favicon.ico"
 MANIFEST_PATH = "./static/manifest.ico"
@@ -40,10 +46,20 @@ MOBILE_STYLE_SNIPPET = """\
             }
         }
         button {font-size: 15px;}
+        audio.svelte-eemfgq {
+            padding: 8px;
+            width: 100%;
+            height: 56px;
+        }
+        textarea {
+            height: 18em;
+            width: 70em;
+            font-size: 16px;
+            font-family: sans-serif;
+            }
     </style>
     <script src="/script.js"></script>
-        """
-app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
+"""
 
 
 class EditAnswerForm(BaseModel):
@@ -68,8 +84,8 @@ class EditExampleForm(BaseModel):
     @classmethod
     def as_form(cls, example_text: str = Form(None)):
         return cls(example_text=example_text)
-    
-    
+
+
 class AddQuestionForm(BaseModel):
     question_text: str
 
@@ -125,11 +141,20 @@ async def root_page(request: Request):
     if request.query_params.get("sort") == "length":
         questions = sorted(questions, key=lambda q: len(q.text))
     for question in questions:
-        audio_src = f"/audio/{question.id}.wav"
+        audio_src = f"/audio/{question.id}.mp3"
+        question_text = question.text
+        if "When i ask you a word" in question_text:
+            continue
+        if " - " in question_text:
+            q_text = question_text.split(" - ")[-1]
+            q_context = question_text.split(" - ")[0]
+        else:
+            q_context = q_text = question_text
         tr = (
-            '<tr><td><a style="text-decoration: none;"'
-            f' href="/question/{question.id}">{shorten_string(question.text)} </a></td>'
-            f'<td><button play-id="{question.id}" class="playButton">Listen</button></td>'
+            '<tr><td> - <a style="text-decoration: none;"'
+            f' href="/question/{question.id}">{q_text!s} </a></td>'
+            f"<td>{q_context}</td>"
+            # f'<td><button play-id="{question.id}" class="playButton">Listen</button></td>'
             f'<td><button onclick="deleteQuestionMainPage(this, {question.id})">Delete</button></td></tr>'
         )
         trs.append(tr)
@@ -160,12 +185,16 @@ async def root_page(request: Request):
             <table border="1">
             <tr>
                 <th>Question</th>
+                <th>Context</th>
                 <th>Action</th>
             </tr>
                 {trs_html}
-            <!-- Add more questions as needed -->
             </table>
             <div id="bottom">
+            <p>
+            <a href="/add_question" style="text-decoration: none;">Add Question
+            </a>
+            </p>
                 <p><a href="#top"  style="text-decoration: none;">Go to Top</a></p>
             </div>
         </body>
@@ -181,7 +210,7 @@ async def edit_question_page(question_id: int):
         return "404"
     form_html = f"""\
     <form method="post" action="/edit_question/{question_id}">
-        <textarea name="question_text" rows="4" cols="50">{question.text}</textarea><br>
+        <textarea class="submit-on-shift-enter" name="question_text">{question.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -222,7 +251,7 @@ async def question_page(question_id: int):
         return "404"
     answers_li_html = "".join(
         [
-            f"<li>{markdown2.markdown(a.text)}"
+            f"<li>{markdown2.markdown(a.text, extras=['strike'])}"
             f"""<button onclick="location.href='/edit_answer/{a.id}'" type="button">Edit</button>"""
             "&nbsp&nbsp&nbsp"
             '<button onclick="deleteAnswer(this,'
@@ -230,7 +259,7 @@ async def question_page(question_id: int):
             for a in question.answers
         ]
     )
-    audio_src = f"/audio/{question_id}.wav"
+    audio_src = f"/audio/{question_id}.mp3"
 
     html = f"""\
         <!DOCTYPE html>
@@ -240,26 +269,33 @@ async def question_page(question_id: int):
             {MOBILE_STYLE_SNIPPET}
         </head>
         <body>
-            <a href="/">Back to Questions</a>
+            <a href="/">Back to Questions</a>&nbsp&nbsp&nbsp&nbsp&nbsp
+            <a href="/add_question">Add Question</a>
             <h1>Question and Answers</h1>
-            
             <h2>Question:</h2>
             <p id="question">{question.text}</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
             <button onclick="deleteQuestion({question_id})" type="button">Delete</button>
             <div>
-            <audio controls>
-                <source src="{audio_src}" type="audio/wav">
+            <audio controls class="svelte-eemfgq">
+                <source src="{audio_src}" type="audio/mp3">
             </audio>
             </div>
+            <button onclick="deleteAudio({question_id})" type="button">Delete audio</button>
             <h2>Answers:</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
-            <ul>
+            <ul id="answer-ul">
                 {answers_li_html}
             </ul>
+            <form method="post" action="/add_answer" style="display:none" id="hidden-a-form">
+                <textarea class="submit-on-shift-enter" name="answer_text"></textarea><br>
+                <input value="{question_id}" name="question_id" type="hidden">
+                <input type="submit" value="Submit">
+            </form>
             <h2>Example:</h2>
             <button onclick="location.href='/edit_example/{question_id}'" type="button">Edit example</button>
-            <p>{markdown2.markdown(question.example or "")}</p>
+            <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
+            <br><br><br><br>
         </body>
         </html>
         """
@@ -272,6 +308,12 @@ async def delete_question(question_id: int):
     return "200"
 
 
+@app.get("/delete_audio/{question_id}", response_class=HTMLResponse)
+async def delete_audio(question_id: int):
+    delete_audio_file(question_id)
+    return "200"
+
+
 @app.get("/edit_answer/{answer_id}", response_class=HTMLResponse)
 async def edit_answer_page(answer_id: int):
     # Replace this with your actual function to fetch answer by ID
@@ -280,7 +322,7 @@ async def edit_answer_page(answer_id: int):
         return "404"
     form_html = f"""\
     <form method="post" action="/edit_answer/{answer_id}">
-        <textarea name="answer_text" rows="4" cols="50">{answer.text}</textarea><br>
+        <textarea class="submit-on-shift-enter" name="answer_text">{answer.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -310,16 +352,15 @@ async def edit_answer(
         return RedirectResponse(url=f"/question/{question_id}", status_code=303)
 
 
-
 @app.get("/edit_example/{question_id}", response_class=HTMLResponse)
 async def edit_example_page(question_id: int):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
     form_html = f"""\
-    <form method="post" action="/edit_example/{question_id}">
-        <textarea name="example_text" rows="4" cols="50">{question.example or ""}</textarea><br>
-        <input type="submit" value="Submit">
+    <form method="post" action="/edit_example/{question_id}" class="answer-form">
+        <textarea class="submit-on-shift-enter" name="example_text">{question.example or ""}</textarea><br>
+        <input type="submit" value="Submit" class="submit-button">
     </form>
     """
 
@@ -341,12 +382,17 @@ async def edit_example_page(question_id: int):
 
 @app.post("/edit_example/{question_id}", response_class=HTMLResponse)
 async def edit_example(
-    question_id: int, form_data: EditExampleForm = Depends(EditExampleForm.as_form)):
+    question_id: int,
+    form_data: EditExampleForm = Depends(EditExampleForm.as_form),
+):
     print(form_data.example_text)
     if not (updated_text := form_data.example_text):
         updated_text = ""
     if returned_qid := db_update_example(question_id, updated_text):
-        return RedirectResponse(url=f"/question/{returned_qid}", status_code=303)
+        return RedirectResponse(
+            url=f"/question/{returned_qid}", status_code=303
+        )
+
 
 @app.get("/delete_answer/{answer_id}", response_class=HTMLResponse)
 async def delete_answer(answer_id: int):
@@ -358,7 +404,7 @@ async def delete_answer(answer_id: int):
 async def add_question_page():
     form_html = f"""\
     <form method="post" action="/add_question">
-        <textarea name="question_text" rows="4" cols="50"></textarea><br>
+        <textarea class="submit-on-shift-enter" name="question_text"></textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -396,7 +442,7 @@ async def add_answer_page(qid: int):
     # Replace this with your actual function to fetch answer by ID
     form_html = f"""\
     <form method="post" action="/add_answer">
-        <textarea name="answer_text" rows="4" cols="50"></textarea><br>
+        <textarea class="submit-on-shift-enter" name="answer_text"></textarea><br>
         <input value="{qid}" name="question_id" type="hidden">
         <input type="submit" value="Submit">
     </form>

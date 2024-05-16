@@ -165,3 +165,7 @@ cython_debug/
 *.db
 *.ipynb
 *.wav
+*.txt
+*.mp3
+temp.py
+add_audio_run.py

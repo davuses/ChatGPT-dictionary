@@ -19,7 +19,9 @@ def get_answer_from_system_node(chat_nodes, node):
     return ""
 
 
-def parse_conv(conv, meanings_mapping):
+def extend_mappings_from_conv(
+    conv, meanings_mapping: dict[str, list[str]], skipped_questions: list
+):
     question_count = 0
     chat_nodes = conv["mapping"]
     for node in chat_nodes.values():
@@ -28,6 +30,8 @@ def parse_conv(conv, meanings_mapping):
             if role == "user":
                 parts = message["content"]["parts"]
                 question: str = parts[0]
+                if question in skipped_questions:
+                    continue
                 question_count = question_count + 1
                 children_id = node["children"]
                 answers = []
@@ -41,23 +45,22 @@ def parse_conv(conv, meanings_mapping):
                     elif child_message := child_node["message"]:
                         answer = get_answer(child_message)
                         answers.append(answer)
-                question = question.lower().strip()
-                if old_answers := meanings_mapping.get(question.lower()):
-                    old_answers.extend(answers)
-                    old_answers[:] = list(set(old_answers))
-                else:
-                    meanings_mapping[question.lower()] = answers
-    print("conv questions count:", question_count)
+                if meanings_mapping.get(question) is None:
+                    meanings_mapping[question] = answers
+    print("questions count in this conv:", question_count)
 
 
 def get_question_answer_mappings(file="new_conversations.json"):
     conversations_file = file
 
     conversations = json.load(open(conversations_file, "r", encoding="utf-8"))
-
+    with open("skipped_questions.txt", "r") as f:
+        skipped_questions = [l.strip() for l in f.readlines()]
     question_answer_mappings: dict[str, list[str]] = {}
     for i, conv in enumerate(conversations):
         print("conversation", i)
-        parse_conv(conv, question_answer_mappings)
+        extend_mappings_from_conv(
+            conv, question_answer_mappings, skipped_questions
+        )
 
     return question_answer_mappings

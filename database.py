@@ -6,6 +6,7 @@ from sqlalchemy import (
     Integer,
     String,
     create_engine,
+    func,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -14,8 +15,6 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
-
-from mappings import get_question_answer_mappings
 
 engine = create_engine(
     "sqlite:///dictionary.db",
@@ -74,7 +73,11 @@ def create_tables():
 
 
 def insert_questions_and_answers():
+    from mappings import get_question_answer_mappings
+
     inserted_question_count = 0
+    questions_with_empty_answers = []
+    questions_with_multi_answers = []
     with Session(engine) as session:
         meanings_mapping = get_question_answer_mappings()
         for k, answers in meanings_mapping.items():
@@ -83,11 +86,19 @@ def insert_questions_and_answers():
                 continue
             session.add(question)
             inserted_question_count += 1
+            if len(answers) > 1:
+                questions_with_multi_answers.append(k)
             for answer_text in answers:
+                if not answer_text:
+                    questions_with_empty_answers.append(k)
                 answer = Answer(text=answer_text, question=question)
                 session.add(answer)
         session.commit()
     print("Inserted questions count:", inserted_question_count)
+    print("questions_with_empty_answers:", len(questions_with_empty_answers))
+    print(questions_with_empty_answers)
+    print("questions_with_multi_answers:", len(questions_with_multi_answers))
+    print(questions_with_multi_answers)
 
 
 def db_get_all_question():
@@ -136,16 +147,19 @@ def db_update_question_text(id: int, text: str):
 
 def db_update_example(question_id: int, example_text: str):
     with Session(engine) as session:
-        question = session.query(Question).filter(Question.id == question_id).first()
+        question = (
+            session.query(Question).filter(Question.id == question_id).first()
+        )
         if question:
             question_id = question.id
             question.example = example_text
             session.commit()
             return question_id
-        
-        
+
+
 def db_add_question(text: str):
     with Session(engine) as session:
+        text = text.strip()
         question = Question(text=text)
         session.add(question)
         session.commit()
@@ -171,18 +185,19 @@ def db_delete_answer(id: int):
             return question_id
 
 
-def db_update_answer_text(id: int, markdown_text: str):
+def db_update_answer_text(id: int, text: str):
     with Session(engine) as session:
         answer = session.query(Answer).filter(Answer.id == id).first()
         if answer:
             question_id = answer.question_id
-            answer.text = markdown_text
+            answer.text = text
             session.commit()
             return question_id
 
 
 def db_add_answer(text: str, question: Question):
     with Session(engine) as session:
+        text = text.strip()
         answer = Answer(text=text, question=question)
         session.add(answer)
         session.commit()
