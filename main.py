@@ -4,7 +4,6 @@ import markdown2
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
@@ -26,7 +25,6 @@ app = FastAPI()
 
 app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
 
-templates = Jinja2Templates(directory="templates")
 
 FAVICON_PATH = "./static/favicon.ico"
 MANIFEST_PATH = "./static/manifest.ico"
