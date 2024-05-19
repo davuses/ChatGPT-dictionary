@@ -147,7 +147,8 @@ async def root_page(request: Request):
             q_text = question_text.split(" - ")[-1]
             q_context = question_text.split(" - ")[0]
         else:
-            q_context = q_text = question_text
+            q_context = ""
+            q_text = question_text
         tr = (
             '<tr><td> - <a style="text-decoration: none;"'
             f' href="/question/{question.id}">{q_text!s} </a></td>'

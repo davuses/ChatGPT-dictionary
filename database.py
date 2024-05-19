@@ -6,8 +6,9 @@ from sqlalchemy import (
     Integer,
     String,
     create_engine,
-    func,
+    event,
 )
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -15,6 +16,14 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 
 engine = create_engine(
     "sqlite:///dictionary.db",
@@ -34,7 +43,11 @@ class Question(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     text: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     answers: Mapped[list["Answer"]] = relationship(
-        "Answer", back_populates="question", lazy="joined"
+        "Answer",
+        back_populates="question",
+        lazy="joined",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     example: Mapped[str] = mapped_column(String, nullable=True)
     is_hidden: Mapped[bool] = mapped_column(
@@ -56,7 +69,9 @@ class Answer(Base):
     text: Mapped[str] = mapped_column(String, nullable=False)
 
     # Establish a many-to-one relationship with the Question table
-    question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"))
+    question_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("question.id", ondelete="CASCADE")
+    )
     question: Mapped[Question] = relationship(
         Question, back_populates="answers"
     )
