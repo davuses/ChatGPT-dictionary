@@ -4,6 +4,7 @@ import markdown2
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from phonemizer import phonemize
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
@@ -51,7 +52,8 @@ MOBILE_STYLE_SNIPPET = """\
         }
         textarea {
             height: 18em;
-            width: 70em;
+            width: 100%;
+            max-width: 70em;
             font-size: 16px;
             font-family: sans-serif;
             }
@@ -138,6 +140,9 @@ async def root_page(request: Request):
     trs = []
     if request.query_params.get("sort") == "length":
         questions = sorted(questions, key=lambda q: len(q.text))
+    show_example = False
+    if request.query_params.get("example") == "true":
+        show_example = True
     for question in questions:
         audio_src = f"/audio/{question.id}.mp3"
         question_text = question.text
@@ -149,20 +154,25 @@ async def root_page(request: Request):
         else:
             q_context = ""
             q_text = question_text
+        example = question.example if question.example else ""
         tr = (
             '<tr><td> - <a style="text-decoration: none;"'
             f' href="/question/{question.id}">{q_text!s} </a></td>'
             f"<td>{q_context}</td>"
+            f"{'<td>' + example + '</td>' if show_example else ''}"
             # f'<td><button play-id="{question.id}" class="playButton">Listen</button></td>'
             f'<td><button onclick="deleteQuestionMainPage(this, {question.id})">Delete</button></td></tr>'
         )
         trs.append(tr)
     trs_html = "".join(trs)
     sort_link_url = "/?sort=length"
+    show_example_link = "/?example=true"
     sort_link = (
         '<a href="#bottom"  style="text-decoration: none;">Go to Bottom</a>'
         f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{sort_link_url}"'
         ' style="text-decoration: none;">Sort by Length</a>'
+        f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{show_example_link}"'
+        ' style="text-decoration: none;">Show Examples</a>'
     )
     add_question_link = (
         '<a href="/add_question" style="text-decoration: none;">Add'
@@ -173,7 +183,7 @@ async def root_page(request: Request):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Dictionary</title>
+            <title>Main Page</title>
             <link rel="icon" type="image/x-icon" href="/favicon.ico">
             {MOBILE_STYLE_SNIPPET}
         </head>
@@ -259,20 +269,21 @@ async def question_page(question_id: int):
         ]
     )
     audio_src = f"/audio/{question_id}.mp3"
-
+    word = question.text.split(" - ")[-1]
     html = f"""\
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Definition</title>
+            <title>Question</title>
             {MOBILE_STYLE_SNIPPET}
         </head>
         <body>
-            <a href="/">Back to Questions</a>&nbsp&nbsp&nbsp&nbsp&nbsp
+            <a href="/">Back to Main Page</a>&nbsp&nbsp&nbsp&nbsp&nbsp
             <a href="/add_question">Add Question</a>
             <h1>Question and Answers</h1>
             <h2>Question:</h2>
             <p id="question">{question.text}</p>
+            <p>/{phonemize(word, strip=True, with_stress=True)}/</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
             <button onclick="deleteQuestion({question_id})" type="button">Delete</button>
             <div>

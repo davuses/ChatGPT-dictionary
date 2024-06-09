@@ -69,36 +69,50 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 });
-// Function to handle form submission when Alt+V is pressed
-function handleAltV(event) {
-  if (event.altKey && event.key === "v") {
-    event.preventDefault(); // Prevent default behavior of pasting text
-    const answerForm = document.getElementById("hidden-a-form");
-    const answerTextArea = answerForm.querySelector(
-      'textarea[name="answer_text"]'
-    );
-    const answerUl = document.getElementById("answer-ul");
 
-    // Check if the answer-ul has no child elements
-    if (answerUl.children.length === 0) {
-      // Access clipboard data
-      navigator.clipboard
-        .readText()
-        .then((text) => {
-          // Set clipboard text to textarea value
-          answerTextArea.value = text;
-          // Submit the form
-          answerForm.submit();
-        })
-        .catch((error) => {
-          console.error("Failed to read clipboard: ", error);
-        });
+const questionUrlPattern = /\/question\/(\d+)/;
+
+if (questionUrlPattern.test(window.location.href)) {
+  document.addEventListener("keydown", (event) => {
+    if (event.altKey && event.key === "v") {
+      event.preventDefault();
+      const answerForm = document.getElementById("hidden-a-form");
+      const answerTextArea = answerForm.querySelector(
+        'textarea[name="answer_text"]'
+      );
+      const answerUl = document.getElementById("answer-ul");
+
+      if (answerUl.children.length === 0) {
+        navigator.clipboard
+          .readText()
+          .then((text) => {
+            answerTextArea.value = text;
+
+            answerForm.submit();
+          })
+          .catch((error) => {
+            console.error("Failed to read clipboard: ", error);
+          });
+      }
+    } else if (event.key === "b") {
+      let url = new URL(document.referrer);
+      if (/\/edit_example\/(\d+)/.test(url.pathname)) {
+        history.go(-3);
+      } else if (url.pathname === "/") {
+        history.go(-1);
+      }
+
     }
-  }
+  });
 }
 
-// Add event listener to listen for key presses
-const urlPattern = /\/question\/(\d+)/;
-if (urlPattern.test(window.location.href)) {
-  document.addEventListener("keydown", handleAltV);
+if (
+  window.location.pathname === "/" ||
+  questionUrlPattern.test(window.location.href)
+) {
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "a") {
+      window.location.href = "/add_question";
+    }
+  });
 }

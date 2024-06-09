@@ -30,6 +30,8 @@ def extend_mappings_from_conv(
             if role == "user":
                 parts = message["content"]["parts"]
                 question: str = parts[0]
+                if not question.strip():
+                    continue
                 if question in skipped_questions:
                     continue
                 question_count = question_count + 1
