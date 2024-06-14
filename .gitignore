@@ -169,3 +169,4 @@ cython_debug/
 *.mp3
 temp.py
 add_audio_run.py
+wordhoard_error.yaml

@@ -4,7 +4,6 @@ import markdown2
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from phonemizer import phonemize
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
@@ -20,16 +19,13 @@ from database import (
     db_update_example,
     db_update_question_text,
 )
-from utils import delete_audio_file
+from utils import delete_audio_file, get_IPA, get_synonyms
 
 app = FastAPI()
 
 app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
 
-
-FAVICON_PATH = "./static/favicon.ico"
-MANIFEST_PATH = "./static/manifest.ico"
-SCRIPT_PATH = "./static/script.js"
+app.mount("/static", StaticFiles(directory="./static"), name="static")
 
 MOBILE_STYLE_SNIPPET = """\
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -45,10 +41,12 @@ MOBILE_STYLE_SNIPPET = """\
             }
         }
         button {font-size: 15px;}
+        audio {
+            height: 38px;
+        }
         audio.svelte-eemfgq {
-            padding: 8px;
+            padding: 3px;
             width: 100%;
-            height: 56px;
         }
         textarea {
             height: 18em;
@@ -58,7 +56,8 @@ MOBILE_STYLE_SNIPPET = """\
             font-family: sans-serif;
             }
     </style>
-    <script src="/script.js"></script>
+    <script src="/static/script.js"></script>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 """
 
 
@@ -112,24 +111,72 @@ def shorten_string(s, max_length=180):
         return s[: max_length - 3] + "..."
 
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon_file():
-    return FileResponse(FAVICON_PATH)
-
-
-@app.get("/manifest.json", include_in_schema=False)
-async def manifest_file():
-    return FileResponse(MANIFEST_PATH)
-
-
-@app.get("/script.js", include_in_schema=False)
-async def script_file():
-    return FileResponse(SCRIPT_PATH)
+@app.get("/static/{file_name}", include_in_schema=False)
+async def static_file(file_name):
+    return FileResponse(f"./static/{file_name}")
 
 
 @app.get("/audio/{file_name}")
 async def get_audio(file_name: str):
     return FileResponse(f"./audio/{file_name}")
+
+
+@app.get("/show_synonyms/{qid}", response_class=HTMLResponse)
+async def show_synonyms(qid: int):
+    question = db_get_question_by_id(qid)
+    if not question:
+        return "No question"
+    question_text = question.text
+    if " - " in question_text:
+        q_text = question_text.split(" - ")[-1]
+    else:
+        q_text = question_text
+    if " " in q_text:
+        return "This feature is only for words"
+    word = q_text
+    synonyms = get_synonyms(word)
+    all_qs = db_get_all_question()
+    q_texts = []
+    for question in all_qs:
+        question_text = question.text
+        if "When i ask you a word" in question_text:
+            continue
+        if " - " in question_text:
+            q_text = question_text.split(" - ")[-1]
+        else:
+            q_text = question_text
+        if q_text in synonyms:
+            q_texts.append((q_text, question.id))
+
+    syns_html = "".join([f"<p>{syn}</p>" for syn in synonyms])
+
+    syns_in_db_html = (
+        "".join(
+            [
+                f'<p><a href="/question/{qid}"  style="text-decoration: none;">{qt}</a></p>'
+                for qt, qid in q_texts
+            ]
+        )
+        or "None"
+    )
+
+    html = f"""\
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Question</title>
+            {MOBILE_STYLE_SNIPPET}
+        </head>
+        <body>
+            <h1>Synonyms</h1>
+            <h2>In database</h2>
+            {syns_in_db_html}
+            <h2>All</h2>
+            {syns_html}
+        </body>
+        </html>
+        """
+    return html
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -184,7 +231,6 @@ async def root_page(request: Request):
         <html>
         <head>
             <title>Main Page</title>
-            <link rel="icon" type="image/x-icon" href="/favicon.ico">
             {MOBILE_STYLE_SNIPPET}
         </head>
         <body>
@@ -269,7 +315,7 @@ async def question_page(question_id: int):
         ]
     )
     audio_src = f"/audio/{question_id}.mp3"
-    word = question.text.split(" - ")[-1]
+    word = question.text.split(" - ")[-1].strip()
     html = f"""\
         <!DOCTYPE html>
         <html>
@@ -283,15 +329,26 @@ async def question_page(question_id: int):
             <h1>Question and Answers</h1>
             <h2>Question:</h2>
             <p id="question">{question.text}</p>
-            <p>/{phonemize(word, strip=True, with_stress=True)}/</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
             <button onclick="deleteQuestion({question_id})" type="button">Delete</button>
+            <hr>
+            <p>
+            /{get_IPA(word)}/
+            <audio controls>
+                <source src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/{word}--_us_1.mp3"}" type="audio/mp3">
+            </audio>
+            <audio controls>
+                <source src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/{word}--_us_2.mp3"}" type="audio/mp3">
+            </audio>
+            </p>
+            <hr>
             <div>
             <audio controls class="svelte-eemfgq">
                 <source src="{audio_src}" type="audio/mp3">
             </audio>
             </div>
             <button onclick="deleteAudio({question_id})" type="button">Delete audio</button>
+            <hr>
             <h2>Answers:</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
             <ul id="answer-ul">
@@ -303,8 +360,11 @@ async def question_page(question_id: int):
                 <input type="submit" value="Submit">
             </form>
             <h2>Example:</h2>
-            <button onclick="location.href='/edit_example/{question_id}'" type="button">Edit example</button>
+            <button onclick="location.href='/edit_example/{question_id}'" type="button" id="edit-example">
+            Edit example</button>
             <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
+            <h2>Synonyms:</h2>
+            <a href='/show_synonyms/{question_id}'>Show synonyms</a>
             <br><br><br><br>
         </body>
         </html>

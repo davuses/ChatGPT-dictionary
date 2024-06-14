@@ -101,7 +101,11 @@ if (questionUrlPattern.test(window.location.href)) {
       } else if (url.pathname === "/") {
         history.go(-1);
       }
-
+    } else if (event.key === "e") {
+      let url = new URL(document.referrer);
+      if (/\/question\/(\d+)/.test(window.location.href)) {
+        document.getElementById("edit-example").click()
+      }
     }
   });
 }
