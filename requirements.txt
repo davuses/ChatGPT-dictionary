@@ -3,5 +3,5 @@ fastapi
 uvicorn[standard]
 markdown2
 python-multipart
-phonemize
+phonemizer
 wordhoard
