@@ -6,3 +6,4 @@ python-multipart
 phonemizer
 # Dependencies: apt-get install festival espeak-ng mbrola
 wordhoard
+edge-tts
