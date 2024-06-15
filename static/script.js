@@ -42,19 +42,18 @@ function deleteAudio(questionId) {
     });
   }
 }
-// document.addEventListener("click", function (event) {
-//   if (!event.target.matches(".playButton")) return;
-//   var button = event.target;
-//   var playId = button.getAttribute("play-id");
-//   var audioSrc = `/audio/${playId}.mp3`;
-//   var audio = document.createElement("audio");
-//   audio.controls = true;
-//   audio.style.display = "block";
-//   audio.src = audioSrc;
-//   button.parentNode.insertBefore(audio, event.target.nextSibling);
-//   // var audio = new Audio(audioSrc);
-//   audio.play();
-// });
+function playTTS(button, questionId) {
+  fetch("/tts_question/" + questionId).then((Resp) => {
+    if (Resp.ok) {
+      var audio = document.createElement("audio");
+      audio.controls = true;
+      audio.style.display = "block";
+      audio.src = `/audio/${questionId}.mp3`;
+      button.parentNode.insertBefore(audio, button.nextSibling);
+      audio.play();
+    }
+  });
+}
 document.addEventListener("DOMContentLoaded", function () {
   const textareas = document.querySelectorAll(".submit-on-shift-enter");
   textareas.forEach(function (textarea) {
@@ -104,7 +103,7 @@ if (questionUrlPattern.test(window.location.href)) {
     } else if (event.key === "e") {
       let url = new URL(document.referrer);
       if (/\/question\/(\d+)/.test(window.location.href)) {
-        document.getElementById("edit-example").click()
+        document.getElementById("edit-example").click();
       }
     }
   });

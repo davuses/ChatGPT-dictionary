@@ -1,7 +1,13 @@
 from pathlib import Path
 
+import edge_tts
 from phonemizer import phonemize
 from wordhoard import Synonyms
+
+from database import Question
+
+audio_directory = Path("./audio")
+audio_directory.mkdir(exist_ok=True)
 
 
 def delete_audio_file(question_id):
@@ -33,3 +39,16 @@ def get_synonyms(word):
     synonyms = synonym.find_synonyms()
     assert isinstance(synonyms, list)
     return synonyms
+
+
+def tts_edge(question: Question):
+    audio_path = audio_directory / Path(f"{question.id}.mp3")
+    if audio_path.exists():
+        return
+    answer_text: str = question.answers[0].text
+    tts_text: str = answer_text.split("\n")[0]
+    question_sentence = question.text.split(" - ")[0]
+    tts_text = f"{question_sentence}. " + tts_text
+    voice = "en-US-AndrewNeural"
+    communicate = edge_tts.Communicate(tts_text, voice)
+    communicate.save_sync(str(audio_path))

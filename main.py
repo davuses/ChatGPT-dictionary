@@ -19,7 +19,7 @@ from database import (
     db_update_example,
     db_update_question_text,
 )
-from utils import delete_audio_file, get_IPA, get_synonyms
+from utils import delete_audio_file, get_IPA, get_synonyms, tts_edge
 
 app = FastAPI()
 
@@ -119,6 +119,15 @@ async def static_file(file_name):
 @app.get("/audio/{file_name}")
 async def get_audio(file_name: str):
     return FileResponse(f"./audio/{file_name}")
+
+
+@app.get("/tts_question/{qid}")
+async def tts_question(qid: int):
+    question = db_get_question_by_id(qid)
+    if not question:
+        return "No question"
+    tts_edge(question)
+    return "ok"
 
 
 @app.get("/show_synonyms/{qid}", response_class=HTMLResponse)
@@ -348,6 +357,8 @@ async def question_page(question_id: int):
             </audio>
             </div>
             <button onclick="deleteAudio({question_id})" type="button">Delete audio</button>
+            <hr>
+            <button onclick="playTTS(this, {question_id})" type="button">Play TTS</button>
             <hr>
             <h2>Answers:</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>

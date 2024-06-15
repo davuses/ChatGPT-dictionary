@@ -4,4 +4,5 @@ uvicorn[standard]
 markdown2
 python-multipart
 phonemizer
+# Dependencies: apt-get install festival espeak-ng mbrola
 wordhoard
