@@ -42,7 +42,7 @@ def get_synonyms(word):
 
 
 def tts_edge(question: Question):
-    audio_path = audio_directory / Path(f"{question.id}.mp3")
+    audio_path = audio_directory / Path(f"{question.id}-edge.mp3")
     if audio_path.exists():
         return
     answer_text: str = question.answers[0].text

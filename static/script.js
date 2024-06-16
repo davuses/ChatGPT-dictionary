@@ -42,13 +42,32 @@ function deleteAudio(questionId) {
     });
   }
 }
-function playTTS(button, questionId) {
+// function playTTS(button, questionId) {
+//   fetch("/tts_question/" + questionId).then((Resp) => {
+//     if (Resp.ok) {
+//       var audio = document.createElement("audio");
+//       audio.controls = true;
+//       audio.style.display = "block";
+//       audio.src = `/audio/${questionId}.mp3`;
+//       audio.classList.add("svelte-eemfgq");
+
+//       var deleteButton = document.createElement("button");
+//       deleteButton.setAttribute("type", "button");
+//       deleteButton.setAttribute("onclick", `deleteAudio(${questionId})`);
+//       deleteButton.textContent = "Delete audio";
+//       button.parentNode.insertBefore(deleteButton, button.nextSibling);
+//       button.parentNode.insertBefore(audio, button.nextSibling);
+//       audio.play();
+//     }
+//   });
+// }
+function playEdgeTTS(button, questionId) {
   fetch("/tts_question/" + questionId).then((Resp) => {
     if (Resp.ok) {
       var audio = document.createElement("audio");
       audio.controls = true;
       audio.style.display = "block";
-      audio.src = `/audio/${questionId}.mp3`;
+      audio.src = `/audio/${questionId}-edge.mp3`;
       button.parentNode.insertBefore(audio, button.nextSibling);
       audio.play();
     }
@@ -68,6 +87,30 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 });
+
+function myOnCanPlayFunction() {
+  let second_ipa_audio = document.getElementById("2nd-ipa-audio");
+  if (second_ipa_audio) {
+    if (second_ipa_audio.readyState) {
+      second_ipa_audio.style.display = "inline";
+    }
+  }
+  let first_ipa_audio = document.getElementById("1st-ipa-audio");
+  if (first_ipa_audio) {
+    if (first_ipa_audio.readyState) {
+      first_ipa_audio.style.display = "inline";
+    }
+  }
+}
+
+function ttsCanPlay() {
+  let tts_div = document.getElementById("tts-div");
+  console.log(tts_div)
+  if (tts_div) {
+    console.log(tts_div.style.display)
+    tts_div.style.display = "block";
+  }
+}
 
 const questionUrlPattern = /\/question\/(\d+)/;
 

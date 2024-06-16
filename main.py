@@ -343,22 +343,27 @@ async def question_page(question_id: int):
             <hr>
             <p>
             /{get_IPA(word)}/
-            <audio controls>
+            <audio id="1st-ipa-audio" controls style="display: none;"
+                oncanplay="myOnCanPlayFunction()"
+                >
                 <source src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/{word}--_us_1.mp3"}" type="audio/mp3">
+                <source src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{word}--_us_1.mp3"}" type="audio/mp3">
             </audio>
-            <audio controls>
-                <source src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/{word}--_us_2.mp3"}" type="audio/mp3">
+            <audio id="2nd-ipa-audio" controls style="display: none;"
+                oncanplay="myOnCanPlayFunction()"
+                >
+                <source id="2nd-ipa-source" src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/{word}--_us_2.mp3"}" type="audio/mp3">
             </audio>
             </p>
             <hr>
-            <div>
-            <audio controls class="svelte-eemfgq">
+            <div id="tts-div" style="display: none;">
+            <audio controls class="svelte-eemfgq" oncanplay="ttsCanPlay()">
                 <source src="{audio_src}" type="audio/mp3">
             </audio>
-            </div>
             <button onclick="deleteAudio({question_id})" type="button">Delete audio</button>
             <hr>
-            <button onclick="playTTS(this, {question_id})" type="button">Play TTS</button>
+            </div>
+            <button onclick="playEdgeTTS(this, {question_id})" type="button">Play Edge TTS</button>
             <hr>
             <h2>Answers:</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
