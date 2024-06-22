@@ -1,0 +1,51 @@
+body {
+    font-size: 19px;
+    font-family: sans-serif;
+}
+@media only screen and (max-width: 600px) {
+    body {
+        font-size: 17px;
+        font-family: sans-serif;
+    }
+}
+button {font-size: 15px;}
+audio {
+    height: 38px;
+}
+audio.svelte-eemfgq {
+    padding: 3px;
+    width: 100%;
+}
+textarea {
+    height: 18em;
+    width: 100%;
+    max-width: 70em;
+    font-size: 16px;
+    font-family: sans-serif;
+    }
+tr:hover {background-color: #d1d1d157;}
+.float{
+    position:fixed;
+    width:60px;
+    height:60px;
+    bottom:40px;
+    right:40px;
+    background-color:#0C9;
+    color:#FFF;
+    border-radius:50px;
+    text-align:center;
+    box-shadow: 2px 2px 3px #999;
+}
+.my-float{
+    margin-top:19px;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    text-align: center;
+}
+@media screen and (min-width: 640px) {
+.hide-on-desktop {
+    display: none;
+    }
+}

@@ -27,38 +27,17 @@ app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
 
 app.mount("/static", StaticFiles(directory="./static"), name="static")
 
-MOBILE_STYLE_SNIPPET = """\
+STYLE_SNIPPET = """\
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {
-            font-size: 19px;
-            font-family: sans-serif;
-        }
-        @media only screen and (max-width: 600px) {
-            body {
-                font-size: 17px;
-                font-family: sans-serif;
-            }
-        }
-        button {font-size: 15px;}
-        audio {
-            height: 38px;
-        }
-        audio.svelte-eemfgq {
-            padding: 3px;
-            width: 100%;
-        }
-        textarea {
-            height: 18em;
-            width: 100%;
-            max-width: 70em;
-            font-size: 16px;
-            font-family: sans-serif;
-            }
-        tr:hover {background-color: #d1d1d157;}
-    </style>
+    <link rel="stylesheet" href="/static/style.css"/>
     <script src="/static/script.js"></script>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/markdown7.css"
+        media="screen and (min-width: 600px)"
+    />
+    <link rel="stylesheet" href="/static/markdown.css"
+        media="screen and (max-width: 640px)"
+    />
 """
 
 
@@ -175,7 +154,7 @@ async def show_synonyms(qid: int):
         <html>
         <head>
             <title>Question</title>
-            {MOBILE_STYLE_SNIPPET}
+            {STYLE_SNIPPET}
         </head>
         <body>
             <h1>Synonyms</h1>
@@ -241,7 +220,7 @@ async def root_page(request: Request):
         <html>
         <head>
             <title>Main Page</title>
-            {MOBILE_STYLE_SNIPPET}
+            {STYLE_SNIPPET}
         </head>
         <body>
             <h1 id="top"><a href="/" style="text-decoration: none";>{questions_count} Questions</a></h1>
@@ -262,6 +241,9 @@ async def root_page(request: Request):
             </p>
                 <p><a href="#top"  style="text-decoration: none;">Go to Top</a></p>
             </div>
+        <a href="#" class="float hide-on-desktop">
+            <i class="my-float" style="font-size:20px">top</i>
+        </a>
         </body>
         </html>
         """
@@ -285,7 +267,7 @@ async def edit_question_page(question_id: int):
     <html>
     <head>
         <title>Edit Question</title>
-        {MOBILE_STYLE_SNIPPET}
+        {STYLE_SNIPPET}
     </head>
     <body>
         <h1>Edit Question</h1>
@@ -331,7 +313,7 @@ async def question_page(question_id: int):
         <html>
         <head>
             <title>Question</title>
-            {MOBILE_STYLE_SNIPPET}
+            {STYLE_SNIPPET}
         </head>
         <body>
             <a href="/">Back to Main Page</a>&nbsp&nbsp&nbsp&nbsp&nbsp
@@ -377,9 +359,9 @@ async def question_page(question_id: int):
                 <input type="submit" value="Submit">
             </form>
             <h2>Example:</h2>
+            <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
             <button onclick="location.href='/edit_example/{question_id}'" type="button" id="edit-example">
             Edit example</button>
-            <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
             <h2>Synonyms:</h2>
             <a href='/show_synonyms/{question_id}'>Show synonyms</a>
             <br><br><br><br>
@@ -419,7 +401,7 @@ async def edit_answer_page(answer_id: int):
     <html>
     <head>
         <title>Edit Answer</title>
-        {MOBILE_STYLE_SNIPPET}
+        {STYLE_SNIPPET}
     </head>
     <body>
         <h1>Edit Answer</h1>
@@ -456,7 +438,7 @@ async def edit_example_page(question_id: int):
     <html>
     <head>
         <title>Edit Example</title>
-        {MOBILE_STYLE_SNIPPET}
+        {STYLE_SNIPPET}
     </head>
     <body>
         <h1>Edit Example</h1>
@@ -501,7 +483,7 @@ async def add_question_page():
     <html>
     <head>
         <title>Add Question</title>
-        {MOBILE_STYLE_SNIPPET}
+        {STYLE_SNIPPET}
     </head>
     <body>
         <h1>Add Question</h1>
@@ -540,7 +522,7 @@ async def add_answer_page(qid: int):
     <html>
     <head>
         <title>Edit Answer</title>
-        {MOBILE_STYLE_SNIPPET}
+        {STYLE_SNIPPET}
     </head>
     <body>
         <h1>Edit Answer</h1>
