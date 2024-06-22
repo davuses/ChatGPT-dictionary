@@ -116,18 +116,24 @@ if (questionUrlPattern.test(window.location.href)) {
   document.addEventListener("keydown", (event) => {
     if (event.altKey && event.key === "v") {
       event.preventDefault();
-      const answerForm = document.getElementById("hidden-a-form");
-      const answerTextArea = answerForm.querySelector(
-        'textarea[name="answer_text"]'
-      );
       const answerUl = document.getElementById("answer-ul");
 
       if (answerUl.children.length === 0) {
         navigator.clipboard
           .readText()
           .then((text) => {
-            answerTextArea.value = text;
-
+            const answerForm = document.createElement("form");
+            answerForm.method = "post";
+            answerForm.action = "/add_answer";
+            let formData = { question_id: questionId, answer_text: text };
+            for (const key in formData) {
+              const hiddenField = document.createElement("input");
+              hiddenField.type = "hidden";
+              hiddenField.name = key;
+              hiddenField.value = formData[key];
+              answerForm.appendChild(hiddenField);
+            }
+            document.body.appendChild(answerForm);
             answerForm.submit();
           })
           .catch((error) => {

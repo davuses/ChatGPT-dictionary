@@ -259,7 +259,7 @@ async def edit_question_page(question_id: int):
         return "404"
     form_html = f"""\
     <form method="post" action="/edit_question/{question_id}">
-        <textarea class="submit-on-shift-enter" name="question_text">{question.text}</textarea><br>
+        <textarea name="question_text">{question.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -355,11 +355,7 @@ async def question_page(question_id: int):
             <ul id="answer-ul">
                 {answers_li_html}
             </ul>
-            <form method="post" action="/add_answer" style="display:none" id="hidden-a-form">
-                <textarea class="submit-on-shift-enter" name="answer_text"></textarea><br>
-                <input value="{question_id}" name="question_id" type="hidden">
-                <input type="submit" value="Submit">
-            </form>
+            <script>var questionId = "{question_id}"</script>
             <h2>Example:</h2>
             <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
             <button onclick="location.href='/edit_example/{question_id}'" type="button" id="edit-example">
@@ -393,7 +389,7 @@ async def edit_answer_page(answer_id: int):
         return "404"
     form_html = f"""\
     <form method="post" action="/edit_answer/{answer_id}">
-        <textarea class="submit-on-shift-enter" name="answer_text">{answer.text}</textarea><br>
+        <textarea name="answer_text">{answer.text}</textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -430,7 +426,7 @@ async def edit_example_page(question_id: int):
         return "404"
     form_html = f"""\
     <form method="post" action="/edit_example/{question_id}" class="answer-form">
-        <textarea class="submit-on-shift-enter" name="example_text">{question.example or ""}</textarea><br>
+        <textarea name="example_text">{question.example or ""}</textarea><br>
         <input type="submit" value="Submit" class="submit-button">
     </form>
     """
@@ -475,7 +471,7 @@ async def delete_answer(answer_id: int):
 async def add_question_page():
     form_html = f"""\
     <form method="post" action="/add_question">
-        <textarea class="submit-on-shift-enter" name="question_text"></textarea><br>
+        <textarea name="question_text"></textarea><br>
         <input type="submit" value="Submit">
     </form>
     """
@@ -513,7 +509,7 @@ async def add_answer_page(qid: int):
     # Replace this with your actual function to fetch answer by ID
     form_html = f"""\
     <form method="post" action="/add_answer">
-        <textarea class="submit-on-shift-enter" name="answer_text"></textarea><br>
+        <textarea name="answer_text"></textarea><br>
         <input value="{qid}" name="question_id" type="hidden">
         <input type="submit" value="Submit">
     </form>
