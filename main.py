@@ -221,7 +221,7 @@ async def root_page(request: Request):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Main Page</title>
+            <title>Dictionary</title>
             {STYLE_SNIPPET}
         </head>
         <body>
@@ -314,7 +314,7 @@ async def question_page(question_id: int):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Question</title>
+            <title>{word.capitalize()}</title>
             {STYLE_SNIPPET}
         </head>
         <body>

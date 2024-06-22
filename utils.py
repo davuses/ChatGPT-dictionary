@@ -37,6 +37,8 @@ def get_synonyms(word):
         ],
     )
     synonyms = synonym.find_synonyms()
+    if not synonyms:
+        return ["None"]
     assert isinstance(synonyms, list)
     return synonyms
 
