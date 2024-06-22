@@ -55,12 +55,31 @@ function playEdgeTTS(button, questionId) {
   });
 }
 document.addEventListener("DOMContentLoaded", function () {
-  const textareas = document.querySelectorAll(".submit-on-shift-enter");
-  textareas.forEach(function (textarea) {
-    textarea.addEventListener("keydown", function (event) {
+  var editor = new mdEditor({
+    toolbar: [
+      "bold",
+      "italic",
+      "strikethrough",
+      "heading",
+      "|",
+      "quote",
+      "unordered-list",
+      "ordered-list",
+      "link",
+      "table",
+      "|",
+      "preview",
+      "side-by-side",
+      "fullscreen",
+      "guide",
+    ],
+  });
+  const mdEditors = document.querySelectorAll(".CodeMirror");
+  mdEditors.forEach(function (mdEditor) {
+    mdEditor.addEventListener("keydown", function (event) {
       if (event.shiftKey && event.key === "Enter") {
         event.preventDefault(); // Prevents the default behavior of adding a new line
-        const form = textarea.closest("form");
+        const form = mdEditor.closest("form");
         if (form) {
           form.submit(); // Submit the form
         }
