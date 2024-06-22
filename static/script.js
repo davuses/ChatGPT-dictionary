@@ -42,25 +42,6 @@ function deleteAudio(questionId) {
     });
   }
 }
-// function playTTS(button, questionId) {
-//   fetch("/tts_question/" + questionId).then((Resp) => {
-//     if (Resp.ok) {
-//       var audio = document.createElement("audio");
-//       audio.controls = true;
-//       audio.style.display = "block";
-//       audio.src = `/audio/${questionId}.mp3`;
-//       audio.classList.add("svelte-eemfgq");
-
-//       var deleteButton = document.createElement("button");
-//       deleteButton.setAttribute("type", "button");
-//       deleteButton.setAttribute("onclick", `deleteAudio(${questionId})`);
-//       deleteButton.textContent = "Delete audio";
-//       button.parentNode.insertBefore(deleteButton, button.nextSibling);
-//       button.parentNode.insertBefore(audio, button.nextSibling);
-//       audio.play();
-//     }
-//   });
-// }
 function playEdgeTTS(button, questionId) {
   fetch("/tts_question/" + questionId).then((Resp) => {
     if (Resp.ok) {
@@ -105,9 +86,7 @@ function myOnCanPlayFunction() {
 
 function ttsCanPlay() {
   let tts_div = document.getElementById("tts-div");
-  console.log(tts_div)
   if (tts_div) {
-    console.log(tts_div.style.display)
     tts_div.style.display = "block";
   }
 }
@@ -144,10 +123,9 @@ if (questionUrlPattern.test(window.location.href)) {
         history.go(-1);
       }
     } else if (event.key === "e") {
-      let url = new URL(document.referrer);
-      if (/\/question\/(\d+)/.test(window.location.href)) {
-        document.getElementById("edit-example").click();
-      }
+      document.getElementById("edit-example").click();
+    } else if (event.key === "D") {
+      document.getElementById("dbt").click();
     }
   });
 }
@@ -159,6 +137,8 @@ if (
   document.addEventListener("keydown", (event) => {
     if (event.key === "a") {
       window.location.href = "/add_question";
+    } else if (event.key === "A") {
+      window.open("/add_question", "_blank").focus();
     }
   });
 }

@@ -55,6 +55,7 @@ MOBILE_STYLE_SNIPPET = """\
             font-size: 16px;
             font-family: sans-serif;
             }
+        tr:hover {background-color: #d1d1d157;}
     </style>
     <script src="/static/script.js"></script>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
@@ -339,7 +340,7 @@ async def question_page(question_id: int):
             <h2>Question:</h2>
             <p id="question">{question.text}</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
-            <button onclick="deleteQuestion({question_id})" type="button">Delete</button>
+            <button onclick="deleteQuestion({question_id})" type="button" id="dbt">Delete</button>
             <hr>
             <p>
             /{get_IPA(word)}/
