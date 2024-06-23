@@ -1,3 +1,5 @@
+import os
+from subprocess import PIPE, Popen
 from typing import Optional
 
 import markdown2
@@ -103,6 +105,64 @@ async def get_audio(file_name: str):
     return FileResponse(f"./audio/{file_name}")
 
 
+def generate_tree(path, html=""):
+    for file in os.listdir(path):
+        rel = path + "/" + file
+        if os.path.isdir(rel):
+            html += (
+                "<p class='toggle'>%s</p><div class='child' hidden='true'>"
+                % (file)
+            )
+            html += generate_tree(rel)
+            html += "</div>"
+        else:
+            html += "<p>%s</p>" % (file)
+    return html
+
+
+@app.get("/notes/{rest_of_path:path}", response_class=HTMLResponse)
+async def notes(rest_of_path: str) -> str:
+    notes_folder = "/home/sakana/Learning-for-IELTS/"
+    file_path = notes_folder + rest_of_path
+    toc_html = ""
+    if os.path.isdir(file_path):
+        proc = Popen(
+            args=["tree", "-H", "./", file_path],
+            stdout=PIPE,
+            universal_newlines=True,
+        )
+        stdout, _ = proc.communicate()
+        note_html = stdout
+    else:
+        try:
+            with open(file_path) as note_file:
+                text = note_file.read()
+                note_html = markdown2.markdown(
+                    text,
+                    extras=["strike", "tables", "toc", "fenced-code-blocks"],
+                )
+                toc_html = note_html.toc_html
+        except:
+            note_html = "Unable to read the file"
+    html = f"""\
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>{rest_of_path.split("/")[-1]}</title>
+            {STYLE_SNIPPET}
+        </head>
+        <body>
+            <a href="/notes/">Notes Tree</a>&nbsp&nbsp&nbsp&nbsp&nbsp
+            <a href="/">Dictionary</a>&nbsp&nbsp&nbsp&nbsp&nbsp
+            <hr>
+            <div><p>Table of Content</p>{toc_html}</div>
+            <p>{note_html}</p>
+        </body>
+        </html>
+    """
+    return html
+
+
 @app.get("/tts_question/{qid}")
 async def tts_question(qid: int):
     question = db_get_question_by_id(qid)
@@ -194,7 +254,7 @@ async def root_page(request: Request):
             q_text = question_text
         example = question.example if question.example else ""
         tr = (
-            '<tr><td> - <a style="text-decoration: none;"'
+            '<tr><td><label class="unselectable"> - </label><a style="text-decoration: none;"'
             f' href="/question/{question.id}">{q_text!s} </a></td>'
             f"<td>{q_context}</td>"
             f"{'<td>' + example + '</td>' if show_example else ''}"
@@ -211,6 +271,7 @@ async def root_page(request: Request):
         ' style="text-decoration: none;">Sort by Length</a>'
         f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{show_example_link}"'
         ' style="text-decoration: none;">Show Examples</a>'
+        '&nbsp&nbsp&nbsp&nbsp&nbsp<a href="/notes/">Notes Tree</a>'
     )
     add_question_link = (
         '<a href="/add_question" style="text-decoration: none;">Add'
