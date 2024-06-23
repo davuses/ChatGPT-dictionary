@@ -141,11 +141,17 @@ if (questionUrlPattern.test(window.location.href)) {
           });
       }
     } else if (event.key === "b") {
-      let url = new URL(document.referrer);
-      if (/\/edit_example\/(\d+)/.test(url.pathname)) {
-        history.go(-3);
-      } else if (url.pathname === "/") {
-        history.go(-1);
+      // go back to the first page
+      // for (i = 0; i < 5; i++) {
+      //   let steps = -(history.length - i);
+      //   if (steps >= 0) {
+      //     break;
+      //   }
+      //   history.go(steps);
+      // }
+      let length = history.length;
+      for (step = length - 1; step > 0; step--) {
+        history.back(step);
       }
     } else if (event.key === "e") {
       document.getElementById("edit-example").click();
