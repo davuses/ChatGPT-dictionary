@@ -293,6 +293,7 @@ async def root_page(request: Request):
             <tr>
                 <th>Question</th>
                 <th>Context</th>
+                {"<th>Examples</th>" if show_example else ""}
                 <th>Action</th>
             </tr>
                 {trs_html}
