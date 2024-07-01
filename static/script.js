@@ -54,39 +54,6 @@ function playEdgeTTS(button, questionId) {
     }
   });
 }
-document.addEventListener("DOMContentLoaded", function () {
-  var editor = new mdEditor({
-    toolbar: [
-      "bold",
-      "italic",
-      "strikethrough",
-      "heading",
-      "quote",
-      "|",
-      "unordered-list",
-      "ordered-list",
-      "link",
-      "table",
-      "|",
-      "preview",
-      "side-by-side",
-      "fullscreen",
-      "guide",
-    ],
-  });
-  const mdEditors = document.querySelectorAll(".CodeMirror");
-  mdEditors.forEach(function (mdEditor) {
-    mdEditor.addEventListener("keydown", function (event) {
-      if (event.shiftKey && event.key === "Enter") {
-        event.preventDefault(); // Prevents the default behavior of adding a new line
-        const form = mdEditor.closest("form");
-        if (form) {
-          form.submit(); // Submit the form
-        }
-      }
-    });
-  });
-});
 
 function myOnCanPlayFunction() {
   let second_ipa_audio = document.getElementById("2nd-ipa-audio");
@@ -108,6 +75,44 @@ function ttsCanPlay() {
   if (tts_div) {
     tts_div.style.display = "block";
   }
+}
+
+const editPagePattern = /\/edit_.*?\/(\d+)/;
+
+if (editPagePattern.test(window.location.href)) {
+  document.addEventListener("DOMContentLoaded", function () {
+    var editor = new mdEditor({
+      toolbar: [
+        "bold",
+        "italic",
+        "strikethrough",
+        "heading",
+        "quote",
+        "|",
+        "unordered-list",
+        "ordered-list",
+        "link",
+        "table",
+        "|",
+        "preview",
+        "side-by-side",
+        "fullscreen",
+        "guide",
+      ],
+    });
+    const mdEditors = document.querySelectorAll(".CodeMirror");
+    mdEditors.forEach(function (mdEditor) {
+      mdEditor.addEventListener("keydown", function (event) {
+        if (event.shiftKey && event.key === "Enter") {
+          event.preventDefault();
+          const form = mdEditor.closest("form");
+          if (form) {
+            form.submit();
+          }
+        }
+      });
+    });
+  });
 }
 
 const questionUrlPattern = /\/question\/(\d+)/;
@@ -170,6 +175,26 @@ if (
       window.location.href = "/add_question";
     } else if (event.key === "A") {
       window.open("/add_question", "_blank").focus();
+    }
+  });
+}
+
+function highlightTableRow(row) {
+  console.log("clicked", row);
+  const previouslySelectedRow = document.querySelector("tr.selected");
+  if (previouslySelectedRow) {
+    previouslySelectedRow.classList.remove("selected");
+  }
+  row.classList.add("selected");
+}
+
+if (window.location.pathname === "/") {
+  document.addEventListener("DOMContentLoaded", function () {
+    const rows = document.querySelectorAll("table tr");
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].onclick = function () {
+        highlightTableRow(this);
+      };
     }
   });
 }

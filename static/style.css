@@ -60,3 +60,6 @@ tr:hover {background-color: #d1d1d157;}
 a {
     text-decoration: none;
 }
+tr.selected {
+    background-color:#c0d6e1 !important;
+}
