@@ -77,22 +77,23 @@ function ttsCanPlay() {
   }
 }
 
-const editPagePattern = /\/edit_.*?\/(\d+)/;
+const editPagePattern = /\/edit_.*?(\d+)|add_.*/;
 
 if (editPagePattern.test(window.location.href)) {
   document.addEventListener("DOMContentLoaded", function () {
     var editor = new mdEditor({
+      // spellChecker: false,
       toolbar: [
         "bold",
         "italic",
         "strikethrough",
-        "heading",
         "quote",
         "|",
         "unordered-list",
         "ordered-list",
         "link",
         "table",
+        "heading",
         "|",
         "preview",
         "side-by-side",

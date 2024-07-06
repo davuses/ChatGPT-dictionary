@@ -3,6 +3,7 @@ from subprocess import PIPE, Popen
 from typing import Optional
 
 import markdown2
+import pip._vendor.tomli as tomllib
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -43,6 +44,11 @@ STYLE_SNIPPET = """\
 <link rel="stylesheet" href="/static/md-editor.min.css">
 <script src="/static/md-editor.min.js"></script>
 """
+
+with open("config.toml") as fp:
+    toml_config = tomllib.load(fp)
+    NOTES_FOLDER = toml_config["notes_folder"]
+    # NOTES_FOLDER = "/home/sakana/Learning-for-IELTS/"
 
 
 class EditAnswerForm(BaseModel):
@@ -122,8 +128,7 @@ def generate_tree(path, html=""):
 
 @app.get("/notes/{rest_of_path:path}", response_class=HTMLResponse)
 async def notes(rest_of_path: str) -> str:
-    notes_folder = "/home/sakana/Learning-for-IELTS/"
-    file_path = notes_folder + rest_of_path
+    file_path = NOTES_FOLDER + rest_of_path
     toc_html = ""
     if os.path.isdir(file_path):
         proc = Popen(
@@ -241,6 +246,10 @@ async def root_page(request: Request):
     show_example = False
     if request.query_params.get("example") == "true":
         show_example = True
+    questions_only = False
+    if request.query_params.get("questions_only") == "true":
+        questions_only = True
+
     for question in questions:
         audio_src = f"/audio/{question.id}.mp3"
         question_text = question.text
@@ -252,11 +261,13 @@ async def root_page(request: Request):
         else:
             q_context = ""
             q_text = question_text
+
         example = question.example if question.example else ""
         tr = (
             '<tr><td><label class="unselectable"> - </label><a style="text-decoration: none;"'
             f' href="/question/{question.id}">{q_text!s} </a></td>'
-            f"<td>{q_context}</td>"
+            # f"<td>{q_context}</td>"
+            f"{'<td>' + q_context + '</td>' if not questions_only else ''}"
             f"{'<td>' + example + '</td>' if show_example else ''}"
             # f'<td><button play-id="{question.id}" class="playButton">Listen</button></td>'
             f'<td><button onclick="deleteQuestionMainPage(this, {question.id})">Delete</button></td></tr>'
@@ -265,12 +276,15 @@ async def root_page(request: Request):
     trs_html = "".join(trs)
     sort_link_url = "/?sort=length"
     show_example_link = "/?example=true"
+    questions_only_link = "/?questions_only=true"
     sort_link = (
         '<a href="#bottom"  style="text-decoration: none;">Go to Bottom</a>'
         f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{sort_link_url}"'
         ' style="text-decoration: none;">Sort by Length</a>'
         f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{show_example_link}"'
         ' style="text-decoration: none;">Show Examples</a>'
+        f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{questions_only_link}"'
+        ' style="text-decoration: none;">Questions Only</a>'
         '&nbsp&nbsp&nbsp&nbsp&nbsp<a href="/notes/">Notes Tree</a>'
     )
     add_question_link = (
@@ -292,7 +306,7 @@ async def root_page(request: Request):
             <table border="1">
             <tr>
                 <th>Question</th>
-                <th>Context</th>
+                {"<th>Context</th>" if not questions_only else ""}
                 {"<th>Examples</th>" if show_example else ""}
                 <th>Action</th>
             </tr>

@@ -170,3 +170,4 @@ cython_debug/
 temp.py
 add_audio_run.py
 wordhoard_error.yaml
+config.toml
