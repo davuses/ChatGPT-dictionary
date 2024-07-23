@@ -95,17 +95,18 @@ def insert_questions_and_answers():
     questions_with_multi_answers = []
     with Session(engine) as session:
         meanings_mapping = get_question_answer_mappings()
-        for k, answers in meanings_mapping.items():
-            question = Question(text=k)
-            if session.query(Question).filter(Question.text == k).first():
+        for k_text, answers in meanings_mapping.items():
+            k_text = k_text.strip()
+            if session.query(Question).filter(Question.text == k_text).first():
                 continue
+            question = Question(text=k_text)
             session.add(question)
             inserted_question_count += 1
             if len(answers) > 1:
-                questions_with_multi_answers.append(k)
+                questions_with_multi_answers.append(k_text)
             for answer_text in answers:
                 if not answer_text:
-                    questions_with_empty_answers.append(k)
+                    questions_with_empty_answers.append(k_text)
                 answer = Answer(text=answer_text, question=question)
                 session.add(answer)
         session.commit()

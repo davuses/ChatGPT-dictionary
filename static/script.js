@@ -81,8 +81,10 @@ const editPagePattern = /\/edit_.*?(\d+)|add_.*/;
 
 if (editPagePattern.test(window.location.href)) {
   document.addEventListener("DOMContentLoaded", function () {
-    var editor = new mdEditor({
-      // spellChecker: false,
+    var editor = new EasyMDE({
+      spellChecker: false,
+      nativeSpellcheck: true,
+      inputStyle: "contenteditable",
       toolbar: [
         "bold",
         "italic",
@@ -98,7 +100,6 @@ if (editPagePattern.test(window.location.href)) {
         "preview",
         "side-by-side",
         "fullscreen",
-        "guide",
       ],
     });
     const mdEditors = document.querySelectorAll(".CodeMirror");

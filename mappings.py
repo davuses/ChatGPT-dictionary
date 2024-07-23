@@ -29,8 +29,9 @@ def extend_mappings_from_conv(
             role = message["author"]["role"]
             if role == "user":
                 parts = message["content"]["parts"]
-                question: str = parts[0]
-                if not question.strip():
+                question: str = parts[0].strip()
+                # Make sure questions are stripped of whitespace
+                if not question:
                     continue
                 if question in skipped_questions:
                     continue
@@ -40,10 +41,13 @@ def extend_mappings_from_conv(
                 for child_id in children_id:
                     child_node = chat_nodes[child_id]
                     if child_node["message"]["author"]["role"] == "system":
-                        answer = get_answer_from_system_node(
-                            chat_nodes, child_node
-                        )
-                        answers.append(answer)
+                        try:
+                            answer = get_answer_from_system_node(
+                                chat_nodes, child_node
+                            )
+                            answers.append(answer)
+                        except:
+                            print("No answer to:", question)
                     elif child_message := child_node["message"]:
                         answer = get_answer(child_message)
                         answers.append(answer)
