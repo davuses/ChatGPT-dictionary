@@ -123,9 +123,8 @@ if (questionUrlPattern.test(window.location.href)) {
   document.addEventListener("keydown", (event) => {
     if (event.altKey && event.key === "v") {
       event.preventDefault();
-      const answerUl = document.getElementById("answer-ul");
-
-      if (answerUl.children.length === 0) {
+      const answerDiv = document.getElementById("answer-div");
+      if (!answerDiv) {
         navigator.clipboard
           .readText()
           .then((text) => {

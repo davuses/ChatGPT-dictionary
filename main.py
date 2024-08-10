@@ -374,16 +374,19 @@ async def question_page(question_id: int):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
-    answers_li_html = "".join(
-        [
+    # Only display the first answer
+    answer_div = ""
+    if question.answers:
+        a = question.answers[0]
+        answer_div = (
+            '<div id="answer-div">'
             f"{markdown2.markdown(a.text, extras=['strike'])}"
             f"""<button onclick="location.href='/edit_answer/{a.id}'" type="button">Edit</button>"""
             "&nbsp&nbsp&nbsp"
             '<button onclick="deleteAnswer(this,'
             f' {a.id})">Delete</button>'
-            for a in question.answers
-        ]
-    )
+            "</div>"
+        )
     audio_src = f"/audio/{question_id}.mp3"
     word = question.text.split(" - ")[-1].strip()
     html = f"""\
@@ -428,7 +431,7 @@ async def question_page(question_id: int):
             <hr>
             <h2>Answers:</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
-                {answers_li_html}
+                {answer_div}
             <script>var questionId = "{question_id}"</script>
             <h2>Example:</h2>
             <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
