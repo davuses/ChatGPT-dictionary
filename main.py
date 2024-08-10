@@ -209,7 +209,7 @@ async def show_synonyms(qid: int):
     syns_in_db_html = (
         "".join(
             [
-                f'<p><a href="/question/{qid}"  style="text-decoration: none;">{qt}</a></p>'
+                f'<p><a href="/question/{qid}"  style="text-decoration: none;">{qt.strip()}</a></p>'
                 for qt, qid in q_texts
             ]
         )
@@ -376,11 +376,11 @@ async def question_page(question_id: int):
         return "404"
     answers_li_html = "".join(
         [
-            f"<li>{markdown2.markdown(a.text, extras=['strike'])}"
+            f"{markdown2.markdown(a.text, extras=['strike'])}"
             f"""<button onclick="location.href='/edit_answer/{a.id}'" type="button">Edit</button>"""
             "&nbsp&nbsp&nbsp"
             '<button onclick="deleteAnswer(this,'
-            f' {a.id})">Delete</button></li>'
+            f' {a.id})">Delete</button>'
             for a in question.answers
         ]
     )
@@ -428,9 +428,7 @@ async def question_page(question_id: int):
             <hr>
             <h2>Answers:</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
-            <ul id="answer-ul">
                 {answers_li_html}
-            </ul>
             <script>var questionId = "{question_id}"</script>
             <h2>Example:</h2>
             <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
