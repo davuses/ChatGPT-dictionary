@@ -119,6 +119,7 @@ if (editPagePattern.test(window.location.href)) {
 
 const questionUrlPattern = /\/question\/(\d+)/;
 
+// Question page keyboard shortcuts: alt+v, b, e, D, p
 if (questionUrlPattern.test(window.location.href)) {
   document.addEventListener("keydown", (event) => {
     if (event.altKey && event.key === "v") {
@@ -147,14 +148,6 @@ if (questionUrlPattern.test(window.location.href)) {
           });
       }
     } else if (event.key === "b") {
-      // go back to the first page
-      // for (i = 0; i < 5; i++) {
-      //   let steps = -(history.length - i);
-      //   if (steps >= 0) {
-      //     break;
-      //   }
-      //   history.go(steps);
-      // }
       let length = history.length;
       for (step = length - 1; step > 0; step--) {
         history.back(step);
@@ -163,6 +156,8 @@ if (questionUrlPattern.test(window.location.href)) {
       document.getElementById("edit-example").click();
     } else if (event.key === "D") {
       document.getElementById("dbt").click();
+    } else if (event.key === "p") {
+      document.getElementById("1st-ipa-audio").play();
     }
   });
 }
