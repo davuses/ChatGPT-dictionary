@@ -434,7 +434,7 @@ async def question_page(question_id: int):
                 {answer_div}
             <script>var questionId = "{question_id}"</script>
             <h2>Example:</h2>
-            <p>{markdown2.markdown(question.example or "", extras=['strike'])}</p>
+            <p>{markdown2.markdown(question.example or "", extras=['strike', 'tables'])}</p>
             <button onclick="location.href='/edit_example/{question_id}'" type="button" id="edit-example">
             Edit example</button>
             <h2>Synonyms:</h2>
