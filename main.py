@@ -220,7 +220,7 @@ async def show_synonyms(qid: int):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Question</title>
+            <title>Synonyms of {word}</title>
             {STYLE_SNIPPET}
         </head>
         <body>
