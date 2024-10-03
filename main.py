@@ -399,6 +399,7 @@ async def question_page(question_id: int):
         <body>
             <a href="/">Back to Main Page</a>&nbsp&nbsp&nbsp&nbsp&nbsp
             <a href="/add_question">Add Question</a>
+            <article>
             <h1>Question and Answers</h1>
             <h2>Question:</h2>
             <p id="question">{question.text}</p>
@@ -440,6 +441,7 @@ async def question_page(question_id: int):
             <h2>Synonyms:</h2>
             <a href='/show_synonyms/{question_id}'>Show synonyms</a>
             <br><br><br><br>
+            </article>
         </body>
         </html>
         """
