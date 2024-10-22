@@ -110,3 +110,6 @@ a {
 tr.selected {
     background-color:#c0d6e1 !important;
 }
+.unselectable [data-content]:before {
+    content: attr(data-content);
+}

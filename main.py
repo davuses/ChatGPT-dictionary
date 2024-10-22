@@ -184,17 +184,16 @@ async def show_synonyms(qid: int):
         return "No question"
     question_text = question.text
     if " - " in question_text:
-        q_text = question_text.split(" - ")[-1]
+        word = question_text.split(" - ")[-1]
     else:
-        q_text = question_text
-    if " " in q_text:
-        return "This feature is only for words"
-    word = q_text
+        word = question_text
+    if " " in word:
+        return "This feature is for words only"
     synonyms = get_synonyms(word)
-    all_qs = db_get_all_question()
-    q_texts = []
-    for question in all_qs:
-        question_text = question.text
+    all_questions = db_get_all_question()
+    syn_tuples = []
+    for q in all_questions:
+        question_text = q.text
         if "When i ask you a word" in question_text:
             continue
         if " - " in question_text:
@@ -202,7 +201,7 @@ async def show_synonyms(qid: int):
         else:
             q_text = question_text
         if q_text in synonyms:
-            q_texts.append((q_text, question.id))
+            syn_tuples.append((q_text, q.id))
 
     syns_html = "".join([f"<p>{syn}</p>" for syn in synonyms])
 
@@ -210,7 +209,7 @@ async def show_synonyms(qid: int):
         "".join(
             [
                 f'<p><a href="/question/{qid}"  style="text-decoration: none;">{qt.strip()}</a></p>'
-                for qt, qid in q_texts
+                for qt, qid in syn_tuples
             ]
         )
         or "None"
@@ -224,7 +223,7 @@ async def show_synonyms(qid: int):
             {STYLE_SNIPPET}
         </head>
         <body>
-            <h1>Synonyms</h1>
+            <h1>Synonyms of  <a href="/question/{qid}"  style="text-decoration: none;">{word}</a></h1>
             <h2>In database</h2>
             {syns_in_db_html}
             <h2>All</h2>
@@ -264,7 +263,7 @@ async def root_page(request: Request):
 
         example = question.example if question.example else ""
         tr = (
-            '<tr><td><label class="unselectable"> - </label><a style="text-decoration: none;"'
+            '<tr><td><label class="unselectable">-<span data-content=" "></span></label><a style="text-decoration: none;"'
             f' href="/question/{question.id}">{q_text!s} </a></td>'
             # f"<td>{q_context}</td>"
             f"{'<td>' + q_context + '</td>' if not questions_only else ''}"
@@ -296,7 +295,7 @@ async def root_page(request: Request):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Dictionary</title>
+            <title>{'Search examples' if show_example else 'Dictionary'}</title>
             {STYLE_SNIPPET}
         </head>
         <body>
@@ -362,6 +361,7 @@ async def edit_question(
     form_data: EditQuestionForm = Depends(EditQuestionForm.as_form),
 ):
     updated_text = form_data.question_text
+    updated_text = updated_text.strip()
     try:
         if q_id := db_update_question_text(question_id, updated_text):
             return RedirectResponse(url=f"/question/{q_id}", status_code=303)
@@ -401,7 +401,7 @@ async def question_page(question_id: int):
             <a href="/add_question">Add Question</a>
             <article>
             <h1>Question and Answers</h1>
-            <h2>Question:</h2>
+            <h2>Question</h2>
             <p id="question">{question.text}</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
             <button onclick="deleteQuestion({question_id})" type="button" id="dbt">Delete</button>
@@ -430,15 +430,15 @@ async def question_page(question_id: int):
             </div>
             <button onclick="playEdgeTTS(this, {question_id})" type="button">Play Edge TTS</button>
             <hr>
-            <h2>Answers:</h2>
+            <h2>Answer</h2>
             <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
                 {answer_div}
             <script>var questionId = "{question_id}"</script>
-            <h2>Example:</h2>
+            <h2>Example</h2>
             <p>{markdown2.markdown(question.example or "", extras=['strike', 'tables'])}</p>
             <button onclick="location.href='/edit_example/{question_id}'" type="button" id="edit-example">
             Edit example</button>
-            <h2>Synonyms:</h2>
+            <h2>Synonyms</h2>
             <a href='/show_synonyms/{question_id}'>Show synonyms</a>
             <br><br><br><br>
             </article>
@@ -576,6 +576,7 @@ async def add_question(
     form_data: AddQuestionForm = Depends(AddQuestionForm.as_form),
 ):
     updated_text = form_data.question_text
+    updated_text = updated_text.strip()
     try:
         if q_id := db_add_question(updated_text):
             return RedirectResponse(url=f"/question/{q_id}", status_code=303)

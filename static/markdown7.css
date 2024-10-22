@@ -288,7 +288,7 @@ sup {
 * {
 	 -webkit-print-color-adjust: exact;
 }
-@media screen and (min-width: 914px) {
+@media screen and (min-width: 1064px) {
    body {
       width: 1064px;
       margin:0 auto;
