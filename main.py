@@ -178,7 +178,7 @@ async def tts_question(qid: int):
 
 
 @app.get("/show_synonyms/{qid}", response_class=HTMLResponse)
-async def show_synonyms(qid: int):
+def show_synonyms(qid: int):
     question = db_get_question_by_id(qid)
     if not question:
         return "No question"
