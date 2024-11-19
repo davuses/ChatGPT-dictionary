@@ -82,6 +82,7 @@ const editPagePattern = /\/edit_.*?(\d+)|add_.*/;
 if (editPagePattern.test(window.location.href)) {
   document.addEventListener("DOMContentLoaded", function () {
     var editor = new EasyMDE({
+      autofocus: true,
       spellChecker: false,
       nativeSpellcheck: true,
       inputStyle: "contenteditable",

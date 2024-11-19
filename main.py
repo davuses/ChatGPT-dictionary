@@ -35,10 +35,10 @@ STYLE_SNIPPET = """\
 <link rel="stylesheet" href="/static/style.css"/>
 <script src="/static/script.js"></script>
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-<link rel="stylesheet" href="/static/markdown7.css"
+<link rel="stylesheet" href="/static/markdown-pc.css"
     media="screen and (min-width: 600px)"
 />
-<link rel="stylesheet" href="/static/markdown.css"
+<link rel="stylesheet" href="/static/markdown-mobile.css"
     media="screen and (max-width: 640px)"
 />
 <link rel="stylesheet" href="/static/md-editor.min.css">

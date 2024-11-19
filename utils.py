@@ -52,5 +52,7 @@ def tts_edge(question: Question):
     question_sentence = question.text.split(" - ")[0]
     tts_text = f"{question_sentence}. " + tts_text
     voice = "en-US-AndrewNeural"
-    communicate = edge_tts.Communicate(tts_text, voice)
+    communicate = edge_tts.Communicate(
+        tts_text, voice, proxy="http://127.0.0.1:10802"
+    )
     communicate.save_sync(str(audio_path))
