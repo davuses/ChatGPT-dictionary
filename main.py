@@ -3,7 +3,7 @@ from subprocess import PIPE, Popen
 from typing import Optional
 
 import markdown2
-import pip._vendor.tomli as tomllib
+import tomllib
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -45,7 +45,7 @@ STYLE_SNIPPET = """\
 <script src="/static/md-editor.min.js"></script>
 """
 
-with open("config.toml") as fp:
+with open("config.toml", "rb") as fp:
     toml_config = tomllib.load(fp)
     NOTES_FOLDER = toml_config["notes_folder"]
     # NOTES_FOLDER = "/home/sakana/Learning-for-IELTS/"
