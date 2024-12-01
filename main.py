@@ -19,12 +19,15 @@ from database import (
     db_get_all_question,
     db_get_answer_by_id,
     db_get_question_by_id,
+    db_question_increment_visit_number,
+    db_question_last_visit_old_enough,
     db_update_answer_text,
     db_update_example,
     db_update_question_text,
 )
 from utils import (
     delete_audio_file,
+    from_last_visit,
     get_all_words,
     get_IPA,
     get_synonyms,
@@ -400,6 +403,11 @@ async def question_page(question_id: int):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
+    how_long_ago = "None"
+    if last_visit := question.last_visit:
+        how_long_ago = from_last_visit(last_visit)
+    if db_question_last_visit_old_enough(question.id):
+        db_question_increment_visit_number(question.id)
     # Only display the first answer
     answer_div = ""
     if question.answers:
@@ -427,6 +435,12 @@ async def question_page(question_id: int):
             <a href="/add_question">Add Question</a>
             <article>
             <h1>Question and Answers</h1>
+            <p
+            style="display: flex; justify-content: space-between;
+                   color: #305969; font-size: medium; font-family: monospace; margin: 0px;">
+                <span>Visit count: {question.visit_count}</span>
+                <span>Last visit: {how_long_ago}</span>
+            </p>
             <h2>Question</h2>
             <p id="question">{question.text}</p>
             <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>

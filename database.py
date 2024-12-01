@@ -1,3 +1,4 @@
+import time
 from argparse import ArgumentParser
 
 from sqlalchemy import (
@@ -53,6 +54,8 @@ class Question(Base):
     is_hidden: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    visit_count: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    last_visit: Mapped[int] = mapped_column(Integer, nullable=True)
 
     def __str__(self) -> str:
         return (
@@ -176,10 +179,38 @@ def db_update_example(question_id: int, example_text: str):
 def db_add_question(text: str):
     with Session(engine) as session:
         text = text.strip()
-        question = Question(text=text)
+        question = Question(text=text, visit_time=int(time.time()))
         session.add(question)
         session.commit()
         return question.id
+
+
+def db_question_last_visit_old_enough(id: int):
+    with Session(engine) as session:
+        question = session.query(Question).filter(Question.id == id).first()
+        if question:
+            last_visit = question.last_visit
+            if not last_visit:
+                question.last_visit = int(time.time())
+                session.commit()
+                return True
+            now = int(time.time())
+            # last visit more than 12h ago
+            if now - last_visit >= 3600 * 12:
+                question.last_visit = now
+                session.commit()
+                return True
+            return False
+
+
+def db_question_increment_visit_number(id: int):
+    with Session(engine) as session:
+        question = session.query(Question).filter(Question.id == id).first()
+        if question:
+            old_count = question.visit_count
+            question.visit_count = old_count + 1
+            session.commit()
+            return True
 
 
 def db_get_answer_by_id(id: int):

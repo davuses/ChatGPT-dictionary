@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import edge_tts
@@ -78,3 +79,14 @@ def tts_edge(question: Question):
         tts_text, voice, proxy="http://127.0.0.1:10802"
     )
     communicate.save_sync(str(audio_path))
+
+
+def from_last_visit(last_visit: int):
+    ...
+    now = int(time.time())
+    time_delta = now - last_visit
+    days = time_delta // 86400  # 86400 seconds in a day
+    if days > 0:
+        return f"{days} day{'s' if days > 1 else ''} ago"
+    else:
+        return "less than a day ago"
