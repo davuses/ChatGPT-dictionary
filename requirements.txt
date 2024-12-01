@@ -4,8 +4,10 @@ uvicorn[standard]
 markdown2
 python-multipart
 phonemizer
-wordhoard
+# wordhoard
 edge-tts
+beautifulsoup4
+requests
 # Dependencies: apt-get install ...
 # festival espeak-ng mbrola
 # tree

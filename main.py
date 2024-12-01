@@ -1,3 +1,4 @@
+import itertools
 import os
 from subprocess import PIPE, Popen
 from typing import Optional
@@ -22,7 +23,13 @@ from database import (
     db_update_example,
     db_update_question_text,
 )
-from utils import delete_audio_file, get_IPA, get_synonyms, tts_edge
+from utils import (
+    delete_audio_file,
+    get_all_words,
+    get_IPA,
+    get_synonyms,
+    tts_edge,
+)
 
 app = FastAPI()
 
@@ -182,38 +189,43 @@ def show_synonyms(qid: int):
     question = db_get_question_by_id(qid)
     if not question:
         return "No question"
-    question_text = question.text
+    question_text: str = question.text
     if " - " in question_text:
         word = question_text.split(" - ")[-1]
     else:
         word = question_text
     if " " in word:
         return "This feature is for words only"
-    synonyms = get_synonyms(word)
-    all_questions = db_get_all_question()
-    syn_tuples = []
-    for q in all_questions:
-        question_text = q.text
-        if "When i ask you a word" in question_text:
-            continue
-        if " - " in question_text:
-            q_text = question_text.split(" - ")[-1]
-        else:
-            q_text = question_text
-        if q_text in synonyms:
-            syn_tuples.append((q_text, q.id))
+    all_words = get_all_words()
+    if synonyms_data := get_synonyms(word):
 
-    syns_html = "".join([f"<p>{syn}</p>" for syn in synonyms])
-
-    syns_in_db_html = (
-        "".join(
-            [
-                f'<p><a href="/question/{qid}"  style="text-decoration: none;">{qt.strip()}</a></p>'
-                for qt, qid in syn_tuples
-            ]
-        )
-        or "None"
-    )
+        trs = []
+        for thesaurus in synonyms_data:
+            synonyms = thesaurus[3]
+            w_strings = []
+            for syn in synonyms:
+                if qids := all_words.get(syn):
+                    w_template = '<a href="/question/{}" style="text-decoration: none;">{}</a>'
+                    w_list = []
+                    for qid in qids:
+                        w_list.append(w_template.format(qids[0], syn))
+                    w_string = " ".join(w_list)
+                else:
+                    w_string = syn
+                w_strings.append(w_string)
+            synonyms_text = ", ".join(w_strings)
+            tr = (
+                "<tr>"
+                # f"<td>{thesaurus[0]}</td>"
+                f"<td>{thesaurus[1]}</td>"
+                f"<td>{thesaurus[2]}</td>"
+                f"<td>{synonyms_text}</td>"
+                "</tr>"
+            )
+            trs.append(tr)
+        trs_html = "".join(trs)
+    else:
+        trs_html = "None"
 
     html = f"""\
         <!DOCTYPE html>
@@ -222,12 +234,26 @@ def show_synonyms(qid: int):
             <title>Synonyms of {word}</title>
             {STYLE_SNIPPET}
         </head>
+        <style>
+        @media screen and (min-width: 1064px) {{
+        body {{
+            width: 1364px;
+            margin:0 auto;
+        }}
+            }}
+        </style>
         <body>
             <h1>Synonyms of  <a href="/question/{qid}"  style="text-decoration: none;">{word}</a></h1>
-            <h2>In database</h2>
-            {syns_in_db_html}
-            <h2>All</h2>
-            {syns_html}
+
+            <table border="1">
+            <tr>
+                <th>Part of speech</th>
+                <th>Meaning</th>
+                <th>Synonyms</th>
+            </tr>
+                {trs_html}
+            </table>
+
         </body>
         </html>
         """
@@ -295,7 +321,7 @@ async def root_page(request: Request):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>{'Search examples' if show_example else 'Dictionary'}</title>
+            <title>{'Examples' if show_example else 'Dictionary'}</title>
             {STYLE_SNIPPET}
         </head>
         <body>
