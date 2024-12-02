@@ -179,7 +179,7 @@ def db_update_example(question_id: int, example_text: str):
 def db_add_question(text: str):
     with Session(engine) as session:
         text = text.strip()
-        question = Question(text=text, visit_time=int(time.time()))
+        question = Question(text=text, last_visit=int(time.time()))
         session.add(question)
         session.commit()
         return question.id
