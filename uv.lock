@@ -228,6 +228,7 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "edge-tts" },
     { name = "fastapi" },
+    { name = "jinja2" },
     { name = "markdown2" },
     { name = "phonemizer" },
     { name = "python-multipart" },
@@ -246,6 +247,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.3" },
     { name = "edge-tts", specifier = ">=6.1.19" },
     { name = "fastapi", specifier = ">=0.115.5" },
+    { name = "jinja2", specifier = ">=3.1.4" },
     { name = "markdown2", specifier = ">=2.5.1" },
     { name = "phonemizer", specifier = ">=3.3.0" },
     { name = "python-multipart", specifier = ">=0.0.17" },
@@ -589,6 +591,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/72/3a/79a912fbd4d8dd6fbb02bf69afd3bb72cf0c729bb3063c6f4498603db17a/jedi-0.19.2.tar.gz", hash = "sha256:4770dc3de41bde3966b02eb84fbcf557fb33cce26ad23da12c742fb50ecb11f0", size = 1231287 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c0/5a/9cac0c82afec3d09ccd97c8b6502d48f165f9124db81b4bcb90b4af974ee/jedi-0.19.2-py2.py3-none-any.whl", hash = "sha256:a8ef22bde8490f57fe5c7681a3c83cb58874daf72b4784de3cce5b6ef6edb5b9", size = 1572278 },
+]
+
+[[package]]
+name = "jinja2"
+version = "3.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markupsafe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ed/55/39036716d19cab0747a5020fc7e907f362fbf48c984b14e62127f7e68e5d/jinja2-3.1.4.tar.gz", hash = "sha256:4a3aee7acbbe7303aede8e9648d13b8bf88a429282aa6122a993f0ac800cb369", size = 240245 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/31/80/3a54838c3fb461f6fec263ebf3a3a41771bd05190238de3486aae8540c36/jinja2-3.1.4-py3-none-any.whl", hash = "sha256:bc5dd2abb727a5319567b7a813e6a2e7318c39f4f487cfe6c89c6f9c7d25197d", size = 133271 },
 ]
 
 [[package]]
