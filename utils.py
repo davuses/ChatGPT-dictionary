@@ -49,7 +49,6 @@ def get_all_words():
         return cached_all_words
 
     all_questions = db_get_all_question()
-    words = []
     for q in all_questions:
         question_text = q.text
         if "When i ask you a word" in question_text:

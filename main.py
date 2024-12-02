@@ -1,5 +1,5 @@
-import itertools
 import os
+import re
 from subprocess import PIPE, Popen
 from typing import Optional
 
@@ -8,6 +8,7 @@ import tomllib
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
@@ -39,6 +40,9 @@ app = FastAPI()
 app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
 
 app.mount("/static", StaticFiles(directory="./static"), name="static")
+
+templates = Jinja2Templates(directory="templates")
+
 
 STYLE_SNIPPET = """\
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -121,28 +125,27 @@ async def get_audio(file_name: str):
     return FileResponse(f"./audio/{file_name}")
 
 
-def generate_tree(path, html=""):
-    for file in os.listdir(path):
-        rel = path + "/" + file
-        if os.path.isdir(rel):
-            html += (
-                "<p class='toggle'>%s</p><div class='child' hidden='true'>"
-                % (file)
-            )
-            html += generate_tree(rel)
-            html += "</div>"
-        else:
-            html += "<p>%s</p>" % (file)
-    return html
-
-
 @app.get("/notes/{rest_of_path:path}", response_class=HTMLResponse)
-async def notes(rest_of_path: str) -> str:
+async def notes(rest_of_path: str, request: Request):
     file_path = NOTES_FOLDER + rest_of_path
     toc_html = ""
-    if os.path.isdir(file_path):
+    is_dir = os.path.isdir(file_path)
+    if is_dir:
         proc = Popen(
-            args=["tree", "-H", "./", file_path],
+            args=[
+                "tree",
+                "-I",
+                "*.png",
+                "-I",
+                "*.jpg",
+                "-I",
+                "*.webp",
+                "-I",
+                "Media",
+                "-H",
+                "./",
+                file_path,
+            ],
             stdout=PIPE,
             universal_newlines=True,
         )
@@ -159,23 +162,18 @@ async def notes(rest_of_path: str) -> str:
                 toc_html = note_html.toc_html
         except:
             note_html = "Unable to read the file"
-    html = f"""\
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>{rest_of_path.split("/")[-1]}</title>
-            {STYLE_SNIPPET}
-        </head>
-        <body>
-            <a href="/notes/">Notes Tree</a>&nbsp&nbsp&nbsp&nbsp&nbsp
-            <a href="/">Dictionary</a>&nbsp&nbsp&nbsp&nbsp&nbsp
-            <hr>
-            <div><p>Table of Content</p>{toc_html}</div>
-            <p>{note_html}</p>
-        </body>
-        </html>
-    """
-    return html
+    title = rest_of_path.split("/")[-1]
+    toc_exist = bool(toc_html)
+    context = {
+        "title": title,
+        "toc_html": toc_html,
+        "note_html": note_html,
+        "is_dir": is_dir,
+        "toc_exist": toc_exist,
+    }
+    return templates.TemplateResponse(
+        request=request, name="notes.html.jinja", context=context
+    )
 
 
 @app.get("/tts_question/{qid}")
@@ -188,7 +186,7 @@ async def tts_question(qid: int):
 
 
 @app.get("/show_synonyms/{qid}", response_class=HTMLResponse)
-def show_synonyms(qid: int):
+def show_synonyms(qid: int, request: Request):
     question = db_get_question_by_id(qid)
     if not question:
         return "No question"
@@ -200,188 +198,84 @@ def show_synonyms(qid: int):
     if " " in word:
         return "This feature is for words only"
     all_words = get_all_words()
+    thesauruses = []
     if synonyms_data := get_synonyms(word):
-
-        trs = []
-        for thesaurus in synonyms_data:
-            synonyms = thesaurus[3]
+        for synonym_data in synonyms_data:
+            synonyms = synonym_data[3]
             w_strings = []
             for syn in synonyms:
                 if qids := all_words.get(syn):
                     w_template = '<a href="/question/{}" style="text-decoration: none;">{}</a>'
-                    w_list = []
-                    for qid in qids:
-                        w_list.append(w_template.format(qids[0], syn))
-                    w_string = " ".join(w_list)
+                    w_string = " / ".join(
+                        [w_template.format(qid, syn) for qid in qids]
+                    )
                 else:
                     w_string = syn
                 w_strings.append(w_string)
-            synonyms_text = ", ".join(w_strings)
-            tr = (
-                "<tr>"
-                # f"<td>{thesaurus[0]}</td>"
-                f"<td>{thesaurus[1]}</td>"
-                f"<td>{thesaurus[2]}</td>"
-                f"<td>{synonyms_text}</td>"
-                "</tr>"
+            synonyms_html = ", ".join(w_strings)
+            meaning_md = re.sub(
+                r"as in (.+?):(.+)",
+                lambda match: f"as in *{match.group(1)}*:\n\n{match.group(2)}",
+                synonym_data[2],
             )
-            trs.append(tr)
-        trs_html = "".join(trs)
-    else:
-        trs_html = "None"
+            thesauruses.append(
+                (synonym_data[1], markdown2.markdown(meaning_md), synonyms_html)
+            )
+    synonyms_exist = bool(synonyms_data)
 
-    html = f"""\
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Synonyms of {word}</title>
-            {STYLE_SNIPPET}
-        </head>
-        <style>
-        @media screen and (min-width: 1064px) {{
-        body {{
-            width: 1364px;
-            margin:0 auto;
-        }}
-            }}
-        </style>
-        <body>
-            <h1>Synonyms of  <a href="/question/{qid}"  style="text-decoration: none;">{word}</a></h1>
-
-            <table border="1">
-            <tr>
-                <th>Part of speech</th>
-                <th>Meaning</th>
-                <th>Synonyms</th>
-            </tr>
-                {trs_html}
-            </table>
-
-        </body>
-        </html>
-        """
-    return html
+    context = {
+        "qid": qid,
+        "word": word,
+        "synonyms_exist": synonyms_exist,
+        "thesauruses": thesauruses,
+    }
+    return templates.TemplateResponse(
+        request=request, name="synonyms.html.jinja", context=context
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
 async def root_page(request: Request):
     questions = db_get_all_question()
-    questions = [q for q in questions if not q.is_hidden]
     questions_count = len(questions)
-    trs = []
-    if request.query_params.get("sort") == "length":
-        questions = sorted(questions, key=lambda q: len(q.text))
-    show_example = False
-    if request.query_params.get("example") == "true":
-        show_example = True
-    questions_only = False
-    if request.query_params.get("questions_only") == "true":
-        questions_only = True
-
+    show_example = request.query_params.get("example") == "true"
+    questions_only = request.query_params.get("questions_only") == "true"
+    q_tuples: list[tuple] = []
+    # (question.id, q_text, q_context, example)
     for question in questions:
-        audio_src = f"/audio/{question.id}.mp3"
         question_text = question.text
         if "When i ask you a word" in question_text:
             continue
+        q_context = ""
+        q_text = question_text
         if " - " in question_text:
-            q_text = question_text.split(" - ")[-1]
+            q_text = question_text.split(" - ")[-1].strip()
             q_context = question_text.split(" - ")[0]
-        else:
-            q_context = ""
-            q_text = question_text
 
-        example = question.example if question.example else ""
-        tr = (
-            '<tr><td><label class="unselectable">-<span data-content=" "></span></label><a style="text-decoration: none;"'
-            f' href="/question/{question.id}">{q_text!s} </a></td>'
-            # f"<td>{q_context}</td>"
-            f"{'<td>' + q_context + '</td>' if not questions_only else ''}"
-            f"{'<td>' + example + '</td>' if show_example else ''}"
-            # f'<td><button play-id="{question.id}" class="playButton">Listen</button></td>'
-            f'<td><button onclick="deleteQuestionMainPage(this, {question.id})">Delete</button></td></tr>'
-        )
-        trs.append(tr)
-    trs_html = "".join(trs)
-    sort_link_url = "/?sort=length"
-    show_example_link = "/?example=true"
-    questions_only_link = "/?questions_only=true"
-    sort_link = (
-        '<a href="#bottom"  style="text-decoration: none;">Go to Bottom</a>'
-        f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{sort_link_url}"'
-        ' style="text-decoration: none;">Sort by Length</a>'
-        f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{show_example_link}"'
-        ' style="text-decoration: none;">Show Examples</a>'
-        f' &nbsp&nbsp&nbsp&nbsp&nbsp<a href="{questions_only_link}"'
-        ' style="text-decoration: none;">Questions Only</a>'
-        '&nbsp&nbsp&nbsp&nbsp&nbsp<a href="/notes/">Notes Tree</a>'
-    )
-    add_question_link = (
-        '<a href="/add_question" style="text-decoration: none;">Add'
-        " Question</a>"
-    )
+        example = question.example or ""
+        q_tuples.append((question.id, q_text, q_context, example))
 
-    html = f"""\
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>{'Examples' if show_example else 'Dictionary'}</title>
-            {STYLE_SNIPPET}
-        </head>
-        <body>
-            <h1 id="top"><a href="/" style="text-decoration: none";>{questions_count} Questions</a></h1>
-            <p>{sort_link}</p>
-            <p>{add_question_link}</p>
-            <table border="1">
-            <tr>
-                <th>Question</th>
-                {"<th>Context</th>" if not questions_only else ""}
-                {"<th>Examples</th>" if show_example else ""}
-                <th>Action</th>
-            </tr>
-                {trs_html}
-            </table>
-            <div id="bottom">
-            <p>
-            <a href="/add_question" style="text-decoration: none;">Add Question
-            </a>
-            </p>
-                <p><a href="#top"  style="text-decoration: none;">Go to Top</a></p>
-            </div>
-        <a href="#" class="float hide-on-desktop">
-            <i class="my-float" style="font-size:20px">top</i>
-        </a>
-        </body>
-        </html>
-        """
-    return html
+    context = {
+        "questions_count": questions_count,
+        "q_tuples": q_tuples,
+        "question_only": questions_only,
+        "show_example": show_example,
+    }
+    return templates.TemplateResponse(
+        request=request, name="root.html.jinja", context=context
+    )
 
 
 @app.get("/edit_question/{question_id}", response_class=HTMLResponse)
-async def edit_question_page(question_id: int):
+async def edit_question_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
-    form_html = f"""\
-    <form method="post" action="/edit_question/{question_id}">
-        <textarea name="question_text">{question.text}</textarea><br>
-        <input type="submit" value="Submit">
-    </form>
-    """
 
-    html = f"""\
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Edit Question</title>
-        {STYLE_SNIPPET}
-    </head>
-    <body>
-        <h1>Edit Question</h1>
-        {form_html}
-    </body>
-    </html>
-    """
-    return html
+    context = {"question_id": question_id, "question_text": question.text}
+    return templates.TemplateResponse(
+        request=request, name="edit_question.html.jinja", context=context
+    )
 
 
 @app.post("/edit_question/{question_id}", response_class=HTMLResponse)
@@ -399,93 +293,47 @@ async def edit_question(
 
 
 @app.get("/question/{question_id}", response_class=HTMLResponse)
-async def question_page(question_id: int):
+async def question_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
-    how_long_ago = "None"
-    if last_visit := question.last_visit:
-        how_long_ago = from_last_visit(last_visit)
+    how_long_ago = (
+        from_last_visit(last_visit)
+        if (last_visit := question.last_visit)
+        else "None"
+    )
     if db_question_last_visit_old_enough(question.id):
         db_question_increment_visit_number(question.id)
     # Only display the first answer
-    answer_div = ""
-    if question.answers:
+    answer_exist = True if question.answers else False
+    answer_text = None
+    answer_id = None
+    if answer_exist:
         a = question.answers[0]
-        answer_div = (
-            '<div id="answer-div">'
-            f"{markdown2.markdown(a.text, extras=['strike'])}"
-            f"""<button onclick="location.href='/edit_answer/{a.id}'" type="button">Edit</button>"""
-            "&nbsp&nbsp&nbsp"
-            '<button onclick="deleteAnswer(this,'
-            f' {a.id})">Delete</button>'
-            "</div>"
-        )
-    audio_src = f"/audio/{question_id}.mp3"
+        answer_text = markdown2.markdown(a.text, extras=["strike"])
+        answer_id = a.id
     word = question.text.split(" - ")[-1].strip()
-    html = f"""\
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>{word.capitalize()}</title>
-            {STYLE_SNIPPET}
-        </head>
-        <body>
-            <a href="/">Back to Main Page</a>&nbsp&nbsp&nbsp&nbsp&nbsp
-            <a href="/add_question">Add Question</a>
-            <article>
-            <h1>Question and Answers</h1>
-            <p
-            style="display: flex; justify-content: space-between;
-                   color: #305969; font-size: medium; font-family: monospace; margin: 0px;">
-                <span>Visit count: {question.visit_count}</span>
-                <span>Last visit: {how_long_ago}</span>
-            </p>
-            <h2>Question</h2>
-            <p id="question">{question.text}</p>
-            <button onclick="location.href='/edit_question/{question_id}'" type="button">Edit</button>
-            <button onclick="deleteQuestion({question_id})" type="button" id="dbt">Delete</button>
-            <hr>
-            <p>
-            /{get_IPA(word)}/
-            <audio id="1st-ipa-audio" controls style="display: none;"
-                oncanplay="myOnCanPlayFunction()"
-                >
-                <source src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/{word}--_us_1.mp3"}" type="audio/mp3">
-                <source src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{word}--_us_1.mp3"}" type="audio/mp3">
-            </audio>
-            <audio id="2nd-ipa-audio" controls style="display: none;"
-                oncanplay="myOnCanPlayFunction()"
-                >
-                <source id="2nd-ipa-source" src="{f"https://ssl.gstatic.com/dictionary/static/sounds/oxford/{word}--_us_2.mp3"}" type="audio/mp3">
-            </audio>
-            </p>
-            <hr>
-            <div id="tts-div" style="display: none;">
-            <audio controls class="svelte-eemfgq" oncanplay="ttsCanPlay()">
-                <source src="{audio_src}" type="audio/mp3">
-            </audio>
-            <button onclick="deleteAudio({question_id})" type="button">Delete audio</button>
-            <hr>
-            </div>
-            <button onclick="playEdgeTTS(this, {question_id})" type="button">Play Edge TTS</button>
-            <hr>
-            <h2>Answer</h2>
-            <button onclick="location.href='/add_answer?qid={question_id}'" type="button">Add answer</button>
-                {answer_div}
-            <script>var questionId = "{question_id}"</script>
-            <h2>Example</h2>
-            <p>{markdown2.markdown(question.example or "", extras=['strike', 'tables'])}</p>
-            <button onclick="location.href='/edit_example/{question_id}'" type="button" id="edit-example">
-            Edit example</button>
-            <h2>Synonyms</h2>
-            <a href='/show_synonyms/{question_id}'>Show synonyms</a>
-            <br><br><br><br>
-            </article>
-        </body>
-        </html>
-        """
-    return html
+    IPA_transcript = get_IPA(word)
+    example_text = (
+        markdown2.markdown(question.example, extras=["strike", "tables"])
+        if question.example
+        else ""
+    )
+    context = {
+        "visit_count": question.visit_count,
+        "how_long_ago": how_long_ago,
+        "question_text": question.text,
+        "question_id": question_id,
+        "IPA_transcript": IPA_transcript,
+        "word": word,
+        "answer_exist": answer_exist,
+        "answer_text": answer_text,
+        "answer_id": answer_id,
+        "example_text": example_text,
+    }
+    return templates.TemplateResponse(
+        request=request, name="question.html.jinja", context=context
+    )
 
 
 @app.get("/delete_question/{question_id}", response_class=HTMLResponse)
@@ -501,32 +349,14 @@ async def delete_audio(question_id: int):
 
 
 @app.get("/edit_answer/{answer_id}", response_class=HTMLResponse)
-async def edit_answer_page(answer_id: int):
-    # Replace this with your actual function to fetch answer by ID
+async def edit_answer_page(answer_id: int, request: Request):
     answer = db_get_answer_by_id(answer_id)
     if not answer:
         return "404"
-    form_html = f"""\
-    <form method="post" action="/edit_answer/{answer_id}">
-        <textarea name="answer_text">{answer.text}</textarea><br>
-        <input type="submit" value="Submit">
-    </form>
-    """
-
-    html = f"""\
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Edit Answer</title>
-        {STYLE_SNIPPET}
-    </head>
-    <body>
-        <h1>Edit Answer</h1>
-        {form_html}
-    </body>
-    </html>
-    """
-    return html
+    context = {"answer_text": answer.text, "answer_id": answer_id}
+    return templates.TemplateResponse(
+        request=request, name="edit_answer.html.jinja", context=context
+    )
 
 
 @app.post("/edit_answer/{answer_id}", response_class=HTMLResponse)
@@ -539,31 +369,18 @@ async def edit_answer(
 
 
 @app.get("/edit_example/{question_id}", response_class=HTMLResponse)
-async def edit_example_page(question_id: int):
+async def edit_example_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
         return "404"
-    form_html = f"""\
-    <form method="post" action="/edit_example/{question_id}" class="answer-form">
-        <textarea name="example_text">{question.example or ""}</textarea><br>
-        <input type="submit" value="Submit" class="submit-button">
-    </form>
-    """
 
-    html = f"""\
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Edit Example</title>
-        {STYLE_SNIPPET}
-    </head>
-    <body>
-        <h1>Edit Example</h1>
-        {form_html}
-    </body>
-    </html>
-    """
-    return html
+    context = {
+        "question_id": question_id,
+        "question_example": question.example or "",
+    }
+    return templates.TemplateResponse(
+        request=request, name="edit_example.html.jinja", context=context
+    )
 
 
 @app.post("/edit_example/{question_id}", response_class=HTMLResponse)
@@ -587,28 +404,11 @@ async def delete_answer(answer_id: int):
 
 
 @app.get("/add_question", response_class=HTMLResponse)
-async def add_question_page():
-    form_html = f"""\
-    <form method="post" action="/add_question">
-        <textarea name="question_text"></textarea><br>
-        <input type="submit" value="Submit">
-    </form>
-    """
+async def add_question_page(request: Request):
 
-    html = f"""\
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Add Question</title>
-        {STYLE_SNIPPET}
-    </head>
-    <body>
-        <h1>Add Question</h1>
-        {form_html}
-    </body>
-    </html>
-    """
-    return html
+    return templates.TemplateResponse(
+        request=request, name="add_question.html.jinja"
+    )
 
 
 @app.post("/add_question", response_class=HTMLResponse)
@@ -625,30 +425,12 @@ async def add_question(
 
 
 @app.get("/add_answer", response_class=HTMLResponse)
-async def add_answer_page(qid: int):
-    # Replace this with your actual function to fetch answer by ID
-    form_html = f"""\
-    <form method="post" action="/add_answer">
-        <textarea name="answer_text"></textarea><br>
-        <input value="{qid}" name="question_id" type="hidden">
-        <input type="submit" value="Submit">
-    </form>
-    """
+async def add_answer_page(qid: int, request: Request):
 
-    html = f"""\
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Edit Answer</title>
-        {STYLE_SNIPPET}
-    </head>
-    <body>
-        <h1>Edit Answer</h1>
-        {form_html}
-    </body>
-    </html>
-    """
-    return html
+    context = {"qid": qid}
+    return templates.TemplateResponse(
+        request=request, name="add_answer.html.jinja", context=context
+    )
 
 
 @app.post("/add_answer", response_class=HTMLResponse)

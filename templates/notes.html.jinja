@@ -1,0 +1,27 @@
+{% extends "base.html.jinja" %}
+{% block title %} {{ title }} {% endblock title %}
+
+{% block body %}
+{% if is_dir %}
+<style>
+    body {
+        line-height: 1;
+        font-size: 19px;
+    }
+</style>
+{% else %}
+{% endif %}
+
+<a href="/notes/"
+    style="margin-right: 40px;">Notes Tree</a>
+<a href="/">Dictionary</a>
+<hr>
+<div>
+    {% if toc_exist %}
+    <h1>Table of Content</h1>
+    {{ toc_html | safe }}
+    {% endif %}
+</div>
+<p>{{ note_html | safe }}</p>
+
+{% endblock body %}

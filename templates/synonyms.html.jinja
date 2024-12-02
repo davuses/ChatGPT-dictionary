@@ -1,0 +1,39 @@
+{% extends "base.html.jinja" %}
+{% block title %} Synonyms of {{ word }} {% endblock title %}
+
+
+<style>
+    @media screen and (min-width: 1064px) {
+
+        body {
+            width: 1364px;
+            margin: 0 auto;
+
+        }
+
+    }
+</style>
+{% block body %}
+
+<h1>Synonyms of <a href="/question/{{ qid }}"
+        style="text-decoration: none;">{{ word }}</a></h1>
+
+<table border="1">
+    <tr>
+        <th>Part of speech</th>
+        <th>Meaning</th>
+        <th>Synonyms</th>
+    </tr>
+    {% if synonyms_exist %}
+    {% for thesaurus in thesauruses %}
+    <tr>
+        <td>{{ thesaurus[0] }}</td>
+        <td>{{ thesaurus[1] | safe }}</td>
+        <td>{{ thesaurus[2] | safe }}</td>
+    </tr>
+    {% endfor %}
+    {% endif %}
+</table>
+
+
+{% endblock body %}

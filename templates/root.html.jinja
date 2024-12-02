@@ -1,0 +1,68 @@
+{% extends "base.html.jinja" %}
+{% block title %} My Dict {% endblock title %}
+{% block body %}
+
+<h1 id="top"><a href="/"
+        style="text-decoration: none"
+        ;>{{ questions_count }} Questions</a></h1>
+<p>
+    <a class="header-link"
+        href="#bottom"
+        style="text-decoration: none;">Go to Bottom</a>
+</p>
+<p>
+    <a class="header-link"
+        href="/?example=true"
+        style="text-decoration: none;">Show Examples</a>
+    <a class="header-link"
+        href="/?questions_only=true"
+        style="text-decoration: none;">Questions Only</a>
+    <a class="header-link"
+        href="/notes/">Notes Tree</a>
+    <a class="header-link"
+        href="/add_question"
+        style="text-decoration: none;">Add Question</a>
+</p>
+<table border="1">
+    <tr>
+        <th>Question</th>
+        {% if not questions_only %}
+        <th>Context</th>
+        {% endif %}
+        {% if show_example %}
+        <th>Examples</th>
+        {% endif %}
+        <th>Action</th>
+    </tr>
+    {% for q_tuple in q_tuples %}
+    <tr>
+        <td><label class="unselectable">-<span data-content=" "></span></label><a style="text-decoration: none;"
+                href="question/{{ q_tuple[0] }}">{{ q_tuple[1] }}</a></td>
+        {% if not questions_only %}
+        <td>
+            {{ q_tuple[2] }}
+        </td>
+        {% endif %}
+        {% if show_example %}
+        <td> {{ q_tuple[3] }} </td>
+        {% endif %}
+        <td><button onclick="deleteQuestionMainPage(this, {{ q_tuple[0] }})">Delete</button></td>
+    </tr>
+    {% endfor %}
+</table>
+<div id="bottom">
+    <p>
+        <a href="/add_question"
+            style="text-decoration: none;">Add Question
+        </a>
+    </p>
+    <p><a href="#top"
+            style="text-decoration: none;">Go to Top</a></p>
+</div>
+<a href="#"
+    class="float hide-on-desktop">
+    <i class="my-float"
+        style="font-size:20px">top</i>
+</a>
+
+{% endblock body %}

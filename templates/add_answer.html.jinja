@@ -1,0 +1,15 @@
+{% extends "base.html.jinja" %}
+{% block title %} Edit Answer {% endblock title %}
+
+{% block body %}
+<h1>Edit Answer</h1>
+<form method="post"
+    action="/add_answer">
+    <textarea name="answer_text"></textarea><br>
+    <input value="{{ qid }}"
+        name="question_id"
+        type="hidden">
+    <input type="submit"
+        value="Submit">
+</form>
+{% endblock body %}

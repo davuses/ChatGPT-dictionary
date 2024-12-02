@@ -1,0 +1,96 @@
+{% extends "base.html.jinja" %}
+{% block title %} {% endblock title %}
+{% block body %}
+
+<body>
+    <p>
+        <a class="header-link"
+            href="/">Back to Main Page</a>
+        <a class="header-link"
+            href="/add_question">Add Question</a>
+    </p>
+    <article>
+        <h1>Question and Answers</h1>
+        <p style="display: flex; justify-content: space-between;
+                   color: #305969; font-size: medium; font-family: monospace; margin: 0px;">
+            <span>Visit count: {{ visit_count }}</span>
+            <span>Last visit: {{ how_long_ago }}</span>
+        </p>
+        <h2>Question</h2>
+        <p id="question">{{ question_text }}</p>
+        <button class="q-button"
+            onclick="location.href='/edit_question/{{ question_id }}'"
+            type="button">Edit</button>
+        <button class="q-button"
+            onclick="deleteQuestion({{ question_id }})"
+            type="button"
+            id="dbt">Delete</button>
+        <hr>
+        <p class="IPA-player">
+            /{{ IPA_transcript }}/
+            <audio id="1st-ipa-audio"
+                controls
+                style="display: none; margin-left: 10px;"
+                oncanplay="myOnCanPlayFunction()">
+                <source src="
+                    https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ word }}--_us_1.mp3"
+                    type="audio/mp3">
+                <source src="
+                    https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ word }}--_us_1.mp3"
+                    type="audio/mp3">
+            </audio>
+            <audio id="2nd-ipa-audio"
+                controls
+                style="display: none; margin-left: 10px;"
+                oncanplay="myOnCanPlayFunction()">
+                <source id="2nd-ipa-source"
+                    src="
+                    https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ word }}--_us_2.mp3"
+                    type="audio/mp3">
+            </audio>
+        </p>
+        <hr>
+        <div id="tts-div"
+            style="display: none;">
+            <audio controls
+                class="svelte-eemfgq"
+                oncanplay="ttsCanPlay()">
+            </audio>
+            <button class="q-button"
+                onclick="deleteAudio({{ question_id }})"
+                type="button">Delete audio</button>
+            <hr>
+        </div>
+        <button class="q-button"
+            onclick="playEdgeTTS(this, {{ question_id }})"
+            type="button">Play Edge TTS</button>
+        <hr>
+        <h2>Answer</h2>
+        <button class="q-button"
+            onclick="location.href='/add_answer?qid={{ question_id }}'"
+            type="button">Add answer</button>
+        {% if answer_exist %}
+        <div id="answer-div">
+            {{ answer_text | safe }}
+            <button class="q-button"
+                onclick="location.href='/edit_answer/{{ answer_id }}'"
+                type="button">Edit</button>
+            <button class="q-button"
+                onclick="deleteAnswer(this,{{ answer_id }})">Delete</button>
+        </div>
+        {% endif %}
+        <script>var questionId = "{{ question_id }}"</script>
+        <h2>Example</h2>
+        <p>{{ example_text | safe }}</p>
+        <button class="q-button"
+            onclick="location.href='/edit_example/{{ question_id }}'"
+            type="button"
+            id="edit-example">
+            Edit example</button>
+        <h2>Synonyms</h2>
+        <a href='/show_synonyms/{{ question_id }}'>Show synonyms</a>
+        <br><br><br><br>
+    </article>
+</body>
+
+{% endblock body %}
