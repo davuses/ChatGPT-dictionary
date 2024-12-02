@@ -33,6 +33,7 @@
         <th>Examples</th>
         {% endif %}
         <th>Action</th>
+        <th>Visit</th>
     </tr>
     {% for q_tuple in q_tuples %}
     <tr>
@@ -47,6 +48,7 @@
         <td> {{ q_tuple[3] }} </td>
         {% endif %}
         <td><button onclick="deleteQuestionMainPage(this, {{ q_tuple[0] }})">Delete</button></td>
+        <td class="visit-{{ q_tuple[4] }}">{{ q_tuple[4] }}</td>
     </tr>
     {% endfor %}
 </table>

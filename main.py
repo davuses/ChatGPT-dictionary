@@ -253,7 +253,9 @@ async def root_page(request: Request):
             q_context = question_text.split(" - ")[0]
 
         example = question.example or ""
-        q_tuples.append((question.id, q_text, q_context, example))
+        q_tuples.append(
+            (question.id, q_text, q_context, example, question.visit_count)
+        )
 
     context = {
         "questions_count": questions_count,
@@ -302,8 +304,11 @@ async def question_page(question_id: int, request: Request):
         if (last_visit := question.last_visit)
         else "None"
     )
+    visit_count = question.visit_count
     if db_question_last_visit_old_enough(question.id):
         db_question_increment_visit_number(question.id)
+        # a bit of hack
+        visit_count += 1
     # Only display the first answer
     answer_exist = True if question.answers else False
     answer_text = None
@@ -320,7 +325,7 @@ async def question_page(question_id: int, request: Request):
         else ""
     )
     context = {
-        "visit_count": question.visit_count,
+        "visit_count": visit_count,
         "how_long_ago": how_long_ago,
         "question_text": question.text,
         "question_id": question_id,
