@@ -47,27 +47,13 @@ function playEdgeTTS(button, questionId) {
     if (Resp.ok) {
       var audio = document.createElement("audio");
       audio.controls = true;
+      audio.className = "svelte-eemfgq";
       audio.style.display = "block";
       audio.src = `/audio/${questionId}-edge.mp3`;
       button.parentNode.insertBefore(audio, button.nextSibling);
       audio.play();
     }
   });
-}
-
-function myOnCanPlayFunction() {
-  let second_ipa_audio = document.getElementById("2nd-ipa-audio");
-  if (second_ipa_audio) {
-    if (second_ipa_audio.readyState) {
-      second_ipa_audio.style.display = "inline";
-    }
-  }
-  let first_ipa_audio = document.getElementById("1st-ipa-audio");
-  if (first_ipa_audio) {
-    if (first_ipa_audio.readyState) {
-      first_ipa_audio.style.display = "inline";
-    }
-  }
 }
 
 function ttsCanPlay() {

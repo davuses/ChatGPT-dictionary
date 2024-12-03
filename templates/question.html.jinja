@@ -2,6 +2,28 @@
 {% block title %} {% endblock title %}
 {% block body %}
 
+<link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+<style>
+    .material-symbols-outlined {
+        font-size: 32px;
+        font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24
+    }
+
+    .audio-icon {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .audio-icon:hover {
+        color: #306e9b;
+    }
+</style>
+
 <body>
     <p>
         <a class="header-link"
@@ -28,10 +50,11 @@
         <hr>
         <p class="IPA-player">
             /{{ IPA_transcript }}/
-            <audio id="1st-ipa-audio"
+
+            <audio id="1-ipa-audio"
                 controls
-                style="display: none; margin-left: 10px;"
-                oncanplay="myOnCanPlayFunction()">
+                style="display: none;"
+                oncanplay="myOnCanPlayFunction(this)">
                 <source src="
                     https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ word }}--_us_1.mp3"
                     type="audio/mp3">
@@ -39,15 +62,64 @@
                     https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ word }}--_us_1.mp3"
                     type="audio/mp3">
             </audio>
-            <audio id="2nd-ipa-audio"
-                controls
+            <span class="material-symbols-outlined audio-icon"
+                id="audio-icon-1"
                 style="display: none; margin-left: 10px;"
-                oncanplay="myOnCanPlayFunction()">
+                onclick="toggleAudio(this)">
+                play_circle
+            </span>
+
+            <audio id="2-ipa-audio"
+                controls
+                style="display: none;"
+                oncanplay="myOnCanPlayFunction(this)">
                 <source id="2nd-ipa-source"
                     src="
                     https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ word }}--_us_2.mp3"
                     type="audio/mp3">
             </audio>
+            <span class="material-symbols-outlined audio-icon"
+                id="audio-icon-2"
+                style="display: none; margin-left: 10px;"
+                onclick="toggleAudio(this)">
+                play_circle
+            </span>
+
+            <script>
+                function toggleAudio(icon) {
+                    const audioId = icon.id[icon.id.length - 1]
+                    const audio = document.getElementById(audioId + "-ipa-audio");
+                    if (audio.paused) {
+                        audio.play();
+                        icon.innerHTML = 'pause_circle'; // Change to pause icon
+
+                    } else {
+                        audio.pause();
+                        icon.innerHTML = 'play_circle'; // Change to play icon
+
+                    }
+                }
+
+                const audioElements = document.querySelectorAll('audio');
+                audioElements.forEach((audio, index) => {
+                    const audioId = audio.id[0];
+                    const icon = document.getElementById("audio-icon-" + audioId);
+
+                    audio.addEventListener('ended', () => {
+                        icon.innerHTML = 'play_circle';
+                    });
+                })
+
+                function myOnCanPlayFunction(audio) {
+                    const audioId = audio.id[0];
+                    if (audio) {
+                        if (audio.readyState) {
+                            const icon = document.getElementById("audio-icon-" + audioId);
+                            icon.style.display = "inline";
+                        }
+                    }
+                }
+            </script>
         </p>
         <hr>
         <div id="tts-div"
