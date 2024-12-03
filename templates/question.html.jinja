@@ -109,7 +109,6 @@
                         icon.innerHTML = 'play_circle';
                     });
                 })
-
                 function myOnCanPlayFunction(audio) {
                     const audioId = audio.id[0];
                     if (audio) {
@@ -119,6 +118,22 @@
                         }
                     }
                 }
+                document.addEventListener("keydown", (event) => {
+                    if (event.key === "p") {
+                        const audioElements = document.querySelectorAll('audio');
+                        let preAudio;
+                        audioElements.forEach((audio, index) => {
+                            let duration = 0;
+                            if (typeof preAudio !== 'undefined') {
+                                duration = preAudio.duration
+                            }
+                            setTimeout(function () {
+                                audio.play(); // Play the audio after the duration
+                            }, duration * 1000);
+                            preAudio = audio
+                        })
+                    }
+                })
             </script>
         </p>
         <hr>

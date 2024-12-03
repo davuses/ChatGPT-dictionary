@@ -143,8 +143,6 @@ if (questionUrlPattern.test(window.location.href)) {
       document.getElementById("edit-example").click();
     } else if (event.key === "D") {
       document.getElementById("dbt").click();
-    } else if (event.key === "p") {
-      document.getElementById("1st-ipa-audio").play();
     }
   });
 }
