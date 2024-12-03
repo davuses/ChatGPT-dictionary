@@ -84,7 +84,7 @@ class ParseWords:
         Helper method to handle common exceptions in query methods.
         """
         logger.error("An error occurred in the following code segment:")
-        logger.error("".join(traceback.format_tb(error.__traceback__)))
+        logger.error(traceback.format_exc())
 
     @staticmethod
     def parse_merriam_webster_modified(soup: BeautifulSoup) -> list:
@@ -111,15 +111,18 @@ class ParseWords:
                             as_in_word = sub_thesaurus_entry.find(
                                 name="div", attrs={"class": "as-in-word"}
                             ).text
-                            definition = (
-                                sub_thesaurus_entry.find(
-                                    name="span", attrs={"class": "dt"}
+                            try:
+                                definition = (
+                                    sub_thesaurus_entry.find(
+                                        name="span", attrs={"class": "dt"}
+                                    )
+                                    .text.strip()
+                                    .split("\n")[0]
+                                    .strip()
                                 )
-                                .text.strip()
-                                .split("\n")[0]
-                                .strip()
-                            )
-                            meaning = ": ".join([as_in_word, definition])
+                                meaning = ": ".join([as_in_word, definition])
+                            except AttributeError:
+                                meaning = as_in_word
                             synonyms_list = []
                             if word_container := sub_thesaurus_entry.find(
                                 name="div",
@@ -301,7 +304,7 @@ class Synonyms:
             response = Query(
                 url, user_agent=self._user_agent, proxies=self._proxies
             ).get_website_html()
-        return response
+        return response  # type: ignore
 
     def find_synonyms(self) -> list[str | list[str]] | None:
         """
