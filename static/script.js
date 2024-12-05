@@ -161,7 +161,6 @@ if (
 }
 
 function highlightTableRow(row) {
-  console.log("clicked", row);
   const previouslySelectedRow = document.querySelector("tr.selected");
   if (previouslySelectedRow) {
     previouslySelectedRow.classList.remove("selected");
@@ -178,4 +177,57 @@ if (window.location.pathname === "/") {
       };
     }
   });
+}
+
+function load_more() {
+  if ((window.location.pathname == "/") & (window.location.search !== "")) {
+    return;
+  }
+  const table = document.querySelector("table");
+  const tableBody = document.querySelector("tbody");
+
+  // Get the last <tr> of the table
+  const lastRow = table.querySelector("tr:last-child");
+
+  // Get the first <td> of the last <tr>
+  const firstCell = lastRow.querySelector("td:first-child");
+
+  // Get the <a> element inside the first <td>
+  const linkElement = firstCell.querySelector("a");
+  const href = linkElement.href;
+  const qid = href.split("/").pop();
+
+  fetch(`/load_more/${qid}`)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json(); // Assuming the response is JSON
+    })
+    .then((data) => {
+      const q_lists = data["q_lists"];
+      q_lists.forEach((q_list) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+      <td>
+          <label class="unselectable">-<span data-content=" "></span></label>
+          <a style="text-decoration: none;"
+              href="question/${q_list[0]}">${q_list[1]}</a>
+      </td>
+      <td>${q_list[2]}</td>
+      <td>
+          <button onclick="deleteQuestionMainPage(this, ${q_list[0]})"
+              >Delete</button>
+      </td>
+      <td class="visit-${q_list[3]}">${q_list[3]}</td>
+  `;
+        row.onclick = function () {
+          highlightTableRow(this);
+        };
+        tableBody.appendChild(row);
+      });
+    })
+    .catch((error) => {
+      console.error("Error fetching data:", error);
+    });
 }

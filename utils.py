@@ -24,7 +24,7 @@ def delete_audio_file(question_id):
 def get_IPA(word) -> str:
     a = phonemize(word, strip=True, with_stress=True)
     if isinstance(a, str):
-        a = a.replace("ɹ", "r")
+        a = a.replace("ɹ", "r").replace("ɐ", "ə")
         return a
     else:
         return str(a)

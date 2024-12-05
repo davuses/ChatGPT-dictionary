@@ -53,18 +53,33 @@
     {% endfor %}
 </table>
 <div id="bottom">
-    <p>
-        <a href="/add_question"
-            style="text-decoration: none;">Add Question
-        </a>
-    </p>
     <p><a href="#top"
+            class="header-link"
             style="text-decoration: none;">Go to Top</a></p>
+    <p>
+        <a class="header-link"
+            href="/?example=true"
+            style="text-decoration: none;">Show Examples</a>
+        <a class="header-link"
+            href="/?questions_only=true"
+            style="text-decoration: none;">Questions Only</a>
+        <a class="header-link"
+            href="/notes/">Notes Tree</a>
+        <a class="header-link"
+            href="/add_question"
+            style="text-decoration: none;">Add Question</a>
+    </p>
 </div>
 <a href="#"
     class="float hide-on-desktop">
     <i class="my-float"
         style="font-size:20px">top</i>
+</a>
+<a href="javascript:void(0);"
+    onclick="load_more();"
+    class="float load-more">
+    <i class="my-float"
+        style="font-size:20px">Load</i>
 </a>
 
 {% endblock body %}

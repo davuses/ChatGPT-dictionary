@@ -137,6 +137,15 @@ def db_get_question_by_id(id: int):
             print("No such question")
 
 
+def db_get_questions_after(id: int):
+    with Session(engine) as session:
+        query = session.query(Question).filter(Question.id > id).all()
+        if questions := query:
+            return questions
+        else:
+            print("No such question")
+
+
 def db_get_question_by_text(question_text: str):
     with Session(engine) as session:
         query = (

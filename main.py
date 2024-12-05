@@ -6,7 +6,12 @@ from typing import Optional
 import markdown2
 import tomllib
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -20,6 +25,7 @@ from database import (
     db_get_all_question,
     db_get_answer_by_id,
     db_get_question_by_id,
+    db_get_questions_after,
     db_question_increment_visit_number,
     db_question_last_visit_old_enough,
     db_update_answer_text,
@@ -260,7 +266,7 @@ async def root_page(request: Request):
     context = {
         "questions_count": questions_count,
         "q_tuples": q_tuples,
-        "question_only": questions_only,
+        "questions_only": questions_only,
         "show_example": show_example,
     }
     return templates.TemplateResponse(
@@ -448,3 +454,25 @@ async def add_answer(
         db_add_answer(updated_text, question=question)
         return RedirectResponse(url=f"/question/{qid}", status_code=303)
     return "Question doesn't exist"
+
+
+@app.get("/load_more/{qid}", response_class=JSONResponse)
+async def load_more(qid: int, request: Request):
+    q_lists = []
+    if questions := db_get_questions_after(qid):
+        q_lists: list[list] = []
+        # (question.id, q_text, q_context, example)
+        for question in questions:
+            question_text = question.text
+            if "When i ask you a word" in question_text:
+                continue
+            q_context = ""
+            q_text = question_text
+            if " - " in question_text:
+                q_text = question_text.split(" - ")[-1].strip()
+                q_context = question_text.split(" - ")[0]
+
+            q_lists.append(
+                [question.id, q_text, q_context, question.visit_count]
+            )
+    return {"q_lists": q_lists}
