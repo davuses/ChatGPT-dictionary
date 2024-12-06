@@ -160,9 +160,13 @@
                 }
                 document.addEventListener("keydown", (event) => {
                     if (event.key === "p") {
-                        const audioElements = document.querySelectorAll('audio');
+                        let audioElems;
+                        const ipaAudios = document.querySelectorAll('.ipa-audio');
+                        if (!ipaAudios[0].readyState && !ipaAudios[1].readyState) {
+                            audioElems = [document.getElementById("google-translate-audio")]
+                        } else { audioElems = ipaAudios }
                         let preAudio;
-                        audioElements.forEach((audio, index) => {
+                        audioElems.forEach((audio, index) => {
                             let duration = 0;
                             if (typeof preAudio !== 'undefined') {
                                 duration = preAudio.duration
