@@ -62,10 +62,6 @@ def get_question_answer_mappings(file="new_conversations.json"):
     conversations = json.load(open(conversations_file, "r", encoding="utf-8"))
     with open("skipped_questions.txt", "r") as f:
         skipped_questions = [l.strip() for l in f.readlines()]
-    with open(file, "r") as f, open("prompt.txt", "r") as prompt_f:
-        file_content = f.read()
-        prompt_text = prompt_f.read()
-        assert prompt_text in file_content
     question_answer_mappings: dict[str, list[str]] = {}
     for i, conv in enumerate(conversations):
         print("conversation", i)
