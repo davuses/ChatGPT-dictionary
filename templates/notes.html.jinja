@@ -2,6 +2,7 @@
 {% block title %} {{ title }} {% endblock title %}
 
 {% block body %}
+
 {% if is_dir %}
 <style>
     body {
@@ -12,16 +13,89 @@
 {% else %}
 {% endif %}
 
+<style>
+    div {
+        display: flex;
+    }
+
+    .toc {
+        width: 250px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        padding: 5px;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .toc ul {
+        list-style: none;
+        font-size: 14px;
+        padding-left: 10px;
+        position: relative;
+        margin: 0px;
+        font-family: BBC Reith Sans;
+    }
+
+    .toc ul::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 10px;
+        width: 1px;
+        background-color: #ccc;
+    }
+
+    .toc li {
+        position: relative;
+
+        margin-bottom: 10px;
+        padding-left: 13px;
+    }
+
+    .toc li::before {
+        content: "";
+        position: absolute;
+        top: 12px;
+        left: 0;
+        width: 10px;
+        height: 1px;
+        background-color: #ccc;
+    }
+
+    .toc a {
+        text-decoration: none;
+        color: #5186bf;
+    }
+
+    .toc a:hover {
+        color: #297bd2;
+        text-decoration: underline;
+    }
+
+    article {
+        margin-left: 50px;
+        padding: 20px;
+    }
+</style>
+
+
 <a href="/notes/"
     style="margin-right: 40px;">Notes Tree</a>
 <a href="/">Dictionary</a>
-<hr>
-<div>
-    {% if toc_exist %}
-    <h1>Table of Content</h1>
-    {{ toc_html | safe }}
-    {% endif %}
+
+<div style="display: flex;">
+    <div class="toc">
+        {% if toc_exist %}
+        {{ toc_html | safe }}
+        {% endif %}
+    </div>
+    <article>
+        <p>{{ note_html | safe }}</p>
+    </article>
 </div>
-<p>{{ note_html | safe }}</p>
 
 {% endblock body %}
