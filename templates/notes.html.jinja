@@ -82,10 +82,23 @@
     }
 </style>
 
-
 <a href="/notes/"
     style="margin-right: 40px;">Notes Tree</a>
-<a href="/">Dictionary</a>
+<a href="/"
+    style="margin-right: 40px;">Dictionary</a>
+    
+{% if not is_dir %}
+<a href="/edit_note/{{ note_path }}"
+    id="edit-note">Edit this note</a>
+{% endif %}
+
+<script>
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "e") {
+            document.getElementById("edit-note").click();
+        }
+    })
+</script>
 
 <div style="display: flex;">
     <div class="toc">

@@ -63,7 +63,7 @@ function ttsCanPlay() {
   }
 }
 
-const editPagePattern = /\/edit_.*?(\d+)|add_.*/;
+const editPagePattern = /\/edit_.*?|add_.*/;
 
 if (editPagePattern.test(window.location.href)) {
   document.addEventListener("DOMContentLoaded", function () {

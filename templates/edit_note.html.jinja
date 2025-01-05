@@ -1,0 +1,14 @@
+{% extends "base.html.jinja" %}
+{% block title %} Edit Note {% endblock title %}
+
+{% block body %}
+<h1>Edit Note</h1>
+<form method="post"
+    action="/edit_note/{{ note_path }}"
+    class="answer-form">
+    <textarea name="note_text">{{ note_text }}</textarea><br>
+    <input type="submit"
+        value="Submit"
+        class="submit-button">
+</form>
+{% endblock body %}

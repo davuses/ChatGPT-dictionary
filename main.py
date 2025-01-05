@@ -95,6 +95,14 @@ class EditExampleForm(BaseModel):
         return cls(example_text=example_text)
 
 
+class EditNoteForm(BaseModel):
+    note_text: Optional[str] = Field(default="", description="Note text")
+
+    @classmethod
+    def as_form(cls, note_text: str = Form(None)):
+        return cls(note_text=note_text)
+
+
 class AddQuestionForm(BaseModel):
     question_text: str
 
@@ -176,10 +184,69 @@ async def notes(rest_of_path: str, request: Request):
         "note_html": note_html,
         "is_dir": is_dir,
         "toc_exist": toc_exist,
+        "note_path": rest_of_path,
     }
     return templates.TemplateResponse(
         request=request, name="notes.html.jinja", context=context
     )
+
+
+@app.get("/edit_note/{rest_of_path:path}", response_class=HTMLResponse)
+async def edit_note_page(rest_of_path: str, request: Request):
+    file_path = NOTES_FOLDER + rest_of_path
+    is_dir = os.path.isdir(file_path)
+    if is_dir:
+        return templates.TemplateResponse(
+            request=request,
+            name="404.html.jinja",
+            context={"message": "Wrong note path"},
+        )
+    try:
+        with open(file_path) as note_file:
+            note_text = note_file.read()
+    except:
+        return templates.TemplateResponse(
+            request=request,
+            name="404.html.jinja",
+            context={"message": "Unable to read the file"},
+        )
+    else:
+        context = {"note_text": note_text, "note_path": rest_of_path}
+        return templates.TemplateResponse(
+            request=request, name="edit_note.html.jinja", context=context
+        )
+
+
+@app.post("/edit_note/{rest_of_path:path}", response_class=HTMLResponse)
+async def edit_note(
+    rest_of_path: str,
+    request: Request,
+    form_data: EditNoteForm = Depends(EditNoteForm.as_form),
+):
+    file_path = NOTES_FOLDER + rest_of_path
+    is_dir = os.path.isdir(file_path)
+    if not (updated_text := form_data.note_text):
+        updated_text = ""
+    if is_dir:
+        return templates.TemplateResponse(
+            request=request,
+            name="404.html.jinja",
+            context={"message": "Wrong note path"},
+        )
+    try:
+        with open(file_path, "r+") as note_file:
+            note_file.read()
+            note_file.seek(0)
+            note_file.truncate(0)
+            print(repr(updated_text))
+            note_file.write(updated_text.replace("\r", ""))
+        return RedirectResponse(url=f"/notes/{rest_of_path}", status_code=303)
+    except:
+        return templates.TemplateResponse(
+            request=request,
+            name="404.html.jinja",
+            context={"message": "Unable to read the file"},
+        )
 
 
 @app.get("/tts_question/{qid}")
@@ -399,7 +466,6 @@ async def edit_example(
     question_id: int,
     form_data: EditExampleForm = Depends(EditExampleForm.as_form),
 ):
-    print(form_data.example_text)
     if not (updated_text := form_data.example_text):
         updated_text = ""
     if returned_qid := db_update_example(question_id, updated_text):
