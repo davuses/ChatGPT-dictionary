@@ -280,28 +280,40 @@ def show_synonyms(qid: int, request: Request):
         return "This feature is for words only"
     all_words = get_all_words()
     thesauruses = []
-    if synonyms_data := get_synonyms(word):
-        for synonym_data in synonyms_data:
-            synonyms = synonym_data[3]
-            w_strings = []
-            for syn in synonyms:
-                if qids := all_words.get(syn):
-                    w_template = '<a href="/question/{}" style="text-decoration: none;">{}</a>'
-                    w_string = " / ".join(
-                        [w_template.format(qid, syn) for qid in qids]
+    try:
+        synonyms_data = get_synonyms(word)
+    except:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html.jinja",
+        )
+    else:
+        if synonyms_data:
+            for synonym_data in synonyms_data:
+                synonyms = synonym_data[3]
+                w_strings = []
+                for syn in synonyms:
+                    if qids := all_words.get(syn):
+                        w_template = '<a href="/question/{}" style="text-decoration: none;">{}</a>'
+                        w_string = " / ".join(
+                            [w_template.format(qid, syn) for qid in qids]
+                        )
+                    else:
+                        w_string = syn
+                    w_strings.append(w_string)
+                synonyms_html = ", ".join(w_strings)
+                meaning_md = re.sub(
+                    r"as in (.+?):(.+)",
+                    lambda match: f"as in *{match.group(1)}*:\n\n{match.group(2)}",
+                    synonym_data[2],
+                )
+                thesauruses.append(
+                    (
+                        synonym_data[1],
+                        markdown2.markdown(meaning_md),
+                        synonyms_html,
                     )
-                else:
-                    w_string = syn
-                w_strings.append(w_string)
-            synonyms_html = ", ".join(w_strings)
-            meaning_md = re.sub(
-                r"as in (.+?):(.+)",
-                lambda match: f"as in *{match.group(1)}*:\n\n{match.group(2)}",
-                synonym_data[2],
-            )
-            thesauruses.append(
-                (synonym_data[1], markdown2.markdown(meaning_md), synonyms_html)
-            )
+                )
     synonyms_exist = bool(synonyms_data)
 
     context = {
