@@ -129,6 +129,14 @@ def shorten_string(s, max_length=180):
         return s[: max_length - 3] + "..."
 
 
+def render_404_page(request, message="404"):
+    return templates.TemplateResponse(
+        request=request,
+        name="404.html.jinja",
+        context={"message": message},
+    )
+
+
 @app.get("/static/{file_name}", include_in_schema=False)
 async def static_file(file_name):
     return FileResponse(f"./static/{file_name}")
@@ -345,7 +353,7 @@ async def root_page(request: Request):
 async def edit_question_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
-        return "404"
+        return render_404_page(request, message="Question Not Found")
 
     context = {"question_id": question_id, "question_text": question.text}
     return templates.TemplateResponse(
@@ -371,7 +379,7 @@ async def edit_question(
 async def question_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
-        return "404"
+        return render_404_page(request, message="Question Not Found")
     how_long_ago = (
         from_last_visit(last_visit)
         if (last_visit := question.last_visit)
@@ -430,7 +438,7 @@ async def delete_audio(question_id: int):
 async def edit_answer_page(answer_id: int, request: Request):
     answer = db_get_answer_by_id(answer_id)
     if not answer:
-        return "404"
+        return render_404_page(request, message="Answer Not Found")
     context = {"answer_text": answer.text, "answer_id": answer_id}
     return templates.TemplateResponse(
         request=request, name="edit_answer.html.jinja", context=context
@@ -450,7 +458,7 @@ async def edit_answer(
 async def edit_example_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
-        return "404"
+        return render_404_page(request, message="Question Not Found")
 
     context = {
         "question_id": question_id,
