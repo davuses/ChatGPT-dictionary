@@ -9,7 +9,7 @@ function deleteAnswer(button, answerId) {
     });
   }
 }
-function deleteQuestionMainPage(button, questionId) {
+function deleteQuestionMainPageByButton(button, questionId) {
   var questionText =
     button.parentElement.previousElementSibling.previousElementSibling
       .textContent;
