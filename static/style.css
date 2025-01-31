@@ -155,6 +155,9 @@ tr.selected {
     justify-content: start;
     font-family: "Lucida Sans Unicode";
 }
+.ipa {
+    font-family: 'Lucida Sans Unicode';
+}
 .visit-0 {
     color: #eff3f5;
 }

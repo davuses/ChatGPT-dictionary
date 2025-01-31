@@ -417,6 +417,11 @@ async def question_page(question_id: int, request: Request):
         if question.example
         else ""
     )
+    print(example_text)
+    example_text = re.sub(
+        r"(?<!>)(/[^>]+?/)", r'<span class="ipa">\1</span>', example_text
+    )
+
     context = {
         "visit_count": visit_count,
         "how_long_ago": how_long_ago,
