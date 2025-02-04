@@ -419,7 +419,7 @@ async def question_page(question_id: int, request: Request):
     )
     print(example_text)
     example_text = re.sub(
-        r"(?<!>)(/[^>]+?/)", r'<span class="ipa">\1</span>', example_text
+        r"(/[^>^<\s]+?/)", r'<span class="ipa">\1</span>', example_text
     )
 
     context = {
