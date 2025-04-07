@@ -215,6 +215,13 @@
                         document.getElementById("dbt").click();
                     } else if (event.key === "a") {
                         window.open("/add_question", "_blank").focus();
+                    } else if (event.key === "Q") {
+                        const textToCopy = document.getElementById('question').innerText;
+                        navigator.clipboard.writeText(textToCopy).then(() => {
+                            console.log('Text copied to clipboard!');
+                        }).catch(err => {
+                            console.error('Failed to copy text: ', err);
+                        });
                     } else if (event.key === "A") {
                         window.location.href = "/add_question";
                     }

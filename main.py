@@ -1,10 +1,10 @@
 import os
 import re
+import tomllib
 from subprocess import PIPE, Popen
 from typing import Optional
 
 import markdown2
-import tomllib
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import (
     FileResponse,
@@ -24,6 +24,7 @@ from database import (
     db_delete_question,
     db_get_all_question,
     db_get_answer_by_id,
+    db_get_latest_questions,
     db_get_question_by_id,
     db_get_questions_after,
     db_question_increment_visit_number,
@@ -329,10 +330,21 @@ def show_synonyms(qid: int, request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 async def root_page(request: Request):
-    questions = db_get_all_question()
+    is_show_example = request.query_params.get("example") == "true"
+    is_questions_only = request.query_params.get("questions_only") == "true"
+    is_all_questions = any(
+        [
+            is_show_example,
+            is_questions_only,
+            request.query_params.get("all_questions") == "true",
+        ]
+    )
+    if is_all_questions:
+        questions = db_get_all_question()
+    else:
+        question_count = 1000
+        questions = db_get_latest_questions(question_count)
     questions_count = len(questions)
-    show_example = request.query_params.get("example") == "true"
-    questions_only = request.query_params.get("questions_only") == "true"
     q_tuples: list[tuple] = []
     # (question.id, q_text, q_context, example)
     for question in questions:
@@ -353,8 +365,9 @@ async def root_page(request: Request):
     context = {
         "questions_count": questions_count,
         "q_tuples": q_tuples,
-        "questions_only": questions_only,
-        "show_example": show_example,
+        "questions_only": is_questions_only,
+        "show_example": is_show_example,
+        "is_all_questions": is_all_questions,
     }
     return templates.TemplateResponse(
         request=request, name="root.html.jinja", context=context

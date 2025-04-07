@@ -128,6 +128,18 @@ def db_get_all_question():
         return questions
 
 
+def db_get_latest_questions(count: int = 1000):
+    with Session(engine) as session:
+        questions = (
+            session.query(Question)
+            .filter(Question.is_hidden == False)
+            .order_by(Question.id.desc())
+            .limit(count)
+            .all()
+        )
+        return questions
+
+
 def db_get_question_by_id(id: int):
     with Session(engine) as session:
         query = session.query(Question).filter(Question.id == id).first()
