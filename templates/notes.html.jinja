@@ -28,6 +28,14 @@
         background-color: #f8f9fa;
         padding: 5px;
         box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+        display: none; /* Hide by default */
+    }
+
+    @media screen and (min-width: 1001px) {
+        .toc {
+            display: block;
+            /* Show only when width is greater than 1000px */
+        }
     }
 
     .toc ul {
@@ -86,7 +94,7 @@
     style="margin-right: 40px;">Notes Tree</a>
 <a href="/"
     style="margin-right: 40px;">Dictionary</a>
-    
+
 {% if not is_dir %}
 <a href="/edit_note/{{ note_path }}"
     id="edit-note">Edit this note</a>
