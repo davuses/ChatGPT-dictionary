@@ -123,7 +123,10 @@ def insert_questions_and_answers():
 def db_get_all_question():
     with Session(engine) as session:
         questions = (
-            session.query(Question).filter(Question.is_hidden == False).all()
+            session.query(Question)
+            .filter(Question.is_hidden == False)
+            .order_by(Question.id.desc())
+            .all()
         )
         return questions
 

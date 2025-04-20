@@ -183,7 +183,7 @@ async def notes(rest_of_path: str, request: Request):
                     extras=["strike", "tables", "toc", "fenced-code-blocks"],
                 )
                 toc_html = note_html.toc_html
-        except:
+        except Exception:
             note_html = "Unable to read the file"
     title = rest_of_path.split("/")[-1]
     toc_exist = bool(toc_html)
@@ -213,7 +213,7 @@ async def edit_note_page(rest_of_path: str, request: Request):
     try:
         with open(file_path) as note_file:
             note_text = note_file.read()
-    except:
+    except Exception:
         return templates.TemplateResponse(
             request=request,
             name="404.html.jinja",
@@ -250,7 +250,7 @@ async def edit_note(
             print(repr(updated_text))
             note_file.write(updated_text.replace("\r", ""))
         return RedirectResponse(url=f"/notes/{rest_of_path}", status_code=303)
-    except:
+    except Exception:
         return templates.TemplateResponse(
             request=request,
             name="404.html.jinja",
@@ -283,7 +283,7 @@ def show_synonyms(qid: int, request: Request):
     thesauruses = []
     try:
         synonyms_data = get_synonyms(word)
-    except:
+    except Exception:
         return templates.TemplateResponse(
             request=request,
             name="error.html.jinja",
