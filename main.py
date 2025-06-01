@@ -247,7 +247,6 @@ async def edit_note(
             note_file.read()
             note_file.seek(0)
             note_file.truncate(0)
-            print(repr(updated_text))
             note_file.write(updated_text.replace("\r", ""))
         return RedirectResponse(url=f"/notes/{rest_of_path}", status_code=303)
     except Exception:
@@ -339,6 +338,7 @@ async def root_page(request: Request):
             request.query_params.get("all_questions") == "true",
         ]
     )
+    is_all_questions = True
     if is_all_questions:
         questions = db_get_all_question()
     else:
@@ -430,7 +430,6 @@ async def question_page(question_id: int, request: Request):
         if question.example
         else ""
     )
-    print(example_text)
     example_text = re.sub(
         r"(/[^>^<\s]+?/)", r'<span class="ipa">\1</span>', example_text
     )
