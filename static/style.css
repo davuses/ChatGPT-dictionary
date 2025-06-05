@@ -182,3 +182,8 @@ tr.selected {
 .visit-7{
     color: #3c4e5d;
 }
+caption {
+    font-family: "BBC Reith Serif";
+    font-weight: bold;
+    font-size: 1.2em;
+}

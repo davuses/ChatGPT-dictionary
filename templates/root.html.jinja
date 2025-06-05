@@ -1,14 +1,6 @@
 {% extends "base.html.jinja" %}
 {% block title %}
-{% if questions_only %}
-Only Questions
-{% elif show_example %}
-Show Examples
-{% elif is_all_questions %}
-All Questions
-{% else %}
 My Dictionary
-{% endif %}
 {% endblock title %}
 {% block body %}
 
@@ -19,50 +11,36 @@ My Dictionary
 <p style="display: flex; justify-content: space-between; align-items: center;">
     <span>
         <a class="header-link"
-            href="/?all_questions=true"
-            style="text-decoration: none;">All Questions</a>
+            href="/?questions_only=true"
+            style="text-decoration: none;">Questions Only</a>
         <a class="header-link"
             href="/?example=true"
             style="text-decoration: none;">Show Examples</a>
-        <a class="header-link"
-            href="/notes/">Notes Tree</a>
-        <a class="header-link"
+
+        {# <a class="header-link"
             href="/add_question"
-            style="text-decoration: none;">Add Question</a>
+            style="text-decoration: none;">Add Question</a> #}
     </span>
-    <a href="#bottom"
-        class="header-link"
-        style="text-decoration: none;">Go to Bottom</a>
+<a class="header-link"
+    href="/notes/" style="font-weight: bold">My Notes</a>
 </p>
 <table border="1">
-    <tr>
-        <th>Question</th>
-        <th>Context</th>
-        {% if show_example %}
-        <th>Examples</th>
-        {% endif %}
-        <th>Action</th>
-        <th>Visit</th>
-    </tr>
-    {% for q_tuple in q_tuples %}
-    <tr id="{{ q_tuple[0] }}">
-        <td><label class="unselectable">-<span data-content=" "></span></label><a style="text-decoration: none;"
-                href="question/{{ q_tuple[0] }}">{{ q_tuple[1] }}</a></td>
-        <td>
-            {{ q_tuple[2] }}
-        </td>
-        {% if show_example %}
-        <td> {{ q_tuple[3] }} </td>
-        {% endif %}
-        <td><button onclick="deleteQuestionMainPageByButton(this, {{ q_tuple[0] }})">Delete</button></td>
-        <td class="visit-{{ q_tuple[4] }}">{{ q_tuple[4] }}</td>
-    </tr>
-    {% endfor %}
+    {% if questions_only %}
+    <caption>Questions Only</caption>
+    {% include "questions_only_table.html.jinja" %}
+    {% elif show_example %}
+    <caption>Questions with Examples</caption>
+    {% include "questions_with_examples.html.jinja" %}
+    {% else %}
+    <caption>My Questions</caption>
+    {% include "questions_default.html.jinja" %}
+    {% endif %}
+
 </table>
 <div id="bottom">
 </div>
 <a href="#"
-    class="float hide-on-desktop">
+    class="float">
     <i class="my-float"
         style="font-size:20px">top</i>
 </a>
