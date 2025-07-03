@@ -1,7 +1,6 @@
 import os
 import re
 import tomllib
-from subprocess import PIPE, Popen
 from typing import Optional
 
 import markdown2
@@ -34,6 +33,7 @@ from database import (
     db_update_question_text,
 )
 from utils import (
+    build_directory_tree_markdown,
     delete_audio_file,
     from_last_visit,
     get_all_words,
@@ -150,41 +150,26 @@ async def get_audio(file_name: str):
 
 @app.get("/notes/{rest_of_path:path}", response_class=HTMLResponse)
 async def notes(rest_of_path: str, request: Request):
-    file_path = NOTES_FOLDER + rest_of_path
+    file_path = os.path.join(NOTES_FOLDER, rest_of_path)
     toc_html = ""
     is_dir = os.path.isdir(file_path)
+
     if is_dir:
-        proc = Popen(
-            args=[
-                "tree",
-                "-I",
-                "*.png",
-                "-I",
-                "*.jpg",
-                "-I",
-                "*.webp",
-                "-I",
-                "Media",
-                "-H",
-                "./",
-                file_path,
-            ],
-            stdout=PIPE,
-            universal_newlines=True,
-        )
-        stdout, _ = proc.communicate()
-        note_html = stdout
+        text = build_directory_tree_markdown(file_path)
     else:
         try:
-            with open(file_path) as note_file:
+            with open(file_path, encoding="utf-8") as note_file:
                 text = note_file.read()
-                note_html = markdown2.markdown(
-                    text,
-                    extras=["strike", "tables", "toc", "fenced-code-blocks"],
-                )
-                toc_html = note_html.toc_html
         except Exception:
-            note_html = "Unable to read the file"
+            text = "Unable to read the file"
+    note_html = markdown2.markdown(
+        text,
+        extras=["strike", "tables", "toc", "fenced-code-blocks"],
+    )
+    toc_html = getattr(note_html, "toc_html", "")
+    if is_dir:
+        note_html = f'<div class="tree-markdown">\n{note_html}\n</div>'
+
     title = rest_of_path.split("/")[-1]
     toc_exist = bool(toc_html)
     context = {

@@ -1,4 +1,7 @@
+import os
 import time
+import urllib
+import urllib.parse
 from pathlib import Path
 
 import edge_tts
@@ -89,3 +92,46 @@ def from_last_visit(last_visit: int):
         return f"{days} day{'s' if days > 1 else ''} ago"
     else:
         return "less than a day ago"
+
+
+def build_directory_tree_markdown(
+    base_path: str, rel_url_base: str = ""
+) -> str:
+    markdown_lines = []
+    for dirpath, dirnames, filenames in os.walk(base_path):
+        # Exclude hidden and unwanted directories
+        dirnames[:] = [
+            d for d in dirnames if not d.startswith(".") and d != "Media"
+        ]
+
+        # Filter hidden and unwanted files
+        filenames = [
+            f
+            for f in filenames
+            if not f.startswith(".")
+            and not f.lower().endswith((".png", ".jpg", ".webp"))
+        ]
+
+        rel_path = os.path.relpath(dirpath, base_path)
+        indent_level = rel_path.count(os.sep)
+        indent = "  " * indent_level
+
+        if rel_path != ".":
+            folder_name = os.path.basename(dirpath)
+            header_level = min(indent_level + 2, 6)  # limit to ######
+            markdown_lines.append(f"\n{'#' * header_level} {folder_name}")
+
+        for filename in filenames:
+            file_rel_path = (
+                os.path.join(rel_path, filename)
+                if rel_path != "."
+                else filename
+            )
+            if filename[-3:] == ".md":
+                filename = filename[:-3]  # Remove .md extension for display
+            file_url = urllib.parse.quote(
+                os.path.join(rel_url_base, file_rel_path).replace(os.sep, "/")
+            )
+            markdown_lines.append(f"{indent}- [{filename}](/notes/{file_url})")
+
+    return "\n".join(markdown_lines)
