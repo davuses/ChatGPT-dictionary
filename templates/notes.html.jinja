@@ -136,7 +136,7 @@
     style="margin-right: 30px;">Dictionary</a>
 
 {% if not is_dir %}
-<a href="/edit_note/{{ note_path }}"
+<a href="/edit_note/{{ request.path_params.note_path }}"
     id="edit-note">Edit this note</a>
 {% endif %}
 
@@ -178,7 +178,13 @@
     </div>
     {% endif %}
     <article>
-        <p>{{ note_html | safe }}</p>
+        {% if is_dir %}
+        <div class="tree-markdown">
+            {{ note_html | safe }}
+        </div>
+        {% else %}
+        {{ note_html | safe }}
+        {% endif %}
     </article>
 </div>
 

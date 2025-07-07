@@ -18,22 +18,35 @@
 <h1>Synonyms of <a href="/question/{{ qid }}"
         style="text-decoration: none;">{{ word }}</a></h1>
 
-<table border="1">
-    <tr>
-        <th>Part of speech</th>
-        <th>Meaning</th>
-        <th>Synonyms</th>
-    </tr>
-    {% if synonyms_exist %}
-    {% for thesaurus in thesauruses %}
-    <tr>
-        <td>{{ thesaurus[0] }}</td>
-        <td>{{ thesaurus[1] | safe }}</td>
-        <td>{{ thesaurus[2] | safe }}</td>
-    </tr>
-    {% endfor %}
-    {% endif %}
+{% if entries %}
+<table class="synonyms-table">
+    <thead>
+        <tr>
+            <th>Part of Speech</th>
+            <th>Meaning</th>
+            <th>Synonyms</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for entry in entries %}
+        <tr>
+            <td>{{ entry.part_of_speech }}</td>
+            <td>{{ entry.meaning_html | safe }}</td>
+            <td>
+                {% for syn in entry.synonyms %}
+                {% if syn in all_words %}
+                {% for qid in all_words[syn] %}
+                <a href="{{ url_for('question_page', question_id=qid) }}">{{ syn }}</a>{% if not loop.last %} / {% endif
+                %}{% endfor %}{% else %}{{ syn }}{% endif %}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
 </table>
+{% else %}
+<p>No synonyms found for this word.</p>
+{% endif %}
 
 
 {% endblock body %}

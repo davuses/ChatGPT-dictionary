@@ -1,20 +1,19 @@
-import os
 import re
-import tomllib
 from typing import Optional
 
 import markdown2
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
-    JSONResponse,
     RedirectResponse,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.templating import _TemplateResponse
 
 from database import (
     db_add_answer,
@@ -25,7 +24,6 @@ from database import (
     db_get_answer_by_id,
     db_get_latest_questions,
     db_get_question_by_id,
-    db_get_questions_after,
     db_question_increment_visit_number,
     db_question_last_visit_old_enough,
     db_update_answer_text,
@@ -33,43 +31,21 @@ from database import (
     db_update_question_text,
 )
 from utils import (
+    NOTES_DIR,
     build_directory_tree_markdown,
-    delete_audio_file,
     from_last_visit,
     get_all_words,
     get_IPA,
-    get_synonyms,
-    tts_edge,
+    get_thesaurus_entries,
+    safe_path_note,
 )
 
 app = FastAPI()
 
-app.mount("/audio", StaticFiles(directory="./audio"), name="audio")
 
 app.mount("/static", StaticFiles(directory="./static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
-
-
-STYLE_SNIPPET = """\
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css"/>
-<script src="/static/script.js"></script>
-<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-<link rel="stylesheet" href="/static/markdown-pc.css"
-    media="screen and (min-width: 600px)"
-/>
-<link rel="stylesheet" href="/static/markdown-mobile.css"
-    media="screen and (max-width: 640px)"
-/>
-<link rel="stylesheet" href="/static/md-editor.min.css">
-<script src="/static/md-editor.min.js"></script>
-"""
-
-with open("config.toml", "rb") as fp:
-    toml_config = tomllib.load(fp)
-    NOTES_FOLDER = toml_config["notes_folder"]
-    # NOTES_FOLDER = "/home/sakana/Learning-for-IELTS/"
 
 
 class EditAnswerForm(BaseModel):
@@ -123,193 +99,28 @@ class AddAnswerForm(BaseModel):
         return cls(answer_text=answer_text, question_id=question_id)
 
 
-def shorten_string(s, max_length=180):
-    if len(s) <= max_length:
-        return s
-    else:
-        return s[: max_length - 3] + "..."
-
-
-def render_404_page(request, message="404"):
-    return templates.TemplateResponse(
-        request=request,
-        name="404.html.jinja",
-        context={"message": message},
-    )
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+):
+    if exc.status_code == 404:
+        return templates.TemplateResponse(
+            "404.html.jinja",
+            {"request": request, "detail": exc.detail},
+            status_code=404,
+        )
+    if exc.status_code == 500:
+        return templates.TemplateResponse(
+            "500.html.jinja",
+            {"request": request, "detail": exc.detail},
+            status_code=500,
+        )
+    return HTMLResponse(content=str(exc.detail), status_code=exc.status_code)
 
 
 @app.get("/static/{file_name}", include_in_schema=False)
 async def static_file(file_name):
     return FileResponse(f"./static/{file_name}")
-
-
-@app.get("/audio/{file_name}")
-async def get_audio(file_name: str):
-    return FileResponse(f"./audio/{file_name}")
-
-
-@app.get("/notes/{rest_of_path:path}", response_class=HTMLResponse)
-async def notes(rest_of_path: str, request: Request):
-    file_path = os.path.join(NOTES_FOLDER, rest_of_path)
-    toc_html = ""
-    is_dir = os.path.isdir(file_path)
-
-    if is_dir:
-        text = build_directory_tree_markdown(file_path)
-    else:
-        try:
-            with open(file_path, encoding="utf-8") as note_file:
-                text = note_file.read()
-        except Exception:
-            text = "Unable to read the file"
-    note_html = markdown2.markdown(
-        text,
-        extras=["strike", "tables", "toc", "fenced-code-blocks"],
-    )
-    toc_html = getattr(note_html, "toc_html", "")
-    if is_dir:
-        note_html = f'<div class="tree-markdown">\n{note_html}\n</div>'
-
-    title = rest_of_path.split("/")[-1]
-    toc_exist = bool(toc_html)
-    context = {
-        "title": title,
-        "toc_html": toc_html,
-        "note_html": note_html,
-        "is_dir": is_dir,
-        "toc_exist": toc_exist,
-        "note_path": rest_of_path,
-    }
-    return templates.TemplateResponse(
-        request=request, name="notes.html.jinja", context=context
-    )
-
-
-@app.get("/edit_note/{rest_of_path:path}", response_class=HTMLResponse)
-async def edit_note_page(rest_of_path: str, request: Request):
-    file_path = NOTES_FOLDER + rest_of_path
-    is_dir = os.path.isdir(file_path)
-    if is_dir:
-        return templates.TemplateResponse(
-            request=request,
-            name="404.html.jinja",
-            context={"message": "Wrong note path"},
-        )
-    try:
-        with open(file_path) as note_file:
-            note_text = note_file.read()
-    except Exception:
-        return templates.TemplateResponse(
-            request=request,
-            name="404.html.jinja",
-            context={"message": "Unable to read the file"},
-        )
-    else:
-        context = {"note_text": note_text, "note_path": rest_of_path}
-        return templates.TemplateResponse(
-            request=request, name="edit_note.html.jinja", context=context
-        )
-
-
-@app.post("/edit_note/{rest_of_path:path}", response_class=HTMLResponse)
-async def edit_note(
-    rest_of_path: str,
-    request: Request,
-    form_data: EditNoteForm = Depends(EditNoteForm.as_form),
-):
-    file_path = NOTES_FOLDER + rest_of_path
-    is_dir = os.path.isdir(file_path)
-    if not (updated_text := form_data.note_text):
-        updated_text = ""
-    if is_dir:
-        return templates.TemplateResponse(
-            request=request,
-            name="404.html.jinja",
-            context={"message": "Wrong note path"},
-        )
-    try:
-        with open(file_path, "r+") as note_file:
-            note_file.read()
-            note_file.seek(0)
-            note_file.truncate(0)
-            note_file.write(updated_text.replace("\r", ""))
-        return RedirectResponse(url=f"/notes/{rest_of_path}", status_code=303)
-    except Exception:
-        return templates.TemplateResponse(
-            request=request,
-            name="404.html.jinja",
-            context={"message": "Unable to read the file"},
-        )
-
-
-@app.get("/tts_question/{qid}")
-async def tts_question(qid: int):
-    question = db_get_question_by_id(qid)
-    if not question:
-        return "No question"
-    tts_edge(question)
-    return "ok"
-
-
-@app.get("/show_synonyms/{qid}", response_class=HTMLResponse)
-def show_synonyms(qid: int, request: Request):
-    question = db_get_question_by_id(qid)
-    if not question:
-        return "No question"
-    question_text: str = question.text
-    if " - " in question_text:
-        word = question_text.split(" - ")[-1]
-    else:
-        word = question_text
-    if " " in word:
-        return "This feature is for words only"
-    all_words = get_all_words()
-    thesauruses = []
-    try:
-        synonyms_data = get_synonyms(word)
-    except Exception:
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html.jinja",
-        )
-    else:
-        if synonyms_data:
-            for synonym_data in synonyms_data:
-                synonyms = synonym_data[3]
-                w_strings = []
-                for syn in synonyms:
-                    if qids := all_words.get(syn):
-                        w_template = '<a href="/question/{}" style="text-decoration: none;">{}</a>'
-                        w_string = " / ".join(
-                            [w_template.format(qid, syn) for qid in qids]
-                        )
-                    else:
-                        w_string = syn
-                    w_strings.append(w_string)
-                synonyms_html = ", ".join(w_strings)
-                meaning_md = re.sub(
-                    r"as in (.+?):(.+)",
-                    lambda match: f"as in *{match.group(1)}*:\n\n{match.group(2)}",
-                    synonym_data[2],
-                )
-                thesauruses.append(
-                    (
-                        synonym_data[1],
-                        markdown2.markdown(meaning_md),
-                        synonyms_html,
-                    )
-                )
-    synonyms_exist = bool(synonyms_data)
-
-    context = {
-        "qid": qid,
-        "word": word,
-        "synonyms_exist": synonyms_exist,
-        "thesauruses": thesauruses,
-    }
-    return templates.TemplateResponse(
-        request=request, name="synonyms.html.jinja", context=context
-    )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -359,38 +170,12 @@ async def root_page(request: Request):
     )
 
 
-@app.get("/edit_question/{question_id}", response_class=HTMLResponse)
-async def edit_question_page(question_id: int, request: Request):
-    question = db_get_question_by_id(question_id)
-    if not question:
-        return render_404_page(request, message="Question Not Found")
-
-    context = {"question_id": question_id, "question_text": question.text}
-    return templates.TemplateResponse(
-        request=request, name="edit_question.html.jinja", context=context
-    )
-
-
-@app.post("/edit_question/{question_id}", response_class=HTMLResponse)
-async def edit_question(
-    question_id: int,
-    form_data: EditQuestionForm = Depends(EditQuestionForm.as_form),
-):
-    updated_text = form_data.question_text
-    updated_text = updated_text.strip()
-    try:
-        if q_id := db_update_question_text(question_id, updated_text):
-            return RedirectResponse(url=f"/question/{q_id}", status_code=303)
-    except IntegrityError:
-        return "Question text UNIQUE constraint failed"
-
-
 @app.get("/question/{question_id}", response_class=HTMLResponse)
 async def question_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
-        return render_404_page(request, message="Question Not Found")
-    how_long_ago = (
+        raise HTTPException(status_code=404, detail="Question not found")
+    how_long_ago: str = (
         from_last_visit(last_visit)
         if (last_visit := question.last_visit)
         else "None"
@@ -436,27 +221,72 @@ async def question_page(question_id: int, request: Request):
     )
 
 
-@app.get("/delete_question/{question_id}", response_class=HTMLResponse)
-async def delete_question(question_id: int):
-    db_delete_question(question_id)
-    return "200"
+@app.get("/edit_question/{question_id}", response_class=HTMLResponse)
+async def edit_question_page(question_id: int, request: Request):
+    question = db_get_question_by_id(question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
 
-
-@app.get("/delete_audio/{question_id}", response_class=HTMLResponse)
-async def delete_audio(question_id: int):
-    delete_audio_file(question_id)
-    return "200"
+    context = {"question_id": question_id, "question_text": question.text}
+    return templates.TemplateResponse(
+        request=request, name="edit_question.html.jinja", context=context
+    )
 
 
 @app.get("/edit_answer/{answer_id}", response_class=HTMLResponse)
 async def edit_answer_page(answer_id: int, request: Request):
     answer = db_get_answer_by_id(answer_id)
     if not answer:
-        return render_404_page(request, message="Answer Not Found")
+        raise HTTPException(status_code=404, detail="Answer not found")
     context = {"answer_text": answer.text, "answer_id": answer_id}
     return templates.TemplateResponse(
         request=request, name="edit_answer.html.jinja", context=context
     )
+
+
+@app.get("/edit_example/{question_id}", response_class=HTMLResponse)
+async def edit_example_page(question_id: int, request: Request):
+    question = db_get_question_by_id(question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    context = {
+        "question_id": question_id,
+        "question_example": question.example or "",
+    }
+    return templates.TemplateResponse(
+        request=request, name="edit_example.html.jinja", context=context
+    )
+
+
+@app.get("/add_question", response_class=HTMLResponse)
+async def add_question_page(request: Request):
+    return templates.TemplateResponse(
+        request=request, name="add_question.html.jinja"
+    )
+
+
+@app.get("/add_answer", response_class=HTMLResponse)
+async def add_answer_page(qid: int, request: Request):
+    context = {"qid": qid}
+    return templates.TemplateResponse(
+        request=request, name="add_answer.html.jinja", context=context
+    )
+
+
+@app.post("/edit_question/{question_id}", response_class=HTMLResponse)
+async def edit_question(
+    question_id: int,
+    form_data: EditQuestionForm = Depends(EditQuestionForm.as_form),
+):
+    updated_text = form_data.question_text.strip()
+    if not updated_text:
+        return "Question text cannot be empty"
+    try:
+        if q_id := db_update_question_text(question_id, updated_text):
+            return RedirectResponse(url=f"/question/{q_id}", status_code=303)
+    except IntegrityError:
+        return "Question text UNIQUE constraint failed"
 
 
 @app.post("/edit_answer/{answer_id}", response_class=HTMLResponse)
@@ -466,21 +296,6 @@ async def edit_answer(
     updated_text = form_data.answer_text
     if question_id := db_update_answer_text(answer_id, updated_text):
         return RedirectResponse(url=f"/question/{question_id}", status_code=303)
-
-
-@app.get("/edit_example/{question_id}", response_class=HTMLResponse)
-async def edit_example_page(question_id: int, request: Request):
-    question = db_get_question_by_id(question_id)
-    if not question:
-        return render_404_page(request, message="Question Not Found")
-
-    context = {
-        "question_id": question_id,
-        "question_example": question.example or "",
-    }
-    return templates.TemplateResponse(
-        request=request, name="edit_example.html.jinja", context=context
-    )
 
 
 @app.post("/edit_example/{question_id}", response_class=HTMLResponse)
@@ -496,40 +311,30 @@ async def edit_example(
         )
 
 
+@app.get("/delete_question/{question_id}", response_class=HTMLResponse)
+async def delete_question(question_id: int):
+    db_delete_question(question_id)
+    return "200"
+
+
 @app.get("/delete_answer/{answer_id}", response_class=HTMLResponse)
 async def delete_answer(answer_id: int):
     if question_id := db_delete_answer(answer_id):
         return RedirectResponse(url=f"/question/{question_id}", status_code=303)
 
 
-@app.get("/add_question", response_class=HTMLResponse)
-async def add_question_page(request: Request):
-
-    return templates.TemplateResponse(
-        request=request, name="add_question.html.jinja"
-    )
-
-
 @app.post("/add_question", response_class=HTMLResponse)
 async def add_question(
     form_data: AddQuestionForm = Depends(AddQuestionForm.as_form),
 ):
-    updated_text = form_data.question_text
-    updated_text = updated_text.strip()
+    updated_text = form_data.question_text.strip()
+    if not updated_text:
+        return "Question text cannot be empty"
     try:
         if q_id := db_add_question(updated_text):
             return RedirectResponse(url=f"/question/{q_id}", status_code=303)
     except IntegrityError:
         return "Question text UNIQUE constraint failed"
-
-
-@app.get("/add_answer", response_class=HTMLResponse)
-async def add_answer_page(qid: int, request: Request):
-
-    context = {"qid": qid}
-    return templates.TemplateResponse(
-        request=request, name="add_answer.html.jinja", context=context
-    )
 
 
 @app.post("/add_answer", response_class=HTMLResponse)
@@ -544,23 +349,108 @@ async def add_answer(
     return "Question doesn't exist"
 
 
-@app.get("/load_more/{qid}", response_class=JSONResponse)
-async def load_more(qid: int, request: Request):
-    q_lists = []
-    if questions := db_get_questions_after(qid):
-        q_lists: list[list] = []
-        # (question.id, q_text, q_context, example)
-        for question in questions:
-            question_text = question.text
-            if "When i ask you a word" in question_text:
-                continue
-            q_context = ""
-            q_text = question_text
-            if " - " in question_text:
-                q_text = question_text.split(" - ")[-1].strip()
-                q_context = question_text.split(" - ")[0]
+@app.get("/show_synonyms/{qid}", response_class=HTMLResponse)
+def show_synonyms(qid: int, request: Request):
+    question = db_get_question_by_id(qid)
+    if not question:
+        return "No question"
+    question_text: str = question.text
+    try:
+        word = question_text.split(" - ")[-1]
+        assert " " not in word
+    except (IndexError, AssertionError):
+        raise HTTPException(status_code=404, detail="Word not valid")
+    try:
+        entries = get_thesaurus_entries(word)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching thesaurus entries: {e}"
+        )
+    context = {
+        "qid": qid,
+        "word": word or "",
+        "entries": entries,
+        "all_words": get_all_words(),  # pass this in
+    }
+    return templates.TemplateResponse(
+        request=request, name="synonyms.html.jinja", context=context
+    )
 
-            q_lists.append(
-                [question.id, q_text, q_context, question.visit_count]
-            )
-    return {"q_lists": q_lists}
+
+@app.get("/notes/", response_class=HTMLResponse)
+async def notes(request: Request):
+    toc_html = ""
+    text = build_directory_tree_markdown(NOTES_DIR)
+    note_html = markdown2.markdown(
+        text,
+        extras=["strike", "tables", "toc", "fenced-code-blocks"],
+    )
+    toc_html = getattr(note_html, "toc_html", "")
+    title = "Notes Tree"
+    toc_exist = bool(toc_html)
+    context = {
+        "title": title,
+        "toc_html": toc_html,
+        "note_html": note_html,
+        "is_dir": True,
+        "toc_exist": toc_exist,
+    }
+    return templates.TemplateResponse(
+        request=request, name="notes.html.jinja", context=context
+    )
+
+
+@app.get("/view_note/{note_path:path}", response_class=HTMLResponse)
+def view_note(note_path: str, request: Request) -> _TemplateResponse:
+    """Return the rendered HTML of a markdown note by relative path."""
+    full_path = safe_path_note(note_path)
+    content = full_path.read_text(encoding="utf-8")
+    note_html = markdown2.markdown(
+        content,
+        extras=["strike", "tables", "toc", "fenced-code-blocks"],
+    )
+    toc_html = getattr(note_html, "toc_html", "")
+    title = full_path.name
+    toc_exist = bool(toc_html)
+    context = {
+        "title": title,
+        "toc_html": toc_html,
+        "note_html": note_html,
+        "is_dir": False,
+        "toc_exist": toc_exist,
+    }
+    return templates.TemplateResponse(
+        request=request, name="notes.html.jinja", context=context
+    )
+
+
+@app.get("/edit_note/{note_path:path}", response_class=HTMLResponse)
+async def edit_note_page(note_path: str, request: Request):
+    full_path = safe_path_note(note_path)
+    content = full_path.read_text(encoding="utf-8")
+    context = {"note_text": content, "note_path": note_path}
+    return templates.TemplateResponse(
+        request=request, name="edit_note.html.jinja", context=context
+    )
+
+
+@app.post("/edit_note/{note_path:path}", response_class=HTMLResponse)
+async def edit_note(
+    note_path: str,
+    request: Request,
+    form_data: EditNoteForm = Depends(EditNoteForm.as_form),
+):
+    full_path = safe_path_note(note_path)
+    updated_text = form_data.note_text or ""
+    try:
+        full_path.write_text(updated_text, encoding="utf-8")
+        return RedirectResponse(
+            url=request.url_for("view_note", note_path=note_path),
+            status_code=303,
+        )
+    except (OSError, IOError):
+        return templates.TemplateResponse(
+            request=request,
+            name="404.html.jinja",
+            context={"message": "Unable to edit the file"},
+        )

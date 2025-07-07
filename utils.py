@@ -1,27 +1,19 @@
 import os
+import re
 import time
+import tomllib
 import urllib
 import urllib.parse
+from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
-import edge_tts
+import markdown2
+from fastapi import HTTPException
 from phonemizer import phonemize
 
-from database import Question, db_get_all_question
+from database import db_get_all_question
 from wordhoard import Synonyms
-
-audio_directory = Path("./audio")
-audio_directory.mkdir(exist_ok=True)
-
-
-def delete_audio_file(question_id):
-    audio_directory = Path("./audio")
-    audio_file_path = audio_directory / f"{question_id}.mp3"
-    if audio_file_path.exists():
-        audio_file_path.unlink()
-        print(f"Deleted {audio_file_path}")
-    else:
-        print(f"File {audio_file_path} doesn't exist")
 
 
 def get_IPA(word) -> str:
@@ -31,17 +23,6 @@ def get_IPA(word) -> str:
         return a
     else:
         return str(a)
-
-
-def get_synonyms(word):
-    synonym = Synonyms(
-        search_string=word,
-        sources=[
-            "merriam-webster",
-        ],
-    )
-    synonyms = synonym.find_synonyms()
-    return synonyms
 
 
 cached_all_words: dict[str, list[int]] = {}
@@ -68,21 +49,6 @@ def get_all_words():
     return cached_all_words
 
 
-def tts_edge(question: Question):
-    audio_path = audio_directory / Path(f"{question.id}-edge.mp3")
-    if audio_path.exists():
-        return
-    answer_text: str = question.answers[0].text
-    tts_text: str = answer_text.split("\n")[0]
-    question_sentence = question.text.split(" - ")[0]
-    tts_text = f"{question_sentence}. " + tts_text
-    voice = "en-US-AndrewNeural"
-    communicate = edge_tts.Communicate(
-        tts_text, voice, proxy="http://127.0.0.1:10802"
-    )
-    communicate.save_sync(str(audio_path))
-
-
 def from_last_visit(last_visit: int):
     ...
     now = int(time.time())
@@ -95,10 +61,12 @@ def from_last_visit(last_visit: int):
 
 
 def build_directory_tree_markdown(
-    base_path: str, rel_url_base: str = ""
+    base_path: Path, rel_url_base: str = ""
 ) -> str:
     markdown_lines = []
     for dirpath, dirnames, filenames in os.walk(base_path):
+        dirpath = Path(dirpath)
+
         # Exclude hidden and unwanted directories
         dirnames[:] = [
             d for d in dirnames if not d.startswith(".") and d != "Media"
@@ -112,26 +80,98 @@ def build_directory_tree_markdown(
             and not f.lower().endswith((".png", ".jpg", ".webp"))
         ]
 
-        rel_path = os.path.relpath(dirpath, base_path)
-        indent_level = rel_path.count(os.sep)
+        rel_path = dirpath.relative_to(base_path)
+        indent_level = len(rel_path.parts)
         indent = "  " * indent_level
 
-        if rel_path != ".":
-            folder_name = os.path.basename(dirpath)
-            header_level = min(indent_level + 2, 6)  # limit to ######
+        if rel_path != Path("."):
+            folder_name = dirpath.name
+            header_level = min(indent_level + 2, 6)
             markdown_lines.append(f"\n{'#' * header_level} {folder_name}")
 
         for filename in filenames:
-            file_rel_path = (
-                os.path.join(rel_path, filename)
-                if rel_path != "."
-                else filename
+            file_path = (
+                rel_path / filename if rel_path != Path(".") else Path(filename)
             )
-            if filename[-3:] == ".md":
-                filename = filename[:-3]  # Remove .md extension for display
+            display_name = (
+                filename[:-3] if filename.endswith(".md") else filename
+            )
             file_url = urllib.parse.quote(
-                os.path.join(rel_url_base, file_rel_path).replace(os.sep, "/")
+                str((Path(rel_url_base) / file_path).as_posix())
             )
-            markdown_lines.append(f"{indent}- [{filename}](/notes/{file_url})")
+            markdown_lines.append(
+                f"{indent}- [{display_name}](/view_note/{file_url})"
+            )
 
     return "\n".join(markdown_lines)
+
+
+with open("config.toml", "rb") as fp:
+    toml_config = tomllib.load(fp)
+    NOTES_DIR = Path(toml_config["notes_folder"]).resolve()
+    NOTES_DIR.mkdir(exist_ok=True)
+
+
+def safe_path_note(subpath: str) -> Path:
+    """Ensure subpath is within NOTES_DIR to avoid directory traversal."""
+    decoded = urllib.parse.unquote(subpath)
+    final_path = (NOTES_DIR / decoded).resolve()
+    if not final_path.is_relative_to(NOTES_DIR):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not final_path.exists() or not final_path.suffix == ".md":
+        raise HTTPException(status_code=404, detail="Note not found")
+    return final_path
+
+
+@dataclass
+class ThesaurusEntry:
+    part_of_speech: str
+    meaning_html: str
+    synonyms: list[str]
+
+
+def get_synonyms(word):
+    synonym = Synonyms(
+        search_string=word,
+        sources=[
+            "merriam-webster",
+        ],
+    )
+    synonyms = cast(
+        list[tuple[str, str, str, list[str]]], synonym.find_synonyms()
+    )
+    return synonyms
+
+
+def format_meaning_html(md_text: str) -> str:
+    """
+    Apply any custom markdown preprocessing, then convert to HTML.
+    """
+
+    # e.g. turn “as in X:Y” → italics + newline
+    def repl(m: re.Match) -> str:
+        a, b = m.group(1).strip(), m.group(2).strip()
+        return f"as in *{a}*:\n\n{b}"
+
+    clean_md = re.sub(r"as in (.+?):(.+)", repl, md_text.strip())
+    return markdown2.markdown(clean_md)
+
+
+def get_thesaurus_entries(
+    word: str,
+) -> list[ThesaurusEntry]:
+    synonyms_data = get_synonyms(word)
+    if not synonyms_data:
+        return []
+    entries = render_thesaurus_entries(synonyms_data)
+    return entries
+
+
+def render_thesaurus_entries(
+    synonyms_data: list[tuple[str, str, str, list[str]]],
+) -> list[ThesaurusEntry]:
+    entries = []
+    for _, pos, meaning_md, synonyms in synonyms_data:
+        meaning_html = format_meaning_html(meaning_md)
+        entries.append(ThesaurusEntry(pos, meaning_html, synonyms))
+    return entries

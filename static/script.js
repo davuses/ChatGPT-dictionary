@@ -33,35 +33,6 @@ function deleteQuestion(questionId) {
     });
   }
 }
-function deleteAudio(questionId) {
-  if (confirm("Are you sure you want to delete this audio?")) {
-    fetch("/delete_audio/" + questionId).then((Response) => {
-      if (Response.ok) {
-        location.reload();
-      }
-    });
-  }
-}
-function playEdgeTTS(button, questionId) {
-  fetch("/tts_question/" + questionId).then((Resp) => {
-    if (Resp.ok) {
-      var audio = document.createElement("audio");
-      audio.controls = true;
-      audio.className = "svelte-eemfgq";
-      audio.style.display = "block";
-      audio.src = `/audio/${questionId}-edge.mp3`;
-      button.parentNode.insertBefore(audio, button.nextSibling);
-      audio.play();
-    }
-  });
-}
-
-function ttsCanPlay() {
-  let tts_div = document.getElementById("tts-div");
-  if (tts_div) {
-    tts_div.style.display = "block";
-  }
-}
 
 const editPagePattern = /\/edit_.*?|add_.*/;
 
