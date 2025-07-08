@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import cast
 
 import markdown2
+from bs4 import BeautifulSoup
 from fastapi import HTTPException
 from phonemizer import phonemize
 
@@ -175,3 +176,18 @@ def render_thesaurus_entries(
         meaning_html = format_meaning_html(meaning_md)
         entries.append(ThesaurusEntry(pos, meaning_html, synonyms))
     return entries
+
+
+def highlight_ipa(html: str) -> str:
+    ipa_pattern = re.compile(r'(?<![=\["\(])(/[^/\s<>]+?/)(?![)\]":])')
+    soup = BeautifulSoup(html, "html.parser")
+
+    for text_node in soup.find_all(string=True):
+        parent = text_node.parent
+        if parent.name in ["script", "style", "code", "pre"]:
+            continue
+
+        new_text = ipa_pattern.sub(r'<span class="ipa">\1</span>', text_node)
+        text_node.replace_with(BeautifulSoup(new_text, "html.parser"))
+
+    return str(soup)

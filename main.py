@@ -1,4 +1,3 @@
-import re
 from typing import Optional
 
 import markdown2
@@ -37,6 +36,7 @@ from utils import (
     get_all_words,
     get_IPA,
     get_thesaurus_entries,
+    highlight_ipa,
     safe_path_note,
 )
 
@@ -187,23 +187,20 @@ async def question_page(question_id: int, request: Request):
         visit_count += 1
     # Only display the first answer
     answer_exist = True if question.answers else False
-    answer_text = None
+    answer_html = None
     answer_id = None
     if answer_exist:
         a = question.answers[0]
-        answer_text = markdown2.markdown(a.text, extras=["strike"])
+        answer_html = markdown2.markdown(a.text, extras=["strike"])
         answer_id = a.id
     word = question.text.split(" - ")[-1].strip()
     IPA_transcript = get_IPA(word)
-    example_text = (
+    example_html = (
         markdown2.markdown(question.example, extras=["strike", "tables"])
         if question.example
         else ""
     )
-    example_text = re.sub(
-        r"(/[^>^<\s]+?/)", r'<span class="ipa">\1</span>', example_text
-    )
-
+    example_html = highlight_ipa(example_html)
     context = {
         "visit_count": visit_count,
         "how_long_ago": how_long_ago,
@@ -212,9 +209,9 @@ async def question_page(question_id: int, request: Request):
         "IPA_transcript": IPA_transcript,
         "word": word,
         "answer_exist": answer_exist,
-        "answer_text": answer_text,
+        "answer_html": answer_html,
         "answer_id": answer_id,
-        "example_text": example_text,
+        "example_html": example_html,
     }
     return templates.TemplateResponse(
         request=request, name="question.html.jinja", context=context

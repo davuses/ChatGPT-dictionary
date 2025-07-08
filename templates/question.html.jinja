@@ -230,7 +230,6 @@
                 var questionId = "{{ question_id }}"
             </script>
         </p>
-        <hr>
         <div id="tts-div"
             style="display: none;">
             <audio controls
@@ -240,16 +239,14 @@
             <button class="q-button"
                 onclick="deleteAudio({{ question_id }})"
                 type="button">Delete audio</button>
-            <hr>
         </div>
-        <hr>
         <h2>Answer</h2>
         <button class="q-button"
             onclick="location.href='/add_answer?qid={{ question_id }}'"
             type="button">Add answer</button>
         {% if answer_exist %}
         <div id="answer-div">
-            {{ answer_text | safe }}
+            {{ answer_html | safe }}
             <button class="q-button"
                 onclick="location.href='/edit_answer/{{ answer_id }}'"
                 type="button">Edit</button>
@@ -258,7 +255,7 @@
         </div>
         {% endif %}
         <h2>Example</h2>
-        <p>{{ example_text | safe }}</p>
+        <p>{{ example_html | safe }}</p>
         <button class="q-button"
             onclick="location.href='/edit_example/{{ question_id }}'"
             type="button"
