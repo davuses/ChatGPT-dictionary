@@ -226,6 +226,18 @@
                         window.location.href = "/add_question";
                     }
                 });
+                function deleteAnswer(button, answerId) {
+                    if (confirm("Are you sure you want to delete this answer?")) {
+                        fetch("/delete_answer/" + answerId).then((Response) => {
+                            if (Response.ok) {
+                                var a_li = button.parentNode;
+                                var a_ul = a_li.parentNode;
+                                a_ul.removeChild(a_li);
+                            }
+                        });
+                    }
+                }
+
 
                 var questionId = "{{ question_id }}"
             </script>

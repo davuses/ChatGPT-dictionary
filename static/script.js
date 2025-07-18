@@ -1,29 +1,3 @@
-function deleteAnswer(button, answerId) {
-  if (confirm("Are you sure you want to delete this answer?")) {
-    fetch("/delete_answer/" + answerId).then((Response) => {
-      if (Response.ok) {
-        var a_li = button.parentNode;
-        var a_ul = a_li.parentNode;
-        a_ul.removeChild(a_li);
-      }
-    });
-  }
-}
-function deleteQuestionMainPageByButton(button, questionId) {
-  var questionText =
-    button.parentElement.previousElementSibling.previousElementSibling
-      .textContent;
-  if (
-    confirm("Are you sure you want to delete this question?\n> " + questionText)
-  ) {
-    fetch("/delete_question/" + questionId).then((Response) => {
-      if (Response.ok) {
-        var row = button.parentNode.parentNode;
-        row.parentNode.removeChild(row);
-      }
-    });
-  }
-}
 function deleteQuestion(questionId) {
   if (confirm("Are you sure you want to delete this question?")) {
     fetch("/delete_question/" + questionId).then((Response) => {
