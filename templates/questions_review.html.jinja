@@ -2,6 +2,7 @@
     <th>Question</th>
     <th>Context</th>
     <th>Visit</th>
+    <th>Mark</th> <!-- New header -->
 </tr>
 {% for QD in q_list %}
 <tr id="{{ QD.question.id }}">
@@ -12,5 +13,15 @@
         {{ QD.q_context }}
     </td>
     <td class="visit-{{ QD.question.visit_count }}">{{ QD.question.visit_count }}</td>
+    <td style="color: #305969; font-size: medium; font-family: monospace; margin: 0px;"">
+        {% if QD.last_review_elapse != "never"%}
+        review: {{ QD.last_review_elapse }}
+        {% else %}
+        <!-- Empty cell if no last_review -->
+        {% endif %}
+    </td>
 </tr>
 {% endfor %}
+{% if last_review_question_id %}
+<a href="#{{last_review_question_id}}" style="font-style: italic; ">last review</a>
+{% endif %}

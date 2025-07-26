@@ -14,8 +14,11 @@ My Dictionary
             href="/?questions_only=true"
             style="text-decoration: none;">Questions Only</a>
         <a class="header-link"
-            href="/?example=true"
+            href="/?show_example=true"
             style="text-decoration: none;">Show Examples</a>
+        <a class="header-link"
+            href="/?review_mode=true"
+            style="text-decoration: none;">Review Mode</a>
 
         {# <a class="header-link"
             href="/add_question"
@@ -32,6 +35,9 @@ My Dictionary
     {% elif show_example %}
     <caption>Questions with Examples</caption>
     {% include "questions_with_examples.html.jinja" %}
+    {% elif review_mode %}
+    <caption>Review Mode</caption>
+    {% include "questions_review.html.jinja" %}
     {% else %}
     <caption>My Questions</caption>
     {% include "questions_default.html.jinja" %}

@@ -55,7 +55,8 @@ class Question(Base):
         Boolean, nullable=False, default=False
     )
     visit_count: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
-    last_visit: Mapped[int] = mapped_column(Integer, nullable=True)
+    last_visit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_review: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     def __str__(self) -> str:
         return (
@@ -81,6 +82,16 @@ class Answer(Base):
 
     def __str__(self) -> str:
         return f'Answer(id={self.id}, text="{self.text}"'
+
+
+class GlobalState(Base):
+    __tablename__ = "global_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+
+    last_review_question_id: Mapped[int | None] = mapped_column(
+        ForeignKey("question.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 # Emit CREATE TABLE DDL
@@ -277,15 +288,44 @@ def db_add_answer(text: str, question: Question):
         return answer.id
 
 
+def db_mark_last_review(id: int):
+    now = int(time.time())
+    with Session(engine) as session:
+        question = session.query(Question).filter(Question.id == id).first()
+        if question:
+            question.last_review = now
+            state = session.get(GlobalState, 1)
+            if state is None:
+                state = GlobalState(id=1)
+                session.add(state)
+            state.last_review_question_id = id
+            session.commit()
+            return True
+    return False
+
+
+def db_remove_last_review(id: int):
+    with Session(engine) as session:
+        question = session.query(Question).filter(Question.id == id).first()
+        if question:
+            question.last_review = None
+            session.commit()
+            return True
+    return False
+
+
+def get_last_reviewed() -> int | None:
+    with Session(engine) as session:
+        state = session.get(GlobalState, 1)
+        return state.last_review_question_id if state else None
+
+
 def main():
     parser = ArgumentParser(description="Your program's description")
 
     subparsers = parser.add_subparsers(dest="mode", help="Mode selection")
-
-    create_table_parser = subparsers.add_parser("create-table")
-
-    insert_parser = subparsers.add_parser("insert")
-
+    subparsers.add_parser("create-table")
+    subparsers.add_parser("insert")
     question_parser = subparsers.add_parser("question")
     question_parser.add_argument(
         "--question", required=True, help="Specify the question"

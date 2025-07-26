@@ -36,7 +36,24 @@
         <p style="display: flex; justify-content: space-between;
                    color: #305969; font-size: medium; font-family: monospace; margin: 0px;">
             <span>Visit count: {{ visit_count }}</span>
-            <span>Last visit: {{ how_long_ago }}</span>
+            <span style="text-align: center;">Last visit: {{ last_visit_elapsed }}</span>
+            <span style="display: flex; align-items: center;">
+                {% if last_review_elapsed != "never" %}
+                <!-- Show Remove button if last_review exists -->
+                <span>Last review: {{ last_review_elapsed }}</span>
+                <button id="remove-last-review"
+                    style="margin-left: 10px;"
+                    onclick="handleRemoveLastReview()">
+                    Remove
+                </button>
+                {% else %}
+                <!-- Show Mark button if last_review is None or 'never' -->
+                <button id="mark-last-review"
+                    style="margin-left: 10px;"
+                    onclick="handleMarkLastReview()">
+                    Review
+                </button>
+                {% endif %}</span>
         </p>
         <h2>Question</h2>
         <p id="question">{{ question_text }}</p>
@@ -238,7 +255,21 @@
                     }
                 }
 
+                function handleMarkLastReview() {
+                    fetch('/question/{{ question_id }}/mark_last_review', { method: 'POST' })
+                        .then(response => {
+                            if (response.ok) location.reload();
+                            else alert('Failed to mark last review.');
+                        });
+                }
 
+                function handleRemoveLastReview() {
+                    fetch('/question/{{ question_id }}/remove_last_review', { method: 'POST' })
+                        .then(response => {
+                            if (response.ok) location.reload();
+                            else alert('Failed to remove last review.');
+                        });
+                }
                 var questionId = "{{ question_id }}"
             </script>
         </p>

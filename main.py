@@ -1,7 +1,7 @@
 from typing import Optional
 
 import markdown2
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -23,17 +23,21 @@ from database import (
     db_get_answer_by_id,
     db_get_latest_questions,
     db_get_question_by_id,
+    db_mark_last_review,
     db_question_increment_visit_number,
     db_question_last_visit_old_enough,
+    db_remove_last_review,
     db_update_answer_text,
     db_update_example,
     db_update_question_text,
+    get_last_reviewed,
 )
 from utils import (
     NOTES_DIR,
+    QuestionDisplay,
     build_directory_tree_markdown,
-    from_last_visit,
     get_all_words,
+    get_how_long_ago,
     get_IPA,
     get_thesaurus_entries,
     highlight_ipa,
@@ -124,16 +128,12 @@ async def static_file(file_name):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root_page(request: Request):
-    is_show_example = request.query_params.get("example") == "true"
-    is_questions_only = request.query_params.get("questions_only") == "true"
-    is_all_questions = any(
-        [
-            is_show_example,
-            is_questions_only,
-            request.query_params.get("all_questions") == "true",
-        ]
-    )
+async def root_page(
+    request: Request,
+    show_example: bool = Query(False),
+    questions_only: bool = Query(False),
+    review_mode: bool = Query(False),
+):
     is_all_questions = True
     if is_all_questions:
         questions = db_get_all_question()
@@ -141,7 +141,7 @@ async def root_page(request: Request):
         question_count = 1000
         questions = db_get_latest_questions(question_count)
     questions_count = len(questions)
-    q_tuples: list[tuple] = []
+    q_list: list[QuestionDisplay] = []
     # (question.id, q_text, q_context, example)
     for question in questions:
         question_text = question.text
@@ -153,17 +153,23 @@ async def root_page(request: Request):
             q_text = question_text.split(" - ")[-1].strip()
             q_context = question_text.split(" - ")[0]
 
-        example = question.example or ""
-        q_tuples.append(
-            (question.id, q_text, q_context, example, question.visit_count)
+        q_list.append(
+            QuestionDisplay(
+                question=question,
+                q_text=q_text,
+                q_context=q_context,
+                last_review_elapse=get_how_long_ago(question.last_review),
+            )
         )
 
     context = {
         "questions_count": questions_count,
-        "q_tuples": q_tuples,
-        "questions_only": is_questions_only,
-        "show_example": is_show_example,
+        "q_list": q_list,
+        "questions_only": questions_only,
+        "show_example": show_example,
+        "review_mode": review_mode,
         "is_all_questions": is_all_questions,
+        "last_review_question_id": get_last_reviewed(),
     }
     return templates.TemplateResponse(
         request=request, name="root.html.jinja", context=context
@@ -175,11 +181,6 @@ async def question_page(question_id: int, request: Request):
     question = db_get_question_by_id(question_id)
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    how_long_ago: str = (
-        from_last_visit(last_visit)
-        if (last_visit := question.last_visit)
-        else "None"
-    )
     visit_count = question.visit_count
     if db_question_last_visit_old_enough(question.id):
         db_question_increment_visit_number(question.id)
@@ -203,7 +204,8 @@ async def question_page(question_id: int, request: Request):
     example_html = highlight_ipa(example_html)
     context = {
         "visit_count": visit_count,
-        "how_long_ago": how_long_ago,
+        "last_visit_elapsed": get_how_long_ago(question.last_visit),
+        "last_review_elapsed": get_how_long_ago(question.last_review),
         "question_text": question.text,
         "question_id": question_id,
         "IPA_transcript": IPA_transcript,
@@ -344,6 +346,22 @@ async def add_answer(
         db_add_answer(updated_text, question=question)
         return RedirectResponse(url=f"/question/{qid}", status_code=303)
     return "Question doesn't exist"
+
+
+@app.post("/question/{question_id}/mark_last_review")
+async def mark_last_review(question_id: int):
+    success = db_mark_last_review(question_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return {"message": "Last review marked"}
+
+
+@app.post("/question/{question_id}/remove_last_review")
+async def remove_last_review(question_id: int):
+    success = db_remove_last_review(question_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return {"message": "Last review removed"}
 
 
 @app.get("/show_synonyms/{qid}", response_class=HTMLResponse)

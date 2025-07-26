@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from fastapi import HTTPException
 from phonemizer import phonemize
 
-from database import db_get_all_question
+from database import Question, db_get_all_question
 from wordhoard import Synonyms
 
 
@@ -50,15 +50,31 @@ def get_all_words():
     return cached_all_words
 
 
-def from_last_visit(last_visit: int):
-    ...
+def get_how_long_ago(timestamp: int | None) -> str:
+    if not timestamp:
+        return "never"
     now = int(time.time())
-    time_delta = now - last_visit
-    days = time_delta // 86400  # 86400 seconds in a day
-    if days > 0:
-        return f"{days} day{'s' if days > 1 else ''} ago"
-    else:
-        return "less than a day ago"
+    time_delta = now - timestamp
+
+    if time_delta < 86400:
+        return "<= a day "
+
+    days = time_delta // 86400
+    years = days // 365
+    months = (days % 365) // 30
+    remaining_days = (days % 365) % 30
+
+    parts = []
+    if years > 0:
+        parts.append(f"{years} year{'s' if years != 1 else ''}")
+    if months > 0:
+        parts.append(f"{months} month{'s' if months != 1 else ''}")
+    if remaining_days > 0 or not parts:
+        parts.append(
+            f"{remaining_days} day{'s' if remaining_days != 1 else ''}"
+        )
+
+    return f"{' '.join(parts)} ago"
 
 
 def build_directory_tree_markdown(
@@ -129,6 +145,14 @@ class ThesaurusEntry:
     part_of_speech: str
     meaning_html: str
     synonyms: list[str]
+
+
+@dataclass
+class QuestionDisplay:
+    question: Question
+    q_text: str
+    q_context: str
+    last_review_elapse: str
 
 
 def get_synonyms(word):
