@@ -268,10 +268,12 @@ table tr td.col-1 {
   text-overflow: ellipsis; /* Add ellipsis (…) when text overflows */
   font-size: 17px;
   font-style: italic;
+  font-family: "Segoe UI", "BBC Reith Serif", Palatino, sans-serif;
 }
 table tr td.col-2 {
   max-width: 45rem;
-  font-size: 17px;
+  font-size: 16px;
+  font-family: Helvetica, sans-serif;
 }
 table tr th :first-child,
 table tr td :first-child {
