@@ -1,7 +1,16 @@
 {% extends "base.html.jinja" %}
 {% block title %}
+{% if questions_only %}
+Questions Only
+{% elif show_example %}
+Show Example
+{% elif review_mode %}
+Review Mode
+{% else %}
 My Dictionary
+{% endif %}
 {% endblock title %}
+
 {% block body %}
 
 <h1 id="top"><a href="/"

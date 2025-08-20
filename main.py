@@ -401,7 +401,7 @@ async def notes(request: Request):
         extras=["strike", "tables", "toc", "fenced-code-blocks"],
     )
     toc_html = getattr(note_html, "toc_html", "")
-    title = "Notes Tree"
+    title = "IELTS Notes"
     toc_exist = bool(toc_html)
     context = {
         "title": title,
