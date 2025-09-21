@@ -203,7 +203,9 @@ def render_thesaurus_entries(
 
 
 def highlight_ipa(html: str) -> str:
-    ipa_pattern = re.compile(r'(?<![=\["\(])(/[^/\s<>]+?/)(?![)\]":])')
+    ipa_pattern = re.compile(
+        r"(?:(?<=^)|(?<=\s))(/[^/\s<>]+?/)(?:(?=$)|(?=\s))"
+    )
     soup = BeautifulSoup(html, "html.parser")
 
     for text_node in soup.find_all(string=True):
