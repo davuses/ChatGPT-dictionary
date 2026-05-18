@@ -10,5 +10,4 @@ beautifulsoup4
 requests
 # Dependencies: apt-get install ...
 # festival espeak-ng mbrola
-# tree
 jinja2
