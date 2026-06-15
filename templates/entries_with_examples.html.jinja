@@ -1,17 +1,17 @@
 <tr>
-    <th>Entry</th>
-    <th>Context</th>
-    <th>Examples</th>
+    <th class="entry-col">Entry</th>
+    <th class="context-col">Context</th>
+    <th class="example-col">Examples</th>
 </tr>
 {% for display in entry_displays %}
 <tr id="{{ display.entry.id }}">
-    <td class="col-1"><label class="unselectable">-<span data-content=" "></span></label><a
+    <td class="entry-col"><label class="unselectable">-<span data-content=" "></span></label><a
             href="entry/{{ display.entry.id }}">{{ display.text }}</a></td>
-    <td class="col-2">
+    <td class="context-col">
         {{ display.context }}
     </td>
     {% if show_example %}
-    <td class="col-2"> {{ display.entry.example }} </td>
+    <td class="example-col"> {{ display.entry.example }} </td>
     {% endif %}
 </tr>
 {% endfor %}

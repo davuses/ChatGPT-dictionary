@@ -20,41 +20,34 @@
     }
 
     .audio-icon:hover {
-        color: #306e9b;
+        color: var(--accent-dark);
     }
 </style>
 {% endblock head %}
 
 {% block body %}
-    <p>
-        <a class="header-link" href="/">Back to Main Page</a>
-        <a class="header-link" href="/add_entry">Add Entry</a>
-    </p>
-    <article>
+    <nav class="page-toolbar" aria-label="Entry actions">
+        <div class="page-toolbar-actions">
+            <a class="button button-ghost" href="/">Dictionary</a>
+            <a class="button button-ghost" href="/show_synonyms/{{ entry_id }}">Synonyms</a>
+        </div>
+        <a class="button button-primary" href="/add_entry">Add</a>
+    </nav>
+    <article class="entry-page">
         <h1 class="word-title"> {{ word }} </h1>
         <p class="word-meta">
-            <span>Visit count: {{ visit_count }}</span>
+            <span>{{ visit_count }} visits</span>
             <span>Last visit: {{ last_visit_elapsed }}</span>
             <span class="flex-center">
-                {% if last_review_elapsed != "never" %}
-                <span>Last review: {{ last_review_elapsed }}</span>
-                <button id="remove-last-review" onclick="handleRemoveLastReview()">Remove</button>
+                {% if is_review_bookmark %}
+                <span>Resume point</span>
+                <button class="button-danger" id="clear-review-bookmark" onclick="handleClearReviewBookmark()">Clear</button>
                 {% else %}
-                <button id="mark-last-review" onclick="handleMarkLastReview()">Review</button>
+                <button id="set-review-bookmark" onclick="handleSetReviewBookmark()">Mark here</button>
                 {% endif %}
             </span>
         </p>
-        <h2>Entry</h2>
-        <p id="entry">{{ entry_text }}</p>
-        <button class="entry-button"
-            onclick="location.href='/edit_entry/{{ entry_id }}'"
-            type="button">Edit</button>
-        <button class="entry-button"
-            onclick="deleteEntry({{ entry_id }})"
-            type="button"
-            id="dbt">Delete</button>
-        <hr>
-        <p class="IPA-player">
+        <div class="pronunciation-row IPA-player">
             /{{ IPA_transcript }}/
 
             <audio id="1-ipa-audio"
@@ -236,33 +229,58 @@
                     if (confirm("Are you sure you want to delete this definition?")) {
                         fetch("/delete_definition/" + definitionId, { method: "DELETE" }).then((Response) => {
                             if (Response.ok) {
-                                var a_li = button.parentNode;
-                                var a_ul = a_li.parentNode;
-                                a_ul.removeChild(a_li);
+                                location.reload();
                             }
                         });
                     }
                 }
 
-                function handleMarkLastReview() {
-                    fetch('/entry/{{ entry_id }}/mark_last_review', { method: 'POST' })
+                function handleSetReviewBookmark() {
+                    fetch('/entry/{{ entry_id }}/set_review_bookmark', { method: 'POST' })
                         .then(response => {
                             if (response.ok) location.reload();
-                            else alert('Failed to mark last review.');
+                            else alert('Failed to set resume point.');
                         });
                 }
 
-                function handleRemoveLastReview() {
-                    fetch('/entry/{{ entry_id }}/remove_last_review', { method: 'POST' })
+                function handleClearReviewBookmark() {
+                    fetch('/entry/{{ entry_id }}/clear_review_bookmark', { method: 'POST' })
                         .then(response => {
                             if (response.ok) location.reload();
-                            else alert('Failed to remove last review.');
+                            else alert('Failed to clear resume point.');
                         });
                 }
                 var entryId = "{{ entry_id }}"
             </script>
-        </p>
-        <h2>Definition</h2>
+        </div>
+        <section class="content-section">
+            <div class="section-header">
+                <h2>Entry</h2>
+                <div class="section-actions">
+                    <button class="entry-button"
+                        onclick="location.href='/edit_entry/{{ entry_id }}'"
+                        type="button">Edit</button>
+                    <button class="entry-button button-danger"
+                        onclick="deleteEntry({{ entry_id }})"
+                        type="button"
+                        id="dbt">Delete</button>
+                </div>
+            </div>
+            <p class="entry-value" id="entry">{{ entry_text }}</p>
+        </section>
+        <section class="content-section">
+            <div class="section-header">
+                <h2>Definition</h2>
+                {% if definition_exists %}
+                <div class="section-actions">
+                    <button class="entry-button"
+                        onclick="location.href='/edit_definition/{{ definition_id }}'"
+                        type="button">Edit</button>
+                    <button class="entry-button button-danger"
+                        onclick="deleteDefinition(this,{{ definition_id }})">Delete</button>
+                </div>
+                {% endif %}
+            </div>
         {% if not definition_exists %}
         <button class="entry-button"
             onclick="location.href='/add_definition?entry_id={{ entry_id }}'"
@@ -271,23 +289,20 @@
         {% if definition_exists %}
         <div id="definition-div">
             {{ definition_html | safe }}
-            <button class="entry-button"
-                onclick="location.href='/edit_definition/{{ definition_id }}'"
-                type="button">Edit</button>
-            <button class="entry-button"
-                onclick="deleteDefinition(this,{{ definition_id }})">Delete</button>
         </div>
         {% endif %}
-        <h2>Example</h2>
-        <p>{{ example_html | safe }}</p>
-        <button class="entry-button"
-            onclick="location.href='/edit_example/{{ entry_id }}'"
-            type="button"
-            id="edit-example">
-            Edit example</button>
-        <h2>Synonyms</h2>
-        <a href='/show_synonyms/{{ entry_id }}'>Show synonyms</a>
-        <br><br><br><br>
+        </section>
+        <section class="content-section">
+            <div class="section-header">
+                <h2>Example</h2>
+                <button class="entry-button"
+                    onclick="location.href='/edit_example/{{ entry_id }}'"
+                    type="button"
+                    id="edit-example">
+                    Edit</button>
+            </div>
+            <div>{{ example_html | safe }}</div>
+        </section>
     </article>
 
 {% endblock body %}

@@ -2,11 +2,20 @@
 {% block title %} Edit Definition {% endblock title %}
 
 {% block body %}
+<nav class="page-toolbar" aria-label="Form navigation">
+    <div class="page-toolbar-actions">
+        <a class="button button-ghost" href="/">Dictionary</a>
+    </div>
+</nav>
+<main class="form-page">
 <h1>Edit Definition</h1>
 <form method="post"
     action="/edit_definition/{{ definition_id }}">
     <textarea name="definition_text">{{ definition_text }}</textarea><br>
-    <input type="submit"
-        value="Submit">
+    <div class="form-actions">
+        <input type="submit"
+            value="Submit">
+    </div>
 </form>
+</main>
 {% endblock body %}

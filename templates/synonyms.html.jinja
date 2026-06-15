@@ -2,19 +2,17 @@
 {% block title %} Synonyms of {{ word }} {% endblock title %}
 
 {% block body %}
-<style>
-    @media screen and (min-width: 1064px) {
-        body {
-            width: 1364px;
-            margin: 0 auto;
-        }
-    }
-</style>
+<nav class="page-toolbar" aria-label="Synonym actions">
+    <div class="page-toolbar-actions">
+        <a class="button button-ghost" href="/entry/{{ entry_id }}">Entry</a>
+        <a class="button button-ghost" href="/">Dictionary</a>
+    </div>
+</nav>
 
-<h1>Synonyms of <a href="/entry/{{ entry_id }}">{{ word }}</a></h1>
+<h1 class="word-title">Synonyms of <a href="/entry/{{ entry_id }}">{{ word }}</a></h1>
 
 {% if senses %}
-<table class="synonyms-table">
+<table class="synonyms-table data-table">
     <thead>
         <tr>
             <th>Part of Speech</th>
@@ -40,7 +38,7 @@
     </tbody>
 </table>
 {% else %}
-<p>No synonyms found for this word.</p>
+<p class="content-section">No synonyms found for this word.</p>
 {% endif %}
 
 

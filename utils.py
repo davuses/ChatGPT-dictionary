@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from fastapi import HTTPException
 from phonemizer import phonemize
 
-from database import Entry, db_get_all_entries
+from database import Entry, EntrySummary, db_get_all_entries
 from wordhoard import Synonyms
 
 
@@ -152,10 +152,9 @@ class ThesaurusSense:
 
 @dataclass
 class EntryDisplay:
-    entry: Entry
+    entry: Entry | EntrySummary
     text: str
     context: str
-    last_review_elapsed: str
 
 
 def get_synonyms(word):

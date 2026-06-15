@@ -1,5 +1,6 @@
 import time
 from argparse import ArgumentParser
+from dataclasses import dataclass
 
 from sqlalchemy import (
     Boolean,
@@ -17,6 +18,14 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+
+
+@dataclass(frozen=True)
+class EntrySummary:
+    id: int
+    text: str
+    visit_count: int
+    example: str | None = None
 
 
 @event.listens_for(Engine, "connect")
@@ -102,42 +111,6 @@ def create_tables():
     )
 
 
-def insert_entries_and_definitions():
-    from mappings import get_question_answer_mappings
-
-    inserted_entry_count = 0
-    entries_with_empty_definitions = []
-    entries_with_multi_definitions = []
-    with Session(engine) as session:
-        meanings_mapping = get_question_answer_mappings()
-        for k_text, definition_texts in meanings_mapping.items():
-            k_text = k_text.strip()
-            if session.query(Entry).filter(Entry.text == k_text).first():
-                continue
-            entry = Entry(text=k_text)
-            session.add(entry)
-            inserted_entry_count += 1
-            if len(definition_texts) > 1:
-                entries_with_multi_definitions.append(k_text)
-            for definition_text in definition_texts:
-                if not definition_text:
-                    entries_with_empty_definitions.append(k_text)
-                definition = Definition(text=definition_text, entry=entry)
-                session.add(definition)
-        session.commit()
-    print("Inserted entries count:", inserted_entry_count)
-    print(
-        "entries_with_empty_definitions:",
-        len(entries_with_empty_definitions),
-    )
-    print(entries_with_empty_definitions)
-    print(
-        "entries_with_multi_definitions:",
-        len(entries_with_multi_definitions),
-    )
-    print(entries_with_multi_definitions)
-
-
 def db_get_all_entries():
     with Session(engine) as session:
         entries = (
@@ -148,6 +121,40 @@ def db_get_all_entries():
         )
         return entries
 
+
+
+def db_get_homepage_entries(include_examples: bool = False):
+    with Session(engine) as session:
+        columns = [Entry.id, Entry.text, Entry.visit_count]
+        if include_examples:
+            columns.append(Entry.example)
+
+        rows = (
+            session.query(*columns)
+            .filter(Entry.is_hidden == False)
+            .order_by(Entry.id.desc())
+            .all()
+        )
+
+        if include_examples:
+            return [
+                EntrySummary(
+                    id=row.id,
+                    text=row.text,
+                    visit_count=row.visit_count or 0,
+                    example=row.example,
+                )
+                for row in rows
+            ]
+
+        return [
+            EntrySummary(
+                id=row.id,
+                text=row.text,
+                visit_count=row.visit_count or 0,
+            )
+            for row in rows
+        ]
 
 
 def db_get_entry_by_id(entry_id: int):
@@ -268,12 +275,10 @@ def db_add_definition(text: str, entry: Entry):
         return definition.id
 
 
-def db_mark_last_review(entry_id: int):
-    now = int(time.time())
+def db_set_review_bookmark(entry_id: int):
     with Session(engine) as session:
         entry = session.query(Entry).filter(Entry.id == entry_id).first()
         if entry:
-            entry.last_review = now
             state = session.get(GlobalState, 1)
             if state is None:
                 state = GlobalState(id=1)
@@ -284,17 +289,16 @@ def db_mark_last_review(entry_id: int):
     return False
 
 
-def db_remove_last_review(entry_id: int):
+def db_clear_review_bookmark(entry_id: int):
     with Session(engine) as session:
-        entry = session.query(Entry).filter(Entry.id == entry_id).first()
-        if entry:
-            entry.last_review = None
+        state = session.get(GlobalState, 1)
+        if state and state.last_review_question_id == entry_id:
+            state.last_review_question_id = None
             session.commit()
-            return True
-    return False
+        return True
 
 
-def get_last_reviewed() -> int | None:
+def get_review_bookmark() -> int | None:
     with Session(engine) as session:
         state = session.get(GlobalState, 1)
         return state.last_review_question_id if state else None
@@ -305,7 +309,6 @@ def main():
 
     subparsers = parser.add_subparsers(dest="mode", help="Mode selection")
     subparsers.add_parser("create-table")
-    subparsers.add_parser("insert")
     entry_parser = subparsers.add_parser("entry")
     entry_parser.add_argument(
         "--entry", required=True, help="Specify the entry"
@@ -319,8 +322,6 @@ def main():
         db_get_entry_by_text(args.entry)
     if args.mode == "create-table":
         create_tables()
-    if args.mode == "insert":
-        insert_entries_and_definitions()
 
 
 if __name__ == "__main__":

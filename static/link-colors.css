@@ -1,0 +1,35 @@
+a,
+a:visited {
+  color: var(--link);
+}
+
+a:hover,
+a:active,
+a:focus {
+  color: var(--accent-dark);
+}
+
+.button,
+.button:visited {
+  color: #20333d;
+}
+
+.button-primary,
+.button-primary:visited {
+  color: #fff;
+}
+
+.button-danger,
+.button-danger:visited {
+  color: #8f2626;
+}
+
+.home-header h1 a,
+.home-header h1 a:visited {
+  color: #162b34;
+}
+
+.view-tab,
+.view-tab:visited {
+  color: #31505d;
+}

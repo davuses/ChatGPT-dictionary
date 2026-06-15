@@ -4,8 +4,6 @@
 Entries Only
 {% elif show_example %}
 Show Example
-{% elif review_mode %}
-Review Mode
 {% else %}
 My Dictionary
 {% endif %}
@@ -13,26 +11,37 @@ My Dictionary
 
 {% block body %}
 
-<h1 id="top"><a href="/"> Latest Entries</a> {{ entries_count }} </h1>
+<header class="home-header" id="top">
+    <div>
+        <h1><a href="/">My Dictionary</a></h1>
+        <p class="entry-count">{{ entries_count }} entries</p>
+    </div>
+    <nav class="home-actions" aria-label="Main navigation">
+        <a class="button button-primary" href="/add_entry">Add</a>
+        <a class="button button-ghost"
+            id="resume-bookmark-link"
+            href="{% if review_bookmark_entry_id %}#{{ review_bookmark_entry_id }}{% else %}#{% endif %}"
+            {% if not review_bookmark_entry_id %}hidden{% endif %}>Resume from last mark</a>
+        <a class="button button-ghost" href="/notes/">Notes</a>
+    </nav>
+</header>
 
-<p class="page-nav">
-    <span>
-        <a class="header-link" href="/?entries_only=true">Entries Only</a>
-        <a class="header-link" href="/?show_example=true">Show Examples</a>
-        <a class="header-link" href="/?review_mode=true">Review Mode</a>
-    </span>
-    <a class="header-link" href="/notes/" style="font-weight: bold">My Notes</a>
-</p>
-<table border="1">
+<nav class="view-tabs" aria-label="Entry views">
+    <a class="view-tab {% if not entries_only and not show_example %}active{% endif %}"
+        href="/">All</a>
+    <a class="view-tab {% if entries_only %}active{% endif %}"
+        href="/?entries_only=true">Entries Only</a>
+    <a class="view-tab {% if show_example %}active{% endif %}"
+        href="/?show_example=true">Examples</a>
+</nav>
+
+<table class="entries-table">
     {% if entries_only %}
     <caption>Entries Only</caption>
     {% include "entries_only_table.html.jinja" %}
     {% elif show_example %}
     <caption>Entries with Examples</caption>
     {% include "entries_with_examples.html.jinja" %}
-    {% elif review_mode %}
-    <caption>Review Mode</caption>
-    {% include "entries_review.html.jinja" %}
     {% else %}
     <caption>My Entries</caption>
     {% include "entries_default.html.jinja" %}
@@ -57,30 +66,106 @@ My Dictionary
 
     });
     document.addEventListener("DOMContentLoaded", function () {
-        const rows = document.querySelectorAll("table tr");
+        const table = document.querySelector(".entries-table");
+        if (!table) return;
 
-        rows.forEach(row => {
-            row.addEventListener("click", function (event) {
-                if (event.target.closest(".dynamic-delete-button")) return;
+        table.addEventListener("click", function (event) {
+            if (event.target.closest(".dynamic-delete-button")) return;
 
-                const previouslySelectedRow = document.querySelector("tr.selected");
-                if (previouslySelectedRow && previouslySelectedRow !== row) {
-                    previouslySelectedRow.classList.remove("selected");
-                }
+            const row = event.target.closest("tr[id]");
+            if (!row) return;
 
-                if (!previouslySelectedRow || previouslySelectedRow !== row) {
-                    row.classList.add("selected");
-                }
-            });
+            const previouslySelectedRow = document.querySelector("tr.selected");
+            if (previouslySelectedRow && previouslySelectedRow !== row) {
+                previouslySelectedRow.classList.remove("selected");
+            }
+
+            if (!previouslySelectedRow || previouslySelectedRow !== row) {
+                row.classList.add("selected");
+            }
         });
+
+        refreshReviewBookmarkLink();
+
+        const resumeLink = document.getElementById("resume-bookmark-link");
+        if (resumeLink) {
+            resumeLink.addEventListener("click", function (event) {
+                event.preventDefault();
+                goToReviewBookmark();
+            });
+        }
     });
+
+    window.addEventListener("pageshow", refreshReviewBookmarkLink);
+    window.addEventListener("focus", refreshReviewBookmarkLink);
+    document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) refreshReviewBookmarkLink();
+    });
+
+    function refreshReviewBookmarkLink() {
+        fetchReviewBookmark().then(updateReviewBookmarkLink);
+    }
+
+    function fetchReviewBookmark() {
+        return fetch("/review_bookmark", { cache: "no-store" })
+            .then((response) => response.json())
+            .catch(() => ({ entry_id: null }));
+    }
+
+    function updateReviewBookmarkLink(data) {
+        const resumeLink = document.getElementById("resume-bookmark-link");
+        if (!resumeLink) return;
+
+        if (data.entry_id) {
+            resumeLink.href = "#" + data.entry_id;
+            resumeLink.hidden = false;
+        } else {
+            resumeLink.href = "#";
+            resumeLink.hidden = true;
+        }
+    }
+
+    function goToReviewBookmark() {
+        fetchReviewBookmark().then((data) => {
+            updateReviewBookmarkLink(data);
+            if (!data.entry_id) return;
+
+            const targetHash = "#" + data.entry_id;
+            const targetRow = document.getElementById(String(data.entry_id));
+            if (!targetRow) return;
+
+            if (window.location.hash !== targetHash) {
+                window.location.hash = targetHash;
+                setTimeout(() => flashResumeTarget(data.entry_id), 0);
+                return;
+            }
+
+            targetRow.scrollIntoView({ block: "start" });
+            flashResumeTarget(data.entry_id);
+        });
+    }
+
+    function flashResumeTarget(entryId) {
+        const targetRow = document.getElementById(String(entryId));
+        if (!targetRow) return;
+
+        targetRow.classList.remove("resume-target-flash");
+        void targetRow.offsetWidth;
+        targetRow.classList.add("resume-target-flash");
+        setTimeout(() => {
+            targetRow.classList.remove("resume-target-flash");
+        }, 1900);
+    }
 
     function delete_selected_entry() {
         const selectedRow = document.querySelector("tr.selected")
+        if (!selectedRow) {
+            return;
+        }
         const selectedEntryId = selectedRow.id;
-        const entryText = selectedRow.firstElementChild.textContent;
+        const entryText = selectedRow.firstElementChild.textContent.trim();
         if (
-            confirm("Are you sure you want to delete this entry?\n ID=" + selectedEntryId + entryText)
+            confirm("Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText)
         ) {
             fetch("/delete_entry/" + selectedEntryId, { method: "DELETE" }).then((Response) => {
                 if (Response.ok) {

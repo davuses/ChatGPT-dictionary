@@ -2,11 +2,21 @@
 {% block title %} Edit Example {% endblock title %}
 
 {% block body %}
+<nav class="page-toolbar" aria-label="Form navigation">
+    <div class="page-toolbar-actions">
+        <a class="button button-ghost" href="/entry/{{ entry_id }}">Entry</a>
+        <a class="button button-ghost" href="/">Dictionary</a>
+    </div>
+</nav>
+<main class="form-page">
 <h1>Edit Example</h1>
 <form method="post"
     action="/edit_example/{{ entry_id }}">
     <textarea name="example_text">{{ entry_example }}</textarea><br>
-    <input type="submit"
-        value="Submit">
+    <div class="form-actions">
+        <input type="submit"
+            value="Submit">
+    </div>
 </form>
+</main>
 {% endblock body %}

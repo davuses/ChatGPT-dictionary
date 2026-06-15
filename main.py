@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
+    JSONResponse,
     RedirectResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -21,15 +22,15 @@ from database import (
     db_delete_entry,
     db_entry_increment_visit_count,
     db_entry_last_visit_old_enough,
-    db_get_all_entries,
     db_get_definition_by_id,
     db_get_entry_by_id,
-    db_mark_last_review,
-    db_remove_last_review,
+    db_get_homepage_entries,
+    db_clear_review_bookmark,
+    db_set_review_bookmark,
     db_update_definition_text,
     db_update_entry_text,
     db_update_example,
-    get_last_reviewed,
+    get_review_bookmark,
 )
 from utils import (
     NOTES_DIR,
@@ -132,9 +133,9 @@ async def root_page(
     request: Request,
     show_example: bool = Query(False),
     entries_only: bool = Query(False),
-    review_mode: bool = Query(False),
 ):
-    entries = db_get_all_entries()
+    entries = db_get_homepage_entries(include_examples=show_example)
+    review_bookmark_entry_id = get_review_bookmark()
     entries_count = len(entries)
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
@@ -150,7 +151,6 @@ async def root_page(
                 entry=entry,
                 text=display_text,
                 context=context_text,
-                last_review_elapsed=get_how_long_ago(entry.last_review),
             )
         )
 
@@ -159,8 +159,7 @@ async def root_page(
         "entry_displays": entry_displays,
         "entries_only": entries_only,
         "show_example": show_example,
-        "review_mode": review_mode,
-        "last_review_entry_id": get_last_reviewed(),
+        "review_bookmark_entry_id": review_bookmark_entry_id,
     }
     return templates.TemplateResponse(
         request=request, name="root.html.jinja", context=context
@@ -193,10 +192,11 @@ async def entry_page(entry_id: int, request: Request):
         else ""
     )
     example_html = highlight_ipa(example_html)
+    review_bookmark_entry_id = get_review_bookmark()
     context = {
         "visit_count": visit_count,
         "last_visit_elapsed": get_how_long_ago(entry.last_visit),
-        "last_review_elapsed": get_how_long_ago(entry.last_review),
+        "is_review_bookmark": entry_id == review_bookmark_entry_id,
         "entry_text": entry.text,
         "entry_id": entry_id,
         "IPA_transcript": IPA_transcript,
@@ -344,20 +344,28 @@ async def add_definition(
     raise HTTPException(status_code=404, detail="Entry not found")
 
 
-@app.post("/entry/{entry_id}/mark_last_review")
-async def mark_last_review(entry_id: int):
-    success = db_mark_last_review(entry_id)
+@app.post("/entry/{entry_id}/set_review_bookmark")
+async def set_review_bookmark(entry_id: int):
+    success = db_set_review_bookmark(entry_id)
     if not success:
         raise HTTPException(status_code=404, detail="Entry not found")
-    return {"message": "Last review marked"}
+    return {"message": "Review bookmark set"}
 
 
-@app.post("/entry/{entry_id}/remove_last_review")
-async def remove_last_review(entry_id: int):
-    success = db_remove_last_review(entry_id)
+@app.post("/entry/{entry_id}/clear_review_bookmark")
+async def clear_review_bookmark(entry_id: int):
+    success = db_clear_review_bookmark(entry_id)
     if not success:
         raise HTTPException(status_code=404, detail="Entry not found")
-    return {"message": "Last review removed"}
+    return {"message": "Review bookmark cleared"}
+
+
+@app.get("/review_bookmark")
+async def review_bookmark():
+    return JSONResponse(
+        {"entry_id": get_review_bookmark()},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/show_synonyms/{entry_id}", response_class=HTMLResponse)

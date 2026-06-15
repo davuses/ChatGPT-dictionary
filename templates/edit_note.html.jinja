@@ -2,11 +2,22 @@
 {% block title %} Edit Note {% endblock title %}
 
 {% block body %}
+<nav class="page-toolbar" aria-label="Form navigation">
+    <div class="page-toolbar-actions">
+        <a class="button button-ghost" href="/view_note/{{ note_path }}">Note</a>
+        <a class="button button-ghost" href="/notes/">Notes Tree</a>
+        <a class="button button-ghost" href="/">Dictionary</a>
+    </div>
+</nav>
+<main class="form-page">
 <h1>Edit Note</h1>
 <form method="post"
     action="/edit_note/{{ note_path }}">
     <textarea name="note_text">{{ note_text }}</textarea><br>
-    <input type="submit"
-        value="Submit">
+    <div class="form-actions">
+        <input type="submit"
+            value="Submit">
+    </div>
 </form>
+</main>
 {% endblock body %}
