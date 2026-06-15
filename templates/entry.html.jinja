@@ -46,10 +46,10 @@
         </p>
         <h2>Entry</h2>
         <p id="entry">{{ entry_text }}</p>
-        <button class="q-button"
+        <button class="entry-button"
             onclick="location.href='/edit_entry/{{ entry_id }}'"
             type="button">Edit</button>
-        <button class="q-button"
+        <button class="entry-button"
             onclick="deleteEntry({{ entry_id }})"
             type="button"
             id="dbt">Delete</button>
@@ -187,24 +187,24 @@
                 document.addEventListener("keydown", (event) => {
                     if (event.altKey && event.key === "v") {
                         event.preventDefault();
-                        const answerDiv = document.getElementById("answer-div");
-                        if (!answerDiv) {
+                        const definitionDiv = document.getElementById("definition-div");
+                        if (!definitionDiv) {
                             navigator.clipboard
                                 .readText()
                                 .then((text) => {
-                                    const answerForm = document.createElement("form");
-                                    answerForm.method = "post";
-                                    answerForm.action = "/add_answer";
-                                    let formData = { entry_id: entryId, answer_text: text };
+                                    const definitionForm = document.createElement("form");
+                                    definitionForm.method = "post";
+                                    definitionForm.action = "/add_definition";
+                                    let formData = { entry_id: entryId, definition_text: text };
                                     for (const key in formData) {
                                         const hiddenField = document.createElement("input");
                                         hiddenField.type = "hidden";
                                         hiddenField.name = key;
                                         hiddenField.value = formData[key];
-                                        answerForm.appendChild(hiddenField);
+                                        definitionForm.appendChild(hiddenField);
                                     }
-                                    document.body.appendChild(answerForm);
-                                    answerForm.submit();
+                                    document.body.appendChild(definitionForm);
+                                    definitionForm.submit();
                                 })
                                 .catch((error) => {
                                     console.error("Failed to read clipboard: ", error);
@@ -232,9 +232,9 @@
                         window.location.href = "/add_entry";
                     }
                 });
-                function deleteAnswer(button, answerId) {
-                    if (confirm("Are you sure you want to delete this answer?")) {
-                        fetch("/delete_answer/" + answerId, { method: "DELETE" }).then((Response) => {
+                function deleteDefinition(button, definitionId) {
+                    if (confirm("Are you sure you want to delete this definition?")) {
+                        fetch("/delete_definition/" + definitionId, { method: "DELETE" }).then((Response) => {
                             if (Response.ok) {
                                 var a_li = button.parentNode;
                                 var a_ul = a_li.parentNode;
@@ -262,25 +262,25 @@
                 var entryId = "{{ entry_id }}"
             </script>
         </p>
-        <h2>Answer</h2>
-        {% if not answer_exist %}
-        <button class="q-button"
-            onclick="location.href='/add_answer?entry_id={{ entry_id }}'"
-            type="button">Add answer</button>
+        <h2>Definition</h2>
+        {% if not definition_exists %}
+        <button class="entry-button"
+            onclick="location.href='/add_definition?entry_id={{ entry_id }}'"
+            type="button">Add definition</button>
         {% endif %}
-        {% if answer_exist %}
-        <div id="answer-div">
-            {{ answer_html | safe }}
-            <button class="q-button"
-                onclick="location.href='/edit_answer/{{ answer_id }}'"
+        {% if definition_exists %}
+        <div id="definition-div">
+            {{ definition_html | safe }}
+            <button class="entry-button"
+                onclick="location.href='/edit_definition/{{ definition_id }}'"
                 type="button">Edit</button>
-            <button class="q-button"
-                onclick="deleteAnswer(this,{{ answer_id }})">Delete</button>
+            <button class="entry-button"
+                onclick="deleteDefinition(this,{{ definition_id }})">Delete</button>
         </div>
         {% endif %}
         <h2>Example</h2>
         <p>{{ example_html | safe }}</p>
-        <button class="q-button"
+        <button class="entry-button"
             onclick="location.href='/edit_example/{{ entry_id }}'"
             type="button"
             id="edit-example">

@@ -144,7 +144,7 @@ def safe_path_note(subpath: str) -> Path:
 
 
 @dataclass
-class ThesaurusEntry:
+class ThesaurusSense:
     part_of_speech: str
     meaning_html: str
     synonyms: list[str]
@@ -153,9 +153,9 @@ class ThesaurusEntry:
 @dataclass
 class EntryDisplay:
     entry: Entry
-    q_text: str
-    q_context: str
-    last_review_elapse: str
+    text: str
+    context: str
+    last_review_elapsed: str
 
 
 def get_synonyms(word):
@@ -173,24 +173,24 @@ def format_meaning_html(md_text: str) -> str:
     return markdown2.markdown(md_text.strip())
 
 
-def get_thesaurus_entries(
+def get_thesaurus_senses(
     word: str,
-) -> list[ThesaurusEntry]:
+) -> list[ThesaurusSense]:
     synonyms_data = get_synonyms(word)
     if not synonyms_data:
         return []
-    entries = render_thesaurus_entries(synonyms_data)
-    return entries
+    senses = render_thesaurus_senses(synonyms_data)
+    return senses
 
 
-def render_thesaurus_entries(
+def render_thesaurus_senses(
     synonyms_data: list[tuple[str, str, str, list[str]]],
-) -> list[ThesaurusEntry]:
-    entries = []
+) -> list[ThesaurusSense]:
+    senses = []
     for _, pos, meaning_md, synonyms in synonyms_data:
         meaning_html = format_meaning_html(meaning_md)
-        entries.append(ThesaurusEntry(pos, meaning_html, synonyms))
-    return entries
+        senses.append(ThesaurusSense(pos, meaning_html, synonyms))
+    return senses
 
 
 def highlight_ipa(html: str) -> str:

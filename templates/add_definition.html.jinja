@@ -1,11 +1,11 @@
 {% extends "base.html.jinja" %}
-{% block title %} Add Answer {% endblock title %}
+{% block title %} Add Definition {% endblock title %}
 
 {% block body %}
-<h1>Add Answer</h1>
+<h1>Add Definition</h1>
 <form method="post"
-    action="/add_answer">
-    <textarea name="answer_text"></textarea><br>
+    action="/add_definition">
+    <textarea name="definition_text"></textarea><br>
     <input value="{{ entry_id }}"
         name="entry_id"
         type="hidden">

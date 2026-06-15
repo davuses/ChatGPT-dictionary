@@ -13,7 +13,7 @@
 
 <h1>Synonyms of <a href="/entry/{{ entry_id }}">{{ word }}</a></h1>
 
-{% if entries %}
+{% if senses %}
 <table class="synonyms-table">
     <thead>
         <tr>
@@ -23,12 +23,12 @@
         </tr>
     </thead>
     <tbody>
-        {% for entry in entries %}
+        {% for sense in senses %}
         <tr>
-            <td>{{ entry.part_of_speech }}</td>
-            <td>{{ entry.meaning_html | safe }}</td>
+            <td>{{ sense.part_of_speech }}</td>
+            <td>{{ sense.meaning_html | safe }}</td>
             <td>
-                {% for syn in entry.synonyms %}
+                {% for syn in sense.synonyms %}
                 {% if syn in all_words %}
                 {% for eid in all_words[syn] %}
                 <a href="{{ url_for('entry_page', entry_id=eid) }}">{{ syn }}</a>{% if not loop.last %} / {% endif

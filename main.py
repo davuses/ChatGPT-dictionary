@@ -15,18 +15,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.templating import _TemplateResponse
 
 from database import (
-    db_add_answer,
+    db_add_definition,
     db_add_entry,
-    db_delete_answer,
+    db_delete_definition,
     db_delete_entry,
-    db_entry_increment_visit_number,
+    db_entry_increment_visit_count,
     db_entry_last_visit_old_enough,
     db_get_all_entries,
-    db_get_answer_by_id,
+    db_get_definition_by_id,
     db_get_entry_by_id,
     db_mark_last_review,
     db_remove_last_review,
-    db_update_answer_text,
+    db_update_definition_text,
     db_update_entry_text,
     db_update_example,
     get_last_reviewed,
@@ -38,7 +38,7 @@ from utils import (
     get_all_words,
     get_how_long_ago,
     get_IPA,
-    get_thesaurus_entries,
+    get_thesaurus_senses,
     highlight_ipa,
     invalidate_words_cache,
     safe_path_note,
@@ -52,12 +52,12 @@ app.mount("/static", StaticFiles(directory="./static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-class EditAnswerForm(BaseModel):
-    answer_text: str
+class EditDefinitionForm(BaseModel):
+    definition_text: str
 
     @classmethod
-    def as_form(cls, answer_text: str = Form(...)):
-        return cls(answer_text=answer_text)
+    def as_form(cls, definition_text: str = Form(...)):
+        return cls(definition_text=definition_text)
 
 
 class EditEntryForm(BaseModel):
@@ -92,13 +92,15 @@ class AddEntryForm(BaseModel):
         return cls(entry_text=entry_text)
 
 
-class AddAnswerForm(BaseModel):
-    answer_text: str
+class AddDefinitionForm(BaseModel):
+    definition_text: str
     entry_id: int
 
     @classmethod
-    def as_form(cls, answer_text: str = Form(...), entry_id: int = Form(...)):
-        return cls(answer_text=answer_text, entry_id=entry_id)
+    def as_form(
+        cls, definition_text: str = Form(...), entry_id: int = Form(...)
+    ):
+        return cls(definition_text=definition_text, entry_id=entry_id)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -134,27 +136,27 @@ async def root_page(
 ):
     entries = db_get_all_entries()
     entries_count = len(entries)
-    q_list: list[EntryDisplay] = []
+    entry_displays: list[EntryDisplay] = []
     for entry in entries:
         entry_text = entry.text
-        q_context = ""
-        q_text = entry_text
+        context_text = ""
+        display_text = entry_text
         if " - " in entry_text:
-            q_text = entry_text.split(" - ")[-1].strip()
-            q_context = entry_text.split(" - ")[0]
+            display_text = entry_text.split(" - ")[-1].strip()
+            context_text = entry_text.split(" - ")[0]
 
-        q_list.append(
+        entry_displays.append(
             EntryDisplay(
                 entry=entry,
-                q_text=q_text,
-                q_context=q_context,
-                last_review_elapse=get_how_long_ago(entry.last_review),
+                text=display_text,
+                context=context_text,
+                last_review_elapsed=get_how_long_ago(entry.last_review),
             )
         )
 
     context = {
         "entries_count": entries_count,
-        "q_list": q_list,
+        "entry_displays": entry_displays,
         "entries_only": entries_only,
         "show_example": show_example,
         "review_mode": review_mode,
@@ -172,17 +174,17 @@ async def entry_page(entry_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Entry not found")
     visit_count = entry.visit_count
     if db_entry_last_visit_old_enough(entry.id):
-        db_entry_increment_visit_number(entry.id)
+        db_entry_increment_visit_count(entry.id)
         # a bit of hack
         visit_count += 1
-    # Only display the first answer
-    answer_exist = bool(entry.answers)
-    answer_html = None
-    answer_id = None
-    if answer_exist:
-        a = entry.answers[0]
-        answer_html = markdown2.markdown(a.text, extras=["strike"])
-        answer_id = a.id
+    # Only display the first definition
+    definition_exists = bool(entry.definitions)
+    definition_html = None
+    definition_id = None
+    if definition_exists:
+        d = entry.definitions[0]
+        definition_html = markdown2.markdown(d.text, extras=["strike"])
+        definition_id = d.id
     word = entry.text.split(" - ")[-1].strip()
     IPA_transcript = get_IPA(word)
     example_html = (
@@ -199,9 +201,9 @@ async def entry_page(entry_id: int, request: Request):
         "entry_id": entry_id,
         "IPA_transcript": IPA_transcript,
         "word": word,
-        "answer_exist": answer_exist,
-        "answer_html": answer_html,
-        "answer_id": answer_id,
+        "definition_exists": definition_exists,
+        "definition_html": definition_html,
+        "definition_id": definition_id,
         "example_html": example_html,
     }
     return templates.TemplateResponse(
@@ -221,14 +223,17 @@ async def edit_entry_page(entry_id: int, request: Request):
     )
 
 
-@app.get("/edit_answer/{answer_id}", response_class=HTMLResponse)
-async def edit_answer_page(answer_id: int, request: Request):
-    answer = db_get_answer_by_id(answer_id)
-    if not answer:
-        raise HTTPException(status_code=404, detail="Answer not found")
-    context = {"answer_text": answer.text, "answer_id": answer_id}
+@app.get("/edit_definition/{definition_id}", response_class=HTMLResponse)
+async def edit_definition_page(definition_id: int, request: Request):
+    definition = db_get_definition_by_id(definition_id)
+    if not definition:
+        raise HTTPException(status_code=404, detail="Definition not found")
+    context = {
+        "definition_text": definition.text,
+        "definition_id": definition_id,
+    }
     return templates.TemplateResponse(
-        request=request, name="edit_answer.html.jinja", context=context
+        request=request, name="edit_definition.html.jinja", context=context
     )
 
 
@@ -254,11 +259,11 @@ async def add_entry_page(request: Request):
     )
 
 
-@app.get("/add_answer", response_class=HTMLResponse)
-async def add_answer_page(entry_id: int, request: Request):
+@app.get("/add_definition", response_class=HTMLResponse)
+async def add_definition_page(entry_id: int, request: Request):
     context = {"entry_id": entry_id}
     return templates.TemplateResponse(
-        request=request, name="add_answer.html.jinja", context=context
+        request=request, name="add_definition.html.jinja", context=context
     )
 
 
@@ -278,12 +283,13 @@ async def edit_entry(
         raise HTTPException(status_code=409, detail="An entry with that text already exists")
 
 
-@app.post("/edit_answer/{answer_id}", response_class=HTMLResponse)
-async def edit_answer(
-    answer_id: int, form_data: EditAnswerForm = Depends(EditAnswerForm.as_form)
+@app.post("/edit_definition/{definition_id}", response_class=HTMLResponse)
+async def edit_definition(
+    definition_id: int,
+    form_data: EditDefinitionForm = Depends(EditDefinitionForm.as_form),
 ):
-    updated_text = form_data.answer_text
-    if entry_id := db_update_answer_text(answer_id, updated_text):
+    updated_text = form_data.definition_text
+    if entry_id := db_update_definition_text(definition_id, updated_text):
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
 
 
@@ -305,9 +311,9 @@ async def delete_entry(entry_id: int):
     return {"message": "deleted"}
 
 
-@app.delete("/delete_answer/{answer_id}", response_class=HTMLResponse)
-async def delete_answer(answer_id: int):
-    if entry_id := db_delete_answer(answer_id):
+@app.delete("/delete_definition/{definition_id}", response_class=HTMLResponse)
+async def delete_definition(definition_id: int):
+    if entry_id := db_delete_definition(definition_id):
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
 
 
@@ -326,14 +332,14 @@ async def add_entry(
         raise HTTPException(status_code=409, detail="An entry with that text already exists")
 
 
-@app.post("/add_answer", response_class=HTMLResponse)
-async def add_answer(
-    form_data: AddAnswerForm = Depends(AddAnswerForm.as_form),
+@app.post("/add_definition", response_class=HTMLResponse)
+async def add_definition(
+    form_data: AddDefinitionForm = Depends(AddDefinitionForm.as_form),
 ):
-    updated_text = form_data.answer_text
+    updated_text = form_data.definition_text
     entry_id = form_data.entry_id
     if entry := db_get_entry_by_id(entry_id):
-        db_add_answer(updated_text, entry=entry)
+        db_add_definition(updated_text, entry=entry)
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
     raise HTTPException(status_code=404, detail="Entry not found")
 
@@ -364,15 +370,15 @@ def show_synonyms(entry_id: int, request: Request):
     if " " in word:
         raise HTTPException(status_code=404, detail="Word not valid")
     try:
-        entries = get_thesaurus_entries(word)
+        senses = get_thesaurus_senses(word)
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error fetching thesaurus entries: {e}"
+            status_code=500, detail=f"Error fetching thesaurus senses: {e}"
         )
     context = {
         "entry_id": entry_id,
         "word": word or "",
-        "entries": entries,
+        "senses": senses,
         "all_words": get_all_words(),
     }
     return templates.TemplateResponse(

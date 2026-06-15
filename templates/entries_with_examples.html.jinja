@@ -3,15 +3,15 @@
     <th>Context</th>
     <th>Examples</th>
 </tr>
-{% for QD in q_list %}
-<tr id="{{ QD.entry.id }}">
+{% for display in entry_displays %}
+<tr id="{{ display.entry.id }}">
     <td class="col-1"><label class="unselectable">-<span data-content=" "></span></label><a
-            href="entry/{{ QD.entry.id }}">{{ QD.q_text }}</a></td>
+            href="entry/{{ display.entry.id }}">{{ display.text }}</a></td>
     <td class="col-2">
-        {{ QD.q_context }}
+        {{ display.context }}
     </td>
     {% if show_example %}
-    <td class="col-2"> {{ QD.entry.example }} </td>
+    <td class="col-2"> {{ display.entry.example }} </td>
     {% endif %}
 </tr>
 {% endfor %}

@@ -44,8 +44,8 @@ class Entry(Base):
     __tablename__ = "question"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     text: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    answers: Mapped[list["Answer"]] = relationship(
-        "Answer",
+    definitions: Mapped[list["Definition"]] = relationship(
+        "Definition",
         back_populates="entry",
         lazy="joined",
         cascade="all, delete-orphan",
@@ -62,12 +62,13 @@ class Entry(Base):
     def __str__(self) -> str:
         return (
             f'Entry(id={self.id}, text="{self.text}",'
-            f" answers={[str(a) for a in self.answers]})"
+            f" definitions={[str(d) for d in self.definitions]})"
             f" example: {self.example}"
         )
 
 
-class Answer(Base):
+class Definition(Base):
+    # NOTE: DB table is still named "answer" to avoid a migration.
     __tablename__ = "answer"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -78,10 +79,10 @@ class Answer(Base):
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("question.id", ondelete="CASCADE")
     )
-    entry: Mapped[Entry] = relationship(Entry, back_populates="answers")
+    entry: Mapped[Entry] = relationship(Entry, back_populates="definitions")
 
     def __str__(self) -> str:
-        return f'Answer(id={self.id}, text="{self.text}"'
+        return f'Definition(id={self.id}, text="{self.text}"'
 
 
 class GlobalState(Base):
@@ -101,34 +102,40 @@ def create_tables():
     )
 
 
-def insert_entries_and_answers():
+def insert_entries_and_definitions():
     from mappings import get_question_answer_mappings
 
     inserted_entry_count = 0
-    entries_with_empty_answers = []
-    entries_with_multi_answers = []
+    entries_with_empty_definitions = []
+    entries_with_multi_definitions = []
     with Session(engine) as session:
         meanings_mapping = get_question_answer_mappings()
-        for k_text, answers in meanings_mapping.items():
+        for k_text, definition_texts in meanings_mapping.items():
             k_text = k_text.strip()
             if session.query(Entry).filter(Entry.text == k_text).first():
                 continue
             entry = Entry(text=k_text)
             session.add(entry)
             inserted_entry_count += 1
-            if len(answers) > 1:
-                entries_with_multi_answers.append(k_text)
-            for answer_text in answers:
-                if not answer_text:
-                    entries_with_empty_answers.append(k_text)
-                answer = Answer(text=answer_text, entry=entry)
-                session.add(answer)
+            if len(definition_texts) > 1:
+                entries_with_multi_definitions.append(k_text)
+            for definition_text in definition_texts:
+                if not definition_text:
+                    entries_with_empty_definitions.append(k_text)
+                definition = Definition(text=definition_text, entry=entry)
+                session.add(definition)
         session.commit()
     print("Inserted entries count:", inserted_entry_count)
-    print("entries_with_empty_answers:", len(entries_with_empty_answers))
-    print(entries_with_empty_answers)
-    print("entries_with_multi_answers:", len(entries_with_multi_answers))
-    print(entries_with_multi_answers)
+    print(
+        "entries_with_empty_definitions:",
+        len(entries_with_empty_definitions),
+    )
+    print(entries_with_empty_definitions)
+    print(
+        "entries_with_multi_definitions:",
+        len(entries_with_multi_definitions),
+    )
+    print(entries_with_multi_definitions)
 
 
 def db_get_all_entries():
@@ -204,7 +211,7 @@ def db_entry_last_visit_old_enough(entry_id: int):
             return False
 
 
-def db_entry_increment_visit_number(entry_id: int):
+def db_entry_increment_visit_count(entry_id: int):
     with Session(engine) as session:
         entry = session.query(Entry).filter(Entry.id == entry_id).first()
         if entry:
@@ -213,38 +220,52 @@ def db_entry_increment_visit_number(entry_id: int):
             return True
 
 
-def db_get_answer_by_id(answer_id: int):
+def db_get_definition_by_id(definition_id: int):
     with Session(engine) as session:
-        return session.query(Answer).filter(Answer.id == answer_id).first()
+        return (
+            session.query(Definition)
+            .filter(Definition.id == definition_id)
+            .first()
+        )
 
 
-def db_delete_answer(answer_id: int):
+def db_delete_definition(definition_id: int):
     with Session(engine) as session:
-        answer = session.query(Answer).filter(Answer.id == answer_id).first()
-        if answer:
-            entry_id = answer.question_id
-            session.query(Answer).filter(Answer.id == answer_id).delete()
+        definition = (
+            session.query(Definition)
+            .filter(Definition.id == definition_id)
+            .first()
+        )
+        if definition:
+            entry_id = definition.question_id
+            session.query(Definition).filter(
+                Definition.id == definition_id
+            ).delete()
             session.commit()
             return entry_id
 
 
-def db_update_answer_text(answer_id: int, text: str):
+def db_update_definition_text(definition_id: int, text: str):
     with Session(engine) as session:
-        answer = session.query(Answer).filter(Answer.id == answer_id).first()
-        if answer:
-            entry_id = answer.question_id
-            answer.text = text
+        definition = (
+            session.query(Definition)
+            .filter(Definition.id == definition_id)
+            .first()
+        )
+        if definition:
+            entry_id = definition.question_id
+            definition.text = text
             session.commit()
             return entry_id
 
 
-def db_add_answer(text: str, entry: Entry):
+def db_add_definition(text: str, entry: Entry):
     with Session(engine) as session:
         text = text.strip()
-        answer = Answer(text=text, entry=entry)
-        session.add(answer)
+        definition = Definition(text=text, entry=entry)
+        session.add(definition)
         session.commit()
-        return answer.id
+        return definition.id
 
 
 def db_mark_last_review(entry_id: int):
@@ -299,7 +320,7 @@ def main():
     if args.mode == "create-table":
         create_tables()
     if args.mode == "insert":
-        insert_entries_and_answers()
+        insert_entries_and_definitions()
 
 
 if __name__ == "__main__":

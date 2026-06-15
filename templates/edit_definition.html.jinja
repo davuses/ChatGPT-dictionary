@@ -1,0 +1,12 @@
+{% extends "base.html.jinja" %}
+{% block title %} Edit Definition {% endblock title %}
+
+{% block body %}
+<h1>Edit Definition</h1>
+<form method="post"
+    action="/edit_definition/{{ definition_id }}">
+    <textarea name="definition_text">{{ definition_text }}</textarea><br>
+    <input type="submit"
+        value="Submit">
+</form>
+{% endblock body %}
