@@ -4,11 +4,9 @@
 {% block body %}
 <h1>Edit Example</h1>
 <form method="post"
-    action="/edit_example/{{ question_id }}"
-    class="answer-form">
-    <textarea name="example_text">{{ question_example }}</textarea><br>
+    action="/edit_example/{{ entry_id }}">
+    <textarea name="example_text">{{ entry_example }}</textarea><br>
     <input type="submit"
-        value="Submit"
-        class="submit-button">
+        value="Submit">
 </form>
 {% endblock body %}

@@ -1,7 +1,7 @@
 {% extends "base.html.jinja" %}
 {% block title %} {{ word }} {% endblock title %}
-{% block body %}
 
+{% block head %}
 <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
 <style>
@@ -23,45 +23,34 @@
         color: #306e9b;
     }
 </style>
+{% endblock head %}
 
-<body>
+{% block body %}
     <p>
-        <a class="header-link"
-            href="/">Back to Main Page</a>
-        <a class="header-link"
-            href="/add_question">Add Question</a>
+        <a class="header-link" href="/">Back to Main Page</a>
+        <a class="header-link" href="/add_entry">Add Entry</a>
     </p>
     <article>
-        <h1 style="font-size: 31px; text-align: center"> {{ word }} </h1>
-        <p style="display: flex; justify-content: space-between;
-                   color: #305969; font-size: medium; font-family: monospace; margin: 0px;">
+        <h1 class="word-title"> {{ word }} </h1>
+        <p class="word-meta">
             <span>Visit count: {{ visit_count }}</span>
-            <span style="text-align: center;">Last visit: {{ last_visit_elapsed }}</span>
-            <span style="display: flex; align-items: center;">
+            <span>Last visit: {{ last_visit_elapsed }}</span>
+            <span class="flex-center">
                 {% if last_review_elapsed != "never" %}
-                <!-- Show Remove button if last_review exists -->
                 <span>Last review: {{ last_review_elapsed }}</span>
-                <button id="remove-last-review"
-                    style="margin-left: 10px;"
-                    onclick="handleRemoveLastReview()">
-                    Remove
-                </button>
+                <button id="remove-last-review" onclick="handleRemoveLastReview()">Remove</button>
                 {% else %}
-                <!-- Show Mark button if last_review is None or 'never' -->
-                <button id="mark-last-review"
-                    style="margin-left: 10px;"
-                    onclick="handleMarkLastReview()">
-                    Review
-                </button>
-                {% endif %}</span>
+                <button id="mark-last-review" onclick="handleMarkLastReview()">Review</button>
+                {% endif %}
+            </span>
         </p>
-        <h2>Question</h2>
-        <p id="question">{{ question_text }}</p>
+        <h2>Entry</h2>
+        <p id="entry">{{ entry_text }}</p>
         <button class="q-button"
-            onclick="location.href='/edit_question/{{ question_id }}'"
+            onclick="location.href='/edit_entry/{{ entry_id }}'"
             type="button">Edit</button>
         <button class="q-button"
-            onclick="deleteQuestion({{ question_id }})"
+            onclick="deleteEntry({{ entry_id }})"
             type="button"
             id="dbt">Delete</button>
         <hr>
@@ -206,7 +195,7 @@
                                     const answerForm = document.createElement("form");
                                     answerForm.method = "post";
                                     answerForm.action = "/add_answer";
-                                    let formData = { question_id: questionId, answer_text: text };
+                                    let formData = { entry_id: entryId, answer_text: text };
                                     for (const key in formData) {
                                         const hiddenField = document.createElement("input");
                                         hiddenField.type = "hidden";
@@ -231,21 +220,21 @@
                     } else if (event.key === "D") {
                         document.getElementById("dbt").click();
                     } else if (event.key === "a") {
-                        window.open("/add_question", "_blank").focus();
+                        window.open("/add_entry", "_blank").focus();
                     } else if (event.key === "Q") {
-                        const textToCopy = document.getElementById('question').innerText;
+                        const textToCopy = document.getElementById('entry').innerText;
                         navigator.clipboard.writeText(textToCopy).then(() => {
                             console.log('Text copied to clipboard!');
                         }).catch(err => {
                             console.error('Failed to copy text: ', err);
                         });
                     } else if (event.key === "A") {
-                        window.location.href = "/add_question";
+                        window.location.href = "/add_entry";
                     }
                 });
                 function deleteAnswer(button, answerId) {
                     if (confirm("Are you sure you want to delete this answer?")) {
-                        fetch("/delete_answer/" + answerId).then((Response) => {
+                        fetch("/delete_answer/" + answerId, { method: "DELETE" }).then((Response) => {
                             if (Response.ok) {
                                 var a_li = button.parentNode;
                                 var a_ul = a_li.parentNode;
@@ -256,7 +245,7 @@
                 }
 
                 function handleMarkLastReview() {
-                    fetch('/question/{{ question_id }}/mark_last_review', { method: 'POST' })
+                    fetch('/entry/{{ entry_id }}/mark_last_review', { method: 'POST' })
                         .then(response => {
                             if (response.ok) location.reload();
                             else alert('Failed to mark last review.');
@@ -264,29 +253,21 @@
                 }
 
                 function handleRemoveLastReview() {
-                    fetch('/question/{{ question_id }}/remove_last_review', { method: 'POST' })
+                    fetch('/entry/{{ entry_id }}/remove_last_review', { method: 'POST' })
                         .then(response => {
                             if (response.ok) location.reload();
                             else alert('Failed to remove last review.');
                         });
                 }
-                var questionId = "{{ question_id }}"
+                var entryId = "{{ entry_id }}"
             </script>
         </p>
-        <div id="tts-div"
-            style="display: none;">
-            <audio controls
-                class="svelte-eemfgq"
-                oncanplay="ttsCanPlay()">
-            </audio>
-            <button class="q-button"
-                onclick="deleteAudio({{ question_id }})"
-                type="button">Delete audio</button>
-        </div>
         <h2>Answer</h2>
+        {% if not answer_exist %}
         <button class="q-button"
-            onclick="location.href='/add_answer?qid={{ question_id }}'"
+            onclick="location.href='/add_answer?entry_id={{ entry_id }}'"
             type="button">Add answer</button>
+        {% endif %}
         {% if answer_exist %}
         <div id="answer-div">
             {{ answer_html | safe }}
@@ -300,14 +281,13 @@
         <h2>Example</h2>
         <p>{{ example_html | safe }}</p>
         <button class="q-button"
-            onclick="location.href='/edit_example/{{ question_id }}'"
+            onclick="location.href='/edit_example/{{ entry_id }}'"
             type="button"
             id="edit-example">
             Edit example</button>
         <h2>Synonyms</h2>
-        <a href='/show_synonyms/{{ question_id }}'>Show synonyms</a>
+        <a href='/show_synonyms/{{ entry_id }}'>Show synonyms</a>
         <br><br><br><br>
     </article>
-</body>
 
 {% endblock body %}

@@ -1,0 +1,12 @@
+{% extends "base.html.jinja" %}
+{% block title %} Add Entry {% endblock title %}
+
+{% block body %}
+<h1>Add Entry</h1>
+<form method="post"
+    action="/add_entry">
+    <textarea name="entry_text"></textarea><br>
+    <input type="submit"
+        value="Submit">
+</form>
+{% endblock body %}

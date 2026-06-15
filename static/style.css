@@ -187,3 +187,45 @@ caption {
   font-weight: bold;
   font-size: 1.2em;
 }
+
+/* Layout helpers */
+.page-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+}
+
+/* Word detail page */
+.word-title {
+  font-size: 31px;
+  text-align: center;
+}
+
+.word-meta {
+  display: flex;
+  justify-content: space-between;
+  color: #305969;
+  font-size: medium;
+  font-family: monospace;
+  margin: 0;
+}
+
+.word-meta button {
+  margin-left: 10px;
+}
+
+/* Review table */
+.review-cell {
+  color: #305969;
+  font-size: medium;
+  font-family: monospace;
+}
+
+.last-review-link {
+  font-style: italic;
+}

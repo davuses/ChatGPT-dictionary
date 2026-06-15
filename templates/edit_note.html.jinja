@@ -4,11 +4,9 @@
 {% block body %}
 <h1>Edit Note</h1>
 <form method="post"
-    action="/edit_note/{{ note_path }}"
-    class="answer-form">
+    action="/edit_note/{{ note_path }}">
     <textarea name="note_text">{{ note_text }}</textarea><br>
     <input type="submit"
-        value="Submit"
-        class="submit-button">
+        value="Submit">
 </form>
 {% endblock body %}

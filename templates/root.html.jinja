@@ -1,7 +1,7 @@
 {% extends "base.html.jinja" %}
 {% block title %}
-{% if questions_only %}
-Questions Only
+{% if entries_only %}
+Entries Only
 {% elif show_example %}
 Show Example
 {% elif review_mode %}
@@ -13,43 +13,29 @@ My Dictionary
 
 {% block body %}
 
-<h1 id="top"><a href="/"
-        style="text-decoration: none"
-        ;> Latest Questions</a> {{ questions_count }} </h1>
+<h1 id="top"><a href="/"> Latest Entries</a> {{ entries_count }} </h1>
 
-<p style="display: flex; justify-content: space-between; align-items: center;">
+<p class="page-nav">
     <span>
-        <a class="header-link"
-            href="/?questions_only=true"
-            style="text-decoration: none;">Questions Only</a>
-        <a class="header-link"
-            href="/?show_example=true"
-            style="text-decoration: none;">Show Examples</a>
-        <a class="header-link"
-            href="/?review_mode=true"
-            style="text-decoration: none;">Review Mode</a>
-
-        {# <a class="header-link"
-            href="/add_question"
-            style="text-decoration: none;">Add Question</a> #}
+        <a class="header-link" href="/?entries_only=true">Entries Only</a>
+        <a class="header-link" href="/?show_example=true">Show Examples</a>
+        <a class="header-link" href="/?review_mode=true">Review Mode</a>
     </span>
-    <a class="header-link"
-        href="/notes/"
-        style="font-weight: bold">My Notes</a>
+    <a class="header-link" href="/notes/" style="font-weight: bold">My Notes</a>
 </p>
 <table border="1">
-    {% if questions_only %}
-    <caption>Questions Only</caption>
-    {% include "questions_only_table.html.jinja" %}
+    {% if entries_only %}
+    <caption>Entries Only</caption>
+    {% include "entries_only_table.html.jinja" %}
     {% elif show_example %}
-    <caption>Questions with Examples</caption>
-    {% include "questions_with_examples.html.jinja" %}
+    <caption>Entries with Examples</caption>
+    {% include "entries_with_examples.html.jinja" %}
     {% elif review_mode %}
     <caption>Review Mode</caption>
-    {% include "questions_review.html.jinja" %}
+    {% include "entries_review.html.jinja" %}
     {% else %}
-    <caption>My Questions</caption>
-    {% include "questions_default.html.jinja" %}
+    <caption>My Entries</caption>
+    {% include "entries_default.html.jinja" %}
     {% endif %}
 
 </table>
@@ -63,10 +49,10 @@ My Dictionary
 <script>
     document.addEventListener("keydown", (event) => {
         if (event.key === "a") {
-            window.open("/add_question", "_blank").focus();
+            window.open("/add_entry", "_blank").focus();
         }
         else if (event.key === "D") {
-            delete_selected_question()
+            delete_selected_entry()
         }
 
     });
@@ -89,14 +75,14 @@ My Dictionary
         });
     });
 
-    function delete_selected_question() {
+    function delete_selected_entry() {
         const selectedRow = document.querySelector("tr.selected")
-        const selectedQId = selectedRow.id;
-        const questionText = selectedRow.firstElementChild.textContent;
+        const selectedEntryId = selectedRow.id;
+        const entryText = selectedRow.firstElementChild.textContent;
         if (
-            confirm("Are you sure you want to delete this question?\n ID=" + selectedQId + questionText)
+            confirm("Are you sure you want to delete this entry?\n ID=" + selectedEntryId + entryText)
         ) {
-            fetch("/delete_question/" + selectedQId).then((Response) => {
+            fetch("/delete_entry/" + selectedEntryId, { method: "DELETE" }).then((Response) => {
                 if (Response.ok) {
                     selectedRow.parentNode.removeChild(selectedRow);
                 }

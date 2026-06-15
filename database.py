@@ -39,13 +39,14 @@ class Base(DeclarativeBase):
     pass
 
 
-class Question(Base):
+class Entry(Base):
+    # NOTE: DB table is still named "question" to avoid a migration.
     __tablename__ = "question"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     text: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     answers: Mapped[list["Answer"]] = relationship(
         "Answer",
-        back_populates="question",
+        back_populates="entry",
         lazy="joined",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -60,7 +61,7 @@ class Question(Base):
 
     def __str__(self) -> str:
         return (
-            f'Question(id={self.id}, text="{self.text}",'
+            f'Entry(id={self.id}, text="{self.text}",'
             f" answers={[str(a) for a in self.answers]})"
             f" example: {self.example}"
         )
@@ -72,13 +73,12 @@ class Answer(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     text: Mapped[str] = mapped_column(String, nullable=False)
 
-    # Establish a many-to-one relationship with the Question table
+    # Establish a many-to-one relationship with the Entry table
+    # (DB column/table names remain "question").
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("question.id", ondelete="CASCADE")
     )
-    question: Mapped[Question] = relationship(
-        Question, back_populates="answers"
-    )
+    entry: Mapped[Entry] = relationship(Entry, back_populates="answers")
 
     def __str__(self) -> str:
         return f'Answer(id={self.id}, text="{self.text}"'
@@ -101,214 +101,173 @@ def create_tables():
     )
 
 
-def insert_questions_and_answers():
+def insert_entries_and_answers():
     from mappings import get_question_answer_mappings
 
-    inserted_question_count = 0
-    questions_with_empty_answers = []
-    questions_with_multi_answers = []
+    inserted_entry_count = 0
+    entries_with_empty_answers = []
+    entries_with_multi_answers = []
     with Session(engine) as session:
         meanings_mapping = get_question_answer_mappings()
         for k_text, answers in meanings_mapping.items():
             k_text = k_text.strip()
-            if session.query(Question).filter(Question.text == k_text).first():
+            if session.query(Entry).filter(Entry.text == k_text).first():
                 continue
-            question = Question(text=k_text)
-            session.add(question)
-            inserted_question_count += 1
+            entry = Entry(text=k_text)
+            session.add(entry)
+            inserted_entry_count += 1
             if len(answers) > 1:
-                questions_with_multi_answers.append(k_text)
+                entries_with_multi_answers.append(k_text)
             for answer_text in answers:
                 if not answer_text:
-                    questions_with_empty_answers.append(k_text)
-                answer = Answer(text=answer_text, question=question)
+                    entries_with_empty_answers.append(k_text)
+                answer = Answer(text=answer_text, entry=entry)
                 session.add(answer)
         session.commit()
-    print("Inserted questions count:", inserted_question_count)
-    print("questions_with_empty_answers:", len(questions_with_empty_answers))
-    print(questions_with_empty_answers)
-    print("questions_with_multi_answers:", len(questions_with_multi_answers))
-    print(questions_with_multi_answers)
+    print("Inserted entries count:", inserted_entry_count)
+    print("entries_with_empty_answers:", len(entries_with_empty_answers))
+    print(entries_with_empty_answers)
+    print("entries_with_multi_answers:", len(entries_with_multi_answers))
+    print(entries_with_multi_answers)
 
 
-def db_get_all_question():
+def db_get_all_entries():
     with Session(engine) as session:
-        questions = (
-            session.query(Question)
-            .filter(Question.is_hidden == False)
-            .order_by(Question.id.desc())
+        entries = (
+            session.query(Entry)
+            .filter(Entry.is_hidden == False)
+            .order_by(Entry.id.desc())
             .all()
         )
-        return questions
+        return entries
 
 
-def db_get_latest_questions(count: int = 1000):
+
+def db_get_entry_by_id(entry_id: int):
     with Session(engine) as session:
-        questions = (
-            session.query(Question)
-            .filter(Question.is_hidden == False)
-            .order_by(Question.id.desc())
-            .limit(count)
-            .all()
-        )
-        return questions
+        return session.query(Entry).filter(Entry.id == entry_id).first()
 
 
-def db_get_question_by_id(id: int):
+def db_get_entry_by_text(entry_text: str):
     with Session(engine) as session:
-        query = session.query(Question).filter(Question.id == id).first()
-        if question := query:
-            return question
-        else:
-            print("No such question")
+        return session.query(Entry).filter(Entry.text == entry_text).first()
 
 
-def db_get_questions_after(id: int):
+def db_delete_entry(entry_id: int):
     with Session(engine) as session:
-        query = session.query(Question).filter(Question.id > id).all()
-        if questions := query:
-            return questions
-        else:
-            print("No such question")
-
-
-def db_get_question_by_text(question_text: str):
-    with Session(engine) as session:
-        query = (
-            session.query(Question)
-            .filter(Question.text == question_text)
-            .first()
-        )
-        if question := query:
-            print(question)
-        else:
-            print("No such question")
-
-
-def db_delete_question(id: int):
-    with Session(engine) as session:
-        session.query(Question).filter(Question.id == id).delete()
+        session.query(Entry).filter(Entry.id == entry_id).delete()
         session.commit()
 
 
-def db_update_question_text(id: int, text: str):
+def db_update_entry_text(entry_id: int, text: str):
     with Session(engine) as session:
-        question = session.query(Question).filter(Question.id == id).first()
-        if question:
-            question_id = question.id
-            question.text = text
+        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        if entry:
+            entry.text = text
             session.commit()
-            return question_id
+            return entry.id
 
 
-def db_update_example(question_id: int, example_text: str):
+def db_update_example(entry_id: int, example_text: str):
     with Session(engine) as session:
-        question = (
-            session.query(Question).filter(Question.id == question_id).first()
-        )
-        if question:
-            question_id = question.id
-            question.example = example_text
+        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        if entry:
+            entry.example = example_text
             session.commit()
-            return question_id
+            return entry.id
 
 
-def db_add_question(text: str):
+def db_add_entry(text: str):
     with Session(engine) as session:
         text = text.strip()
-        question = Question(text=text, last_visit=int(time.time()))
-        session.add(question)
+        entry = Entry(text=text, last_visit=int(time.time()))
+        session.add(entry)
         session.commit()
-        return question.id
+        return entry.id
 
 
-def db_question_last_visit_old_enough(id: int):
+def db_entry_last_visit_old_enough(entry_id: int):
     with Session(engine) as session:
-        question = session.query(Question).filter(Question.id == id).first()
-        if question:
-            last_visit = question.last_visit
+        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        if entry:
+            last_visit = entry.last_visit
             if not last_visit:
-                question.last_visit = int(time.time())
+                entry.last_visit = int(time.time())
                 session.commit()
                 return True
             now = int(time.time())
             # last visit more than 12h ago
             if now - last_visit >= 3600 * 12:
-                question.last_visit = now
+                entry.last_visit = now
                 session.commit()
                 return True
             return False
 
 
-def db_question_increment_visit_number(id: int):
+def db_entry_increment_visit_number(entry_id: int):
     with Session(engine) as session:
-        question = session.query(Question).filter(Question.id == id).first()
-        if question:
-            old_count = question.visit_count
-            question.visit_count = old_count + 1
+        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        if entry:
+            entry.visit_count = entry.visit_count + 1
             session.commit()
             return True
 
 
-def db_get_answer_by_id(id: int):
+def db_get_answer_by_id(answer_id: int):
     with Session(engine) as session:
-        query = session.query(Answer).filter(Answer.id == id).first()
-        if answer := query:
-            return answer
-        else:
-            print("No such answer")
+        return session.query(Answer).filter(Answer.id == answer_id).first()
 
 
-def db_delete_answer(id: int):
+def db_delete_answer(answer_id: int):
     with Session(engine) as session:
-        answer = session.query(Answer).filter(Answer.id == id).first()
+        answer = session.query(Answer).filter(Answer.id == answer_id).first()
         if answer:
-            question_id = answer.question_id
-            session.query(Answer).filter(Answer.id == id).delete()
+            entry_id = answer.question_id
+            session.query(Answer).filter(Answer.id == answer_id).delete()
             session.commit()
-            return question_id
+            return entry_id
 
 
-def db_update_answer_text(id: int, text: str):
+def db_update_answer_text(answer_id: int, text: str):
     with Session(engine) as session:
-        answer = session.query(Answer).filter(Answer.id == id).first()
+        answer = session.query(Answer).filter(Answer.id == answer_id).first()
         if answer:
-            question_id = answer.question_id
+            entry_id = answer.question_id
             answer.text = text
             session.commit()
-            return question_id
+            return entry_id
 
 
-def db_add_answer(text: str, question: Question):
+def db_add_answer(text: str, entry: Entry):
     with Session(engine) as session:
         text = text.strip()
-        answer = Answer(text=text, question=question)
+        answer = Answer(text=text, entry=entry)
         session.add(answer)
         session.commit()
         return answer.id
 
 
-def db_mark_last_review(id: int):
+def db_mark_last_review(entry_id: int):
     now = int(time.time())
     with Session(engine) as session:
-        question = session.query(Question).filter(Question.id == id).first()
-        if question:
-            question.last_review = now
+        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        if entry:
+            entry.last_review = now
             state = session.get(GlobalState, 1)
             if state is None:
                 state = GlobalState(id=1)
                 session.add(state)
-            state.last_review_question_id = id
+            state.last_review_question_id = entry_id
             session.commit()
             return True
     return False
 
 
-def db_remove_last_review(id: int):
+def db_remove_last_review(entry_id: int):
     with Session(engine) as session:
-        question = session.query(Question).filter(Question.id == id).first()
-        if question:
-            question.last_review = None
+        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        if entry:
+            entry.last_review = None
             session.commit()
             return True
     return False
@@ -326,21 +285,21 @@ def main():
     subparsers = parser.add_subparsers(dest="mode", help="Mode selection")
     subparsers.add_parser("create-table")
     subparsers.add_parser("insert")
-    question_parser = subparsers.add_parser("question")
-    question_parser.add_argument(
-        "--question", required=True, help="Specify the question"
+    entry_parser = subparsers.add_parser("entry")
+    entry_parser.add_argument(
+        "--entry", required=True, help="Specify the entry"
     )
 
     args = parser.parse_args()
 
     print("Mode:", args.mode)
-    if args.mode == "question":
-        print("Question:", args.question)
-        db_get_question_by_text(args.question)
+    if args.mode == "entry":
+        print("Entry:", args.entry)
+        db_get_entry_by_text(args.entry)
     if args.mode == "create-table":
         create_tables()
     if args.mode == "insert":
-        insert_questions_and_answers()
+        insert_entries_and_answers()
 
 
 if __name__ == "__main__":

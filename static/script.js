@@ -1,6 +1,6 @@
-function deleteQuestion(questionId) {
-  if (confirm("Are you sure you want to delete this question?")) {
-    fetch("/delete_question/" + questionId).then((Response) => {
+function deleteEntry(entryId) {
+  if (confirm("Are you sure you want to delete this entry?")) {
+    fetch("/delete_entry/" + entryId, { method: "DELETE" }).then((Response) => {
       if (Response.ok) {
         location.reload();
       }

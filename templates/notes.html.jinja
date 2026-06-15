@@ -4,7 +4,9 @@
 {% block body %}
 
 <style>
-    div {
+    .notes-layout,
+    .toc,
+    .tree-markdown {
         display: flex;
         align-items: baseline;
     }
@@ -27,6 +29,19 @@
     /* When visible */
     .toc.visible {
         transform: translateX(0);
+    }
+
+    #toggle-toc {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 1100;
+        background-color: #ffffff;
+        border: 1px solid #ccc;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     }
 
     /* Larger screens: show permanently */
@@ -143,12 +158,11 @@
 <script>
     document.addEventListener("keydown", (event) => {
         if (event.key === "e") {
-            document.getElementById("edit-note").click();
+            const editLink = document.getElementById("edit-note");
+            if (editLink) editLink.click();
         }
-    })
+    });
 
-</script>
-<script>
     document.addEventListener("DOMContentLoaded", function () {
         const toc = document.querySelector(".toc");
         const button = document.getElementById("toggle-toc");
@@ -158,20 +172,8 @@
         });
     });
 </script>
-<button id="toggle-toc"
-    style="
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    z-index: 1100;
-    background-color: #ffffff;
-    border: 1px solid #ccc;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-">☰</button>
-<div style="display: flex;">
+<button id="toggle-toc">☰</button>
+<div class="notes-layout">
     {% if toc_exist %}
     <div class="toc">
         {{ toc_html | safe }}

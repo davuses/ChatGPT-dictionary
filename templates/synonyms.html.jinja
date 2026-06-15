@@ -1,22 +1,17 @@
 {% extends "base.html.jinja" %}
 {% block title %} Synonyms of {{ word }} {% endblock title %}
 
-
+{% block body %}
 <style>
     @media screen and (min-width: 1064px) {
-
         body {
             width: 1364px;
             margin: 0 auto;
-
         }
-
     }
 </style>
-{% block body %}
 
-<h1>Synonyms of <a href="/question/{{ qid }}"
-        style="text-decoration: none;">{{ word }}</a></h1>
+<h1>Synonyms of <a href="/entry/{{ entry_id }}">{{ word }}</a></h1>
 
 {% if entries %}
 <table class="synonyms-table">
@@ -35,8 +30,8 @@
             <td>
                 {% for syn in entry.synonyms %}
                 {% if syn in all_words %}
-                {% for qid in all_words[syn] %}
-                <a href="{{ url_for('question_page', question_id=qid) }}">{{ syn }}</a>{% if not loop.last %} / {% endif
+                {% for eid in all_words[syn] %}
+                <a href="{{ url_for('entry_page', entry_id=eid) }}">{{ syn }}</a>{% if not loop.last %} / {% endif
                 %}{% endfor %}{% else %}{{ syn }}{% endif %}{% if not loop.last %},{% endif %}
                 {% endfor %}
             </td>

@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from fastapi import HTTPException
 from phonemizer import phonemize
 
-from database import Question, db_get_all_question
+from database import Entry, db_get_all_entries
 from wordhoard import Synonyms
 
 
@@ -29,24 +29,26 @@ def get_IPA(word) -> str:
 cached_all_words: dict[str, list[int]] = {}
 
 
+def invalidate_words_cache() -> None:
+    cached_all_words.clear()
+
+
 def get_all_words():
     if cached_all_words:
         return cached_all_words
 
-    all_questions = db_get_all_question()
-    for q in all_questions:
-        question_text = q.text
-        if "When i ask you a word" in question_text:
-            continue
-        if " - " in question_text:
-            word = question_text.split(" - ")[-1]
+    all_entries = db_get_all_entries()
+    for entry in all_entries:
+        entry_text = entry.text
+        if " - " in entry_text:
+            word = entry_text.split(" - ")[-1]
         else:
-            word = question_text
+            word = entry_text
         word = word.strip()
         if ids := cached_all_words.get(word):
-            ids.append(q.id)
+            ids.append(entry.id)
         else:
-            cached_all_words[word] = [q.id]
+            cached_all_words[word] = [entry.id]
     return cached_all_words
 
 
@@ -127,6 +129,7 @@ with open("config.toml", "rb") as fp:
     toml_config = tomllib.load(fp)
     NOTES_DIR = Path(toml_config["notes_folder"]).resolve()
     NOTES_DIR.mkdir(exist_ok=True)
+    MW_THESAURUS_API_KEY = toml_config["mw_thesaurus_api_key"]
 
 
 def safe_path_note(subpath: str) -> Path:
@@ -148,8 +151,8 @@ class ThesaurusEntry:
 
 
 @dataclass
-class QuestionDisplay:
-    question: Question
+class EntryDisplay:
+    entry: Entry
     q_text: str
     q_context: str
     last_review_elapse: str
@@ -158,9 +161,7 @@ class QuestionDisplay:
 def get_synonyms(word):
     synonym = Synonyms(
         search_string=word,
-        sources=[
-            "merriam-webster",
-        ],
+        api_key=MW_THESAURUS_API_KEY,
     )
     synonyms = cast(
         list[tuple[str, str, str, list[str]]], synonym.find_synonyms()
@@ -169,17 +170,7 @@ def get_synonyms(word):
 
 
 def format_meaning_html(md_text: str) -> str:
-    """
-    Apply any custom markdown preprocessing, then convert to HTML.
-    """
-
-    # e.g. turn “as in X:Y” → italics + newline
-    def repl(m: re.Match) -> str:
-        a, b = m.group(1).strip(), m.group(2).strip()
-        return f"as in *{a}*:\n\n{b}"
-
-    clean_md = re.sub(r"as in (.+?):(.+)", repl, md_text.strip())
-    return markdown2.markdown(clean_md)
+    return markdown2.markdown(md_text.strip())
 
 
 def get_thesaurus_entries(
