@@ -139,9 +139,20 @@ tr:hover {
 }
 
 .entries-table {
-  border-collapse: collapse;
+  /*
+   * separate (not collapse) borders: border-collapse resolves shared borders
+   * across the whole table, which is costly for thousands of rows and fights
+   * with per-row content-visibility containment. With separate borders each
+   * cell owns its borders, so skipped rows need no table-wide reconciliation.
+   * The single-line grid is reproduced via table top/left + per-cell
+   * right/bottom borders below.
+   */
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
   width: 100%;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
 }
 
 .data-table,
@@ -157,10 +168,24 @@ tr:hover {
 .data-table td,
 .synonyms-table th,
 .synonyms-table td {
-  border: 1px solid var(--border);
   padding: 4px 6px;
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+/* collapse-border tables: full border on every cell */
+.data-table th,
+.data-table td,
+.synonyms-table th,
+.synonyms-table td {
+  border: 1px solid var(--border);
+}
+
+/* separate-border table: each cell draws its right/bottom; table draws top/left */
+.entries-table th,
+.entries-table td {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .entries-table th,
@@ -187,7 +212,7 @@ tr:hover {
  */
 .entries-table tr[id] {
   content-visibility: auto;
-  contain-intrinsic-size: auto 33px;
+  contain-intrinsic-size: auto 50px;
 }
 
 .entries-table tr.resume-target-flash td {
@@ -549,7 +574,7 @@ caption {
 }
 
 .entry-value {
-  font-size: 20px;
+  /* font-size: 20px; */
   margin: 0 0 10px;
 }
 
