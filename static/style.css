@@ -177,6 +177,19 @@ tr:hover {
   scroll-margin-top: 48px;
 }
 
+/*
+ * The dictionary renders every entry (thousands of rows) in one table so
+ * Ctrl+F can search the whole list. content-visibility lets the browser skip
+ * layout/paint for off-screen rows, which avoids a multi-hundred-ms freeze
+ * when the tab regains focus. Only data rows (which carry an id) are skipped;
+ * the sticky header row has no id and stays rendered. Ctrl+F and #id anchor
+ * jumps still work because the browser renders matched/targeted subtrees.
+ */
+.entries-table tr[id] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 33px;
+}
+
 .entries-table tr.resume-target-flash td {
   animation: resume-target-flash 1.8s ease-out;
 }
