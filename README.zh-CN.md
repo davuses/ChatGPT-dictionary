@@ -4,6 +4,9 @@
 
 [English README](README.md)
 
+![词条列表](docs/screenshot-list.png)
+![词条详情](docs/screenshot-entry.png)
+
 ## 功能特性
 
 - **词条与释义** — 添加单词/短语，为每个词条附加一个或多个 Markdown 格式的释义和一个例句

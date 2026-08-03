@@ -4,6 +4,9 @@
 
 A personal vocabulary web app for IELTS study, built with FastAPI and SQLite. Add words and phrases, write your own definitions in Markdown, attach usage examples, and review them later — with phonetic transcription, thesaurus lookups, and a built-in Markdown notes browser thrown in.
 
+![Entry list](docs/screenshot-list.png)
+![Word detail](docs/screenshot-entry.png)
+
 ## Features
 
 - **Entries & definitions** — add words/phrases, attach one or more Markdown-formatted definitions and an example sentence
