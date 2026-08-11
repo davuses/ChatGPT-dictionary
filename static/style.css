@@ -354,7 +354,12 @@ tr.selected {
  * everywhere else the page's own content (a word, "Add Entry", "Not
  * Found"...) is the real <h1>. */
 .page-header {
-  align-items: center;
+  /* flex-start, not center: pages with a subtitle (dashboard, entries,
+   * quiz) have a taller left column than pages without one, and centering
+   * against that variable height shifted the nav ~10px up/down depending
+   * on which page you were on. Top-aligning keeps the nav row planted at
+   * a fixed position regardless of what the left side contains. */
+  align-items: flex-start;
   display: flex;
   gap: 16px;
   justify-content: space-between;
@@ -363,8 +368,15 @@ tr.selected {
 
 .page-header h1,
 .brand-title {
+  /* Explicit weight, not left to the browser default: every page carried
+   * this in a real <h1> before the header was unified, so it was always
+   * bold. Now that most pages use a non-heading <p> instead (see the
+   * macro's brand_as_h1 doc comment), only the tag itself differs - the
+   * weight must be pinned here or it silently follows the h1-vs-p default
+   * instead of staying consistent. */
   font-family: "BBC Reith Serif", serif;
   font-size: 30px;
+  font-weight: bold;
   line-height: 1.1;
   margin: 0;
 }
@@ -685,7 +697,6 @@ input[type="submit"]:hover {
   }
 
   .page-header {
-    align-items: flex-start;
     flex-direction: column;
   }
 

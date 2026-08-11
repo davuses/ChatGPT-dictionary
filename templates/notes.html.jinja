@@ -147,7 +147,7 @@
 </style>
 
 {% set edit_link %}{% if not is_dir %}<a class="button button-ghost" href="/edit_note/{{ request.path_params.note_path }}" id="edit-note">Edit</a>{% endif %}{% endset %}
-{{ page_header(active="notes", extra_nav=edit_link) }}
+{{ page_header(extra_nav=edit_link) }}
 
 <script>
     document.addEventListener("keydown", (event) => {

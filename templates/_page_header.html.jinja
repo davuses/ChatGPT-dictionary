@@ -1,13 +1,18 @@
 {#
   Shared global header, used by every page so nav items/order/labels can't
-  drift per-template. `active` highlights the current section (browse/quiz/
-  notes/add, or omitted on pages that aren't one of the four - an entry
-  page, a form, an error page). `brand_as_h1` is true only on the
-  dashboard, where "My Dictionary" is the actual subject of the page;
-  everywhere else the page's own content is the real <h1> and the brand is
-  a styled (non-heading) link back home.
+  drift per-template. `active` highlights the current section (browse/notes/
+  add, or omitted on pages that aren't one of those - an entry page, a
+  form, an error page). `brand_as_h1` is true only on the dashboard, where
+  "My Dictionary" is the actual subject of the page; everywhere else the
+  page's own content is the real <h1> and the brand is a styled
+  (non-heading) link back home - font-weight is pinned explicitly in CSS
+  so that choice of tag can't visibly change how bold it renders.
+  `show_notes` is true only on the dashboard: Notes is a secondary section,
+  not something every page needs a shortcut to. Quiz isn't in this nav at
+  all - the dashboard already features it as an on-page card, and it isn't
+  a frequent-enough destination from everywhere else to earn a global slot.
 #}
-{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="") %}
+{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False) %}
 <header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
     <div>
         {% if brand_as_h1 %}
@@ -19,8 +24,7 @@
     </div>
     <nav class="page-nav" aria-label="Main navigation">
         <a class="button button-ghost{% if active == 'browse' %} active{% endif %}" href="/entries">Browse</a>
-        <a class="button button-ghost{% if active == 'quiz' %} active{% endif %}" href="/quiz">Quiz</a>
-        <a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>
+        {% if show_notes %}<a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>{% endif %}
         <a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>
         {{ extra_nav | safe }}
     </nav>

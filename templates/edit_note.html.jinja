@@ -4,7 +4,7 @@
 
 {% block body %}
 {% set note_link %}<a class="button button-ghost" href="/view_note/{{ note_path }}">Note</a>{% endset %}
-{{ page_header(active="notes", extra_nav=note_link) }}
+{{ page_header(extra_nav=note_link) }}
 <main class="form-page">
 <h1>Edit Note</h1>
 <form method="post"
