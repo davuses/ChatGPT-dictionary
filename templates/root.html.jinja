@@ -40,8 +40,7 @@ My Dictionary
 {% block dashboard_widgets %}
 <section class="dashboard-card">
     <h2>Today's word</h2>
-    {{ quiz_card(question) }}
-    <a class="button button-ghost" href="/quiz">Try another</a>
+    {{ quiz_card(question, action_href="/quiz", action_label="Try another") }}
 </section>
 {% endblock dashboard_widgets %}
 

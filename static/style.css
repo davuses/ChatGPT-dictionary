@@ -465,7 +465,7 @@ tr.selected {
 }
 
 .quiz-card {
-  margin: 4px 0 14px;
+  margin: 0;
 }
 
 .quiz-sentence {
@@ -473,14 +473,21 @@ tr.selected {
   font-family: "BBC Reith Serif", serif;
   font-size: 20px;
   line-height: 1.5;
-  margin: 0 0 12px;
+  margin: 0 0 14px;
+}
+
+.quiz-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .quiz-answer {
   background: var(--surface);
   border-radius: 6px;
   color: #20333d;
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   padding: 10px 12px;
 }
 

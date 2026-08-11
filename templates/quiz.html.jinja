@@ -17,10 +17,12 @@ Quiz
     </nav>
 </header>
 
-{{ quiz_card(question) }}
-
-{% if question %}
-<a class="button button-primary" href="/quiz?exclude={{ question.entry_id }}">Next question</a>
-{% endif %}
+<section class="dashboard-card">
+    {% if question %}
+    {{ quiz_card(question, action_href="/quiz?exclude=" ~ question.entry_id, action_label="Next question") }}
+    {% else %}
+    {{ quiz_card(question) }}
+    {% endif %}
+</section>
 
 {% endblock body %}
