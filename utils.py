@@ -54,6 +54,9 @@ def get_all_words():
     return cached_all_words
 
 
+QUIZ_MIN_SENTENCE_WORDS = 5
+
+
 def _word_in_text(word: str, text: str | None) -> bool:
     """Whole-word (not substring) case-insensitive match, e.g. "cat" must not
     match inside "category"."""
@@ -61,6 +64,14 @@ def _word_in_text(word: str, text: str | None) -> bool:
         return False
     pattern = r"(?<!\w)" + re.escape(word) + r"(?!\w)"
     return re.search(pattern, text, re.IGNORECASE) is not None
+
+
+def _is_quizzable_sentence(word: str, text: str | None) -> bool:
+    """Whole-word match is necessary but not sufficient: some "examples"
+    are really just usage notes or alternate phrasings ("Or well-balanced",
+    "grind away at*"), too short to give a test-taker enough to work with.
+    Require a minimum amount of surrounding context."""
+    return _word_in_text(word, text) and len(text.split()) >= QUIZ_MIN_SENTENCE_WORDS
 
 
 def _blank_word(sentence: str, word: str) -> str:
@@ -143,8 +154,11 @@ def get_quiz_pool() -> list[QuizCandidate]:
         if not word:
             continue
 
-        sentences = [s for s in _example_sentences(entry.example) if _word_in_text(word, s)]
-        if _word_in_text(word, context):
+        sentences = [
+            s for s in _example_sentences(entry.example)
+            if _is_quizzable_sentence(word, s)
+        ]
+        if _is_quizzable_sentence(word, context):
             sentences.insert(0, context)
         if sentences:
             cached_quiz_pool.append(
