@@ -46,7 +46,10 @@ from utils import (
     get_IPA,
     get_thesaurus_senses,
     highlight_ipa,
+    invalidate_quiz_pool_cache,
     invalidate_words_cache,
+    pick_daily_question,
+    pick_random_question,
     safe_path_note,
 )
 
@@ -137,13 +140,28 @@ async def static_file(file_name):
 async def root_page(request: Request):
     review_bookmark_entry_id = get_review_bookmark()
     seven_days_ago = int(time.time()) - 7 * 86400
+    daily_question = pick_daily_question()
+    if daily_question and db_entry_last_visit_old_enough(daily_question.entry_id):
+        db_entry_increment_visit_count(daily_question.entry_id)
     context = {
         "entries_count": db_count_entries(),
         "visited_last_7_days": db_count_entries_visited_since(seven_days_ago),
         "review_bookmark_entry_id": review_bookmark_entry_id,
+        "question": daily_question,
     }
     return templates.TemplateResponse(
         request=request, name="root.html.jinja", context=context
+    )
+
+
+@app.get("/quiz", response_class=HTMLResponse)
+async def quiz_page(request: Request, exclude: Optional[int] = Query(None)):
+    question = pick_random_question(exclude_entry_id=exclude)
+    if question and db_entry_last_visit_old_enough(question.entry_id):
+        db_entry_increment_visit_count(question.entry_id)
+    context = {"question": question}
+    return templates.TemplateResponse(
+        request=request, name="quiz.html.jinja", context=context
     )
 
 
@@ -306,6 +324,7 @@ async def edit_entry(
     try:
         if e_id := db_update_entry_text(entry_id, updated_text):
             invalidate_words_cache()
+            invalidate_quiz_pool_cache()
             return RedirectResponse(url=f"/entry/{e_id}", status_code=303)
     except IntegrityError:
         raise HTTPException(status_code=409, detail="An entry with that text already exists")
@@ -329,6 +348,7 @@ async def edit_example(
     if not (updated_text := form_data.example_text):
         updated_text = ""
     if updated_eid := db_update_example(entry_id, updated_text):
+        invalidate_quiz_pool_cache()
         return RedirectResponse(url=f"/entry/{updated_eid}", status_code=303)
 
 
@@ -336,6 +356,7 @@ async def edit_example(
 async def delete_entry(entry_id: int):
     db_delete_entry(entry_id)
     invalidate_words_cache()
+    invalidate_quiz_pool_cache()
     return {"message": "deleted"}
 
 
@@ -355,6 +376,7 @@ async def add_entry(
     try:
         if e_id := db_add_entry(updated_text):
             invalidate_words_cache()
+            invalidate_quiz_pool_cache()
             return RedirectResponse(url=f"/entry/{e_id}", status_code=303)
     except IntegrityError:
         raise HTTPException(status_code=409, detail="An entry with that text already exists")

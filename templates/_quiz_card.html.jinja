@@ -1,0 +1,14 @@
+{% macro quiz_card(question) %}
+{% if question %}
+<div class="quiz-card">
+    <p class="quiz-sentence">{{ question.blanked_sentence }}</p>
+    <button type="button" class="button button-ghost quiz-reveal-btn" onclick="toggleQuizAnswer(this)">Show answer</button>
+    <p class="quiz-answer" hidden>
+        <strong>{{ question.word }}</strong>
+        &mdash; <a href="/entry/{{ question.entry_id }}">View full entry</a>
+    </p>
+</div>
+{% else %}
+<p class="quiz-empty">No quizzable entries yet &mdash; add some examples first.</p>
+{% endif %}
+{% endmacro %}

@@ -464,6 +464,30 @@ tr.selected {
   margin: 0 0 12px;
 }
 
+.quiz-card {
+  margin: 4px 0 14px;
+}
+
+.quiz-sentence {
+  color: #20333d;
+  font-family: "BBC Reith Serif", serif;
+  font-size: 20px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.quiz-answer {
+  background: var(--surface);
+  border-radius: 6px;
+  color: #20333d;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+}
+
+.quiz-empty {
+  color: var(--muted);
+}
+
 .page-toolbar-actions {
   display: flex;
   flex-wrap: wrap;

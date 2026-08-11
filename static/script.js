@@ -8,6 +8,16 @@ function deleteEntry(entryId) {
   }
 }
 
+function toggleQuizAnswer(button) {
+  const card = button.closest(".quiz-card");
+  if (!card) return;
+  const answer = card.querySelector(".quiz-answer");
+  if (!answer) return;
+  const isHidden = answer.hidden;
+  answer.hidden = !isHidden;
+  button.textContent = isHidden ? "Hide answer" : "Show answer";
+}
+
 const editPagePattern = /\/edit_.*?|add_.*/;
 
 if (editPagePattern.test(window.location.href)) {

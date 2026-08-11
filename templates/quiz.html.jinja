@@ -1,0 +1,26 @@
+{% extends "base.html.jinja" %}
+{% from "_quiz_card.html.jinja" import quiz_card %}
+{% block title %}
+Quiz
+{% endblock title %}
+
+{% block body %}
+
+<header class="home-header">
+    <div>
+        <h1><a href="/">My Dictionary</a></h1>
+        <p class="entry-count">Fill in the blank</p>
+    </div>
+    <nav class="home-actions" aria-label="Main navigation">
+        <a class="button button-ghost" href="/entries">Browse</a>
+        <a class="button button-ghost" href="/">Dashboard</a>
+    </nav>
+</header>
+
+{{ quiz_card(question) }}
+
+{% if question %}
+<a class="button button-primary" href="/quiz?exclude={{ question.entry_id }}">Next question</a>
+{% endif %}
+
+{% endblock body %}

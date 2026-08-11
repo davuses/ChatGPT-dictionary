@@ -1,4 +1,5 @@
 {% extends "base.html.jinja" %}
+{% from "_quiz_card.html.jinja" import quiz_card %}
 {% block title %}
 My Dictionary
 {% endblock title %}
@@ -36,7 +37,12 @@ My Dictionary
 </section>
 {% endif %}
 
-{# Reserved for future widgets (e.g. a daily fill-in-the-blank quiz card). #}
-{% block dashboard_widgets %}{% endblock dashboard_widgets %}
+{% block dashboard_widgets %}
+<section class="dashboard-card">
+    <h2>Today's word</h2>
+    {{ quiz_card(question) }}
+    <a class="button button-ghost" href="/quiz">Try another</a>
+</section>
+{% endblock dashboard_widgets %}
 
 {% endblock body %}

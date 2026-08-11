@@ -1,10 +1,12 @@
 import os
+import random
 import re
 import time
 import tomllib
 import urllib
 import urllib.parse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import cast
 
@@ -50,6 +52,134 @@ def get_all_words():
         else:
             cached_all_words[word] = [entry.id]
     return cached_all_words
+
+
+def _word_in_text(word: str, text: str | None) -> bool:
+    """Whole-word (not substring) case-insensitive match, e.g. "cat" must not
+    match inside "category"."""
+    if not text:
+        return False
+    pattern = r"(?<!\w)" + re.escape(word) + r"(?!\w)"
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
+def _blank_word(sentence: str, word: str) -> str:
+    """Blank every occurrence, not just the first — a sentence can
+    legitimately use the same word twice (e.g. two clauses joined into one
+    quote), and leaving a second instance visible would give the answer
+    away."""
+    pattern = r"(?<!\w)" + re.escape(word) + r"(?!\w)"
+    return re.sub(pattern, "_____", sentence, flags=re.IGNORECASE)
+
+
+def _example_sentences(example: str | None) -> list[str]:
+    """Split an Entry.example field into individual candidate sentences.
+
+    Many entries store a single plain sentence, but a majority store a
+    whole markdown blob instead: a leading gloss/definition line followed
+    by several quoted usage examples (each paragraph prefixed with "> "
+    or "* "). Only the quoted usage paragraphs make good quiz material —
+    the leading gloss is a definition, not a sentence to blank — so quote
+    paragraphs are extracted individually and preferred; the raw field is
+    only used as-is when it has no such structure at all.
+    """
+    if not example:
+        return []
+    example = example.strip()
+    if not example:
+        return []
+
+    paragraphs = re.split(r"\r?\n\s*\r?\n", example)
+    quote_paragraphs = []
+    plain_paragraphs = []
+    for para in paragraphs:
+        lines = [line.strip() for line in para.strip().splitlines()]
+        lines = [line for line in lines if line]
+        if not lines:
+            continue
+        is_quote = all(line.startswith((">", "*")) for line in lines)
+        cleaned = " ".join(line.lstrip("> *").strip() for line in lines).strip()
+        if not cleaned:
+            continue
+        (quote_paragraphs if is_quote else plain_paragraphs).append(cleaned)
+
+    return quote_paragraphs or plain_paragraphs
+
+
+@dataclass(frozen=True)
+class QuizCandidate:
+    entry_id: int
+    word: str
+    sentences: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class QuizQuestion:
+    entry_id: int
+    word: str
+    blanked_sentence: str
+
+
+cached_quiz_pool: list[QuizCandidate] = []
+
+
+def invalidate_quiz_pool_cache() -> None:
+    cached_quiz_pool.clear()
+
+
+def get_quiz_pool() -> list[QuizCandidate]:
+    """Entries quizzable with a plain fill-in-the-blank: the headword must
+    appear as a whole word in the entry's own context clause and/or its
+    example. Entries without a clean match are left out rather than
+    guessed at (no stemming, no LLM-generated sentences)."""
+    if cached_quiz_pool:
+        return cached_quiz_pool
+
+    for entry in db_get_all_entries():
+        if " - " not in entry.text:
+            continue
+        context, word = entry.text.rsplit(" - ", 1)
+        word = word.strip()
+        if not word:
+            continue
+
+        sentences = [s for s in _example_sentences(entry.example) if _word_in_text(word, s)]
+        if _word_in_text(word, context):
+            sentences.insert(0, context)
+        if sentences:
+            cached_quiz_pool.append(
+                QuizCandidate(entry_id=entry.id, word=word, sentences=sentences)
+            )
+
+    return cached_quiz_pool
+
+
+def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> QuizQuestion:
+    sentence = rng.choice(candidate.sentences)
+    return QuizQuestion(
+        entry_id=candidate.entry_id,
+        word=candidate.word,
+        blanked_sentence=_blank_word(sentence, candidate.word),
+    )
+
+
+def pick_random_question(exclude_entry_id: int | None = None) -> QuizQuestion | None:
+    pool = get_quiz_pool()
+    if not pool:
+        return None
+    candidates = [c for c in pool if c.entry_id != exclude_entry_id] or pool
+    return _question_from_candidate(candidates[random.randrange(len(candidates))], random)
+
+
+def pick_daily_question() -> QuizQuestion | None:
+    """Same question all day (and for every session that day), seeded by
+    today's date so it acts like a lightweight daily prompt."""
+    pool = get_quiz_pool()
+    if not pool:
+        return None
+    rng = random.Random(date.today().isoformat())
+    candidate = pool[rng.randrange(len(pool))]
+    return _question_from_candidate(candidate, rng)
 
 
 def get_how_long_ago(timestamp: int | None) -> str:
