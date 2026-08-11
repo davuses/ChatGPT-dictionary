@@ -1,4 +1,5 @@
 import time
+from dataclasses import replace
 from typing import Optional
 
 import markdown2
@@ -48,6 +49,7 @@ from utils import (
     highlight_ipa,
     invalidate_quiz_pool_cache,
     invalidate_words_cache,
+    normalize_pronoun_casing,
     pick_daily_question,
     pick_random_question,
     safe_path_note,
@@ -185,6 +187,10 @@ async def entries_page(
         if " - " in entry_text:
             display_text = entry_text.split(" - ")[-1].strip()
             context_text = entry_text.split(" - ")[0]
+        context_text = normalize_pronoun_casing(context_text)
+
+        if show_example and entry.example:
+            entry = replace(entry, example=normalize_pronoun_casing(entry.example))
 
         entry_displays.append(
             EntryDisplay(
@@ -233,7 +239,9 @@ async def entry_page(entry_id: int, request: Request):
     word = entry.text.split(" - ")[-1].strip()
     IPA_transcript = get_IPA(word)
     example_html = (
-        markdown2.markdown(entry.example, extras=["strike", "tables"])
+        markdown2.markdown(
+            normalize_pronoun_casing(entry.example), extras=["strike", "tables"]
+        )
         if entry.example
         else ""
     )
@@ -243,7 +251,7 @@ async def entry_page(entry_id: int, request: Request):
         "visit_count": visit_count,
         "last_visit_elapsed": get_how_long_ago(entry.last_visit),
         "is_review_bookmark": entry_id == review_bookmark_entry_id,
-        "entry_text": entry.text,
+        "entry_text": normalize_pronoun_casing(entry.text),
         "entry_id": entry_id,
         "IPA_transcript": IPA_transcript,
         "word": word,

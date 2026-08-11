@@ -19,6 +19,16 @@ from database import Entry, EntrySummary, db_get_all_entries
 from wordhoard import Synonyms
 
 
+def normalize_pronoun_casing(text: str) -> str:
+    """Capitalize the standalone pronoun "i" (common in casually-typed
+    source text, e.g. "i think it helps") without touching any other
+    lowercase word. Display-time fix only — the stored data is left as
+    saved."""
+    if not text:
+        return text
+    return re.sub(r"(?<!\w)i(?!\w)", "I", text)
+
+
 def get_IPA(word) -> str:
     a = phonemize(word, strip=True, with_stress=True)
     if isinstance(a, str):
@@ -195,7 +205,7 @@ def get_quiz_pool() -> list[QuizCandidate]:
 
 
 def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> QuizQuestion:
-    sentence = rng.choice(candidate.sentences)
+    sentence = normalize_pronoun_casing(rng.choice(candidate.sentences))
     blanked_sentence, display_word = _blank_word(sentence, candidate.word)
     return QuizQuestion(
         entry_id=candidate.entry_id,
