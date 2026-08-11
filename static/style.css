@@ -302,22 +302,12 @@ tr:hover {
   text-align: center;
   box-shadow: 2px 2px 3px #999;
 }
-.load-more {
-  left: 40px;
-}
-
 .my-float {
   font-size: 20px;
   display: flex;
   justify-content: center;
   text-align: center;
   align-items: center;
-}
-
-@media screen and (min-width: 640px) {
-  .hide-on-desktop {
-    display: none;
-  }
 }
 
 .unselectable {
@@ -365,10 +355,6 @@ tr.selected {
   content: attr(data-content);
 }
 
-.header-link {
-  margin: 10px;
-}
-
 .home-header {
   align-items: center;
   display: flex;
@@ -394,13 +380,6 @@ tr.selected {
 
 .home-header h1 a:hover {
   text-decoration: none;
-}
-
-.entry-count {
-  color: var(--muted);
-  font-family: monospace;
-  font-size: 15px;
-  margin: 4px 0 0;
 }
 
 .home-actions {
@@ -448,10 +427,6 @@ tr.selected {
 .dashboard-card p {
   color: var(--muted);
   margin: 0 0 12px;
-}
-
-.quiz-card {
-  margin: 0;
 }
 
 .quiz-sentence {
@@ -629,13 +604,6 @@ caption {
   font-size: 1.2em;
 }
 
-/* Layout helpers */
-.page-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .flex-center {
   display: flex;
   align-items: center;
@@ -660,13 +628,6 @@ caption {
 
 .word-meta button {
   margin-left: 10px;
-}
-
-/* Review table */
-.review-cell {
-  color: var(--muted);
-  font-size: medium;
-  font-family: monospace;
 }
 
 .entry-value {
