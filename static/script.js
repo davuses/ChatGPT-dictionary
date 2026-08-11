@@ -67,6 +67,10 @@ if (editPagePattern.test(window.location.href)) {
   document.addEventListener("DOMContentLoaded", function () {
     var editor = new EasyMDE({
       autofocus: true,
+      // Font Awesome is vendored in static/ and linked from base.html.jinja;
+      // without this EasyMDE injects a maxcdn.bootstrapcdn.com <link>, which
+      // leaves the toolbar as tofu boxes whenever that CDN is unreachable.
+      autoDownloadFontAwesome: false,
       spellChecker: false,
       nativeSpellcheck: true,
       inputStyle: "contenteditable",
