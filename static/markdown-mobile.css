@@ -5,107 +5,97 @@ html {
   -ms-text-size-adjust: 100%;
 }
 
-body {
+/* See the note in markdown-pc.css: typography and container styling are
+ * intentionally omitted so markdown content inherits the app's own type
+ * instead of re-introducing a per-breakpoint font change. (This file used
+ * to set a *sans* stack while markdown-pc.css set a *serif* one, so the
+ * same content changed typeface at 600px.) */
+.markdown-body {
   color: #444;
-  font-family: "BBC Reith Sans", Georgia, Palatino, "Palatino Linotype", Times,
-    "Times New Roman", serif;
-  font-size: 14px;
   line-height: 1.5em;
-  padding: 1em;
-  margin: auto;
-  max-width: 42em;
-  background: #fefefe;
 }
 
-a {
+.markdown-body a {
   color: #0645ad;
   text-decoration: none;
 }
-a:visited {
+.markdown-body a:visited {
   color: #0b0080;
 }
-a:hover {
+.markdown-body a:hover {
   color: #06e;
 }
-a:active {
+.markdown-body a:active {
   color: #faa700;
 }
-a:focus {
+.markdown-body a:focus {
   outline: thin dotted;
 }
-a:hover,
-a:active {
+.markdown-body a:hover, .markdown-body a:active {
   outline: 0;
 }
 
-::-moz-selection {
+.markdown-body ::-moz-selection {
   background: rgba(255, 255, 0, 0.3);
   color: #000;
 }
-::selection {
+.markdown-body ::selection {
   background: rgba(255, 255, 0, 0.3);
   color: #000;
 }
 
-a::-moz-selection {
+.markdown-body a::-moz-selection {
   background: rgba(255, 255, 0, 0.3);
   color: #0645ad;
 }
-a::selection {
+.markdown-body a::selection {
   background: rgba(255, 255, 0, 0.3);
   color: #0645ad;
 }
 
-p {
+.markdown-body p {
   margin: 1em 0;
 }
 
-img {
+.markdown-body img {
   max-width: 100%;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   font-weight: normal;
   color: #111;
   line-height: 1em;
 }
-h4,
-h5,
-h6 {
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
   font-weight: bold;
 }
-h1 {
+.markdown-body h1 {
   font-size: 2em;
 }
-h2 {
+.markdown-body h2 {
   font-size: 1.7em;
   font-weight: bold;
 }
-h3 {
+.markdown-body h3 {
   font-size: 1.3em;
 }
-h4 {
+.markdown-body h4 {
   font-size: 1.2em;
 }
-h5 {
+.markdown-body h5 {
   font-size: 1em;
 }
-h6 {
+.markdown-body h6 {
   font-size: 0.9em;
 }
 
-blockquote {
+.markdown-body blockquote {
   color: #666666;
   margin: 0;
   padding-left: 1em;
   border-left: 0.5em #eee solid;
 }
-hr {
+.markdown-body hr {
   display: block;
   height: 2px;
   border: 0;
@@ -114,141 +104,122 @@ hr {
   margin: 1em 0;
   padding: 0;
 }
-pre,
-code,
-kbd,
-samp {
+.markdown-body pre, .markdown-body code, .markdown-body kbd, .markdown-body samp {
   color: #000;
   font-family: monospace, monospace;
   _font-family: "courier new", monospace;
   font-size: 0.98em;
 }
-pre {
+.markdown-body pre {
   white-space: pre;
   white-space: pre-wrap;
   word-wrap: break-word;
 }
 
-b,
-strong {
+.markdown-body b, .markdown-body strong {
   font-weight: bold;
 }
 
-dfn {
+.markdown-body dfn {
   font-style: italic;
 }
 
-ins {
+.markdown-body ins {
   background: #ff9;
   color: #000;
   text-decoration: none;
 }
 
-mark {
+.markdown-body mark {
   background: #ff0;
   color: #000;
   font-style: italic;
   font-weight: bold;
 }
 
-sub,
-sup {
+.markdown-body sub, .markdown-body sup {
   font-size: 75%;
   line-height: 0;
   position: relative;
   vertical-align: baseline;
 }
-sup {
+.markdown-body sup {
   top: -0.5em;
 }
-sub {
+.markdown-body sub {
   bottom: -0.25em;
 }
 
-ul,
-ol {
+.markdown-body ul, .markdown-body ol {
   margin: -2px;
   padding: 0 0 0 1.5em;
 }
-li p:last-child {
+.markdown-body li p:last-child {
   margin: 0;
 }
-dd {
+.markdown-body dd {
   margin: 0 0 0 2em;
 }
 
-img {
+.markdown-body img {
   border: 0;
   -ms-interpolation-mode: bicubic;
   vertical-align: middle;
 }
 
-table {
+.markdown-body table {
   border-collapse: collapse;
   border-spacing: 0;
   width: 100%;
 }
-th {
+.markdown-body th {
   border-bottom: 1px solid black;
 }
-td {
+.markdown-body td {
   vertical-align: top;
 }
 
-@media only screen and (min-width: 480px) {
-  body {
-    font-size: 14px;
-  }
-}
-
-@media only screen and (min-width: 768px) {
-  body {
-    font-size: 16px;
-  }
-}
+/* Removed: per-breakpoint font-size overrides (14px @480, 16px @768). They
+ * re-introduced the typography control this file no longer owns - markdown
+ * content inherits the app's own size from style.css. */
 
 @media print {
-  * {
+  .markdown-body * {
     background: transparent !important;
     color: black !important;
     filter: none !important;
     -ms-filter: none !important;
   }
-  body {
+  .markdown-body {
     font-size: 12pt;
     max-width: 100%;
   }
-  a,
-  a:visited {
+  .markdown-body a, .markdown-body a:visited {
     text-decoration: underline;
   }
-  hr {
+  .markdown-body hr {
     height: 1px;
     border: 0;
     border-bottom: 1px solid black;
   }
-  a[href]:after {
+  .markdown-body a[href]:after {
     content: " (" attr(href) ")";
   }
-  abbr[title]:after {
+  .markdown-body abbr[title]:after {
     content: " (" attr(title) ")";
   }
-  .ir a:after,
-  a[href^="javascript:"]:after,
-  a[href^="#"]:after {
+  .markdown-body .ir a:after, .markdown-body a[href^="javascript:"]:after, .markdown-body a[href^="#"]:after {
     content: "";
   }
-  pre,
-  blockquote {
+  .markdown-body pre, .markdown-body blockquote {
     border: 1px solid #999;
     padding-right: 1em;
     page-break-inside: avoid;
   }
-  tr,
-  img {
+  .markdown-body tr, .markdown-body img {
     page-break-inside: avoid;
   }
-  img {
+  .markdown-body img {
     max-width: 100% !important;
   }
   @page :left {
@@ -257,14 +228,11 @@ td {
   @page :right {
     margin: 15mm 10mm 15mm 20mm;
   }
-  p,
-  h2,
-  h3 {
+  .markdown-body p, .markdown-body h2, .markdown-body h3 {
     orphans: 3;
     widows: 3;
   }
-  h2,
-  h3 {
+  .markdown-body h2, .markdown-body h3 {
     page-break-after: avoid;
   }
 }

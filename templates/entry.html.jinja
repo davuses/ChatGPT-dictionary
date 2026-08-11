@@ -287,7 +287,7 @@
             type="button">Add definition</button>
         {% endif %}
         {% if definition_exists %}
-        <div id="definition-div">
+        <div id="definition-div" class="markdown-body">
             {{ definition_html | safe }}
         </div>
         {% endif %}
@@ -301,7 +301,7 @@
                     id="edit-example">
                     Edit</button>
             </div>
-            <div>{{ example_html | safe }}</div>
+            <div class="markdown-body">{{ example_html | safe }}</div>
         </section>
     </article>
 

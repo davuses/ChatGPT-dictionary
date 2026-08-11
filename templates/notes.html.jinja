@@ -189,7 +189,7 @@
             {{ note_html | safe }}
         </div>
         {% else %}
-        {{ note_html | safe }}
+        <div class="markdown-body">{{ note_html | safe }}</div>
         {% endif %}
     </article>
 </div>
