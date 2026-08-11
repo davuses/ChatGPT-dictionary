@@ -74,13 +74,23 @@ def _is_quizzable_sentence(word: str, text: str | None) -> bool:
     return _word_in_text(word, text) and len(text.split()) >= QUIZ_MIN_SENTENCE_WORDS
 
 
-def _blank_word(sentence: str, word: str) -> str:
+def _blank_word(sentence: str, word: str) -> tuple[str, str]:
     """Blank every occurrence, not just the first — a sentence can
     legitimately use the same word twice (e.g. two clauses joined into one
     quote), and leaving a second instance visible would give the answer
-    away."""
-    pattern = r"(?<!\w)" + re.escape(word) + r"(?!\w)"
-    return re.sub(pattern, "_____", sentence, flags=re.IGNORECASE)
+    away.
+
+    Returns (blanked_sentence, display_word). The display word is taken
+    from how it actually appears in the sentence, not from the entry's
+    stored headword — entries are saved as "<context> - <word>" and the
+    two aren't always cased the same (e.g. word stored as "Pipe dream"
+    when the sentence has lowercase "pipe dream"), which would otherwise
+    make a perfectly ordinary word look like a proper noun on reveal.
+    """
+    pattern = re.compile(r"(?<!\w)" + re.escape(word) + r"(?!\w)", re.IGNORECASE)
+    match = pattern.search(sentence)
+    display_word = match.group(0) if match else word
+    return pattern.sub("_____", sentence), display_word
 
 
 def _example_sentences(example: str | None) -> list[str]:
@@ -170,10 +180,11 @@ def get_quiz_pool() -> list[QuizCandidate]:
 
 def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> QuizQuestion:
     sentence = rng.choice(candidate.sentences)
+    blanked_sentence, display_word = _blank_word(sentence, candidate.word)
     return QuizQuestion(
         entry_id=candidate.entry_id,
-        word=candidate.word,
-        blanked_sentence=_blank_word(sentence, candidate.word),
+        word=display_word,
+        blanked_sentence=blanked_sentence,
     )
 
 
