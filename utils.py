@@ -116,6 +116,13 @@ _NON_SENTENCE_LABEL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# A whole line wrapped in a single pair of asterisks ("*fit in with*") is
+# markdown italic emphasis used as a sub-heading grouping the quotes below
+# it, not a sentence — distinct from a real bullet marker ("* content"),
+# which has a space right after the asterisk.
+_WHOLE_LINE_ITALIC_LABEL_RE = re.compile(r"^\*[^*\s].*[^*\s]\*$")
+_BULLET_LINE_RE = re.compile(r"^\*\s")
+
 
 def _example_sentences(example: str | None) -> list[str]:
     """Split an Entry.example field into individual candidate sentences.
@@ -143,6 +150,8 @@ def _example_sentences(example: str | None) -> list[str]:
         lines = [line.strip() for line in para.strip().splitlines()]
         lines = [line for line in lines if line]
         if not lines:
+            continue
+        if len(lines) == 1 and _WHOLE_LINE_ITALIC_LABEL_RE.match(lines[0]) and not _BULLET_LINE_RE.match(lines[0]):
             continue
         is_quote = all(line.startswith((">", "*")) for line in lines)
         cleaned = " ".join(line.lstrip("> *").strip() for line in lines).strip()
