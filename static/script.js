@@ -18,6 +18,49 @@ function toggleQuizAnswer(button) {
   button.textContent = isHidden ? "Hide answer" : "Show answer";
 }
 
+// "Next question" on /quiz: fetch a fresh question in place instead of a
+// full page reload. The button's href is kept in sync with the server's
+// exclude-list response as a fallback (new tab / JS failure still works,
+// just as a normal navigation).
+document.addEventListener("DOMContentLoaded", function () {
+  const nextBtn = document.getElementById("quiz-next-btn");
+  if (!nextBtn) return;
+
+  nextBtn.addEventListener("click", function (event) {
+    event.preventDefault();
+    const card = nextBtn.closest(".quiz-card");
+    if (!card) return;
+
+    const url = new URL(nextBtn.href, window.location.href);
+    const exclude = url.searchParams.get("exclude") || "";
+
+    fetch("/quiz/next?exclude=" + encodeURIComponent(exclude), {
+      cache: "no-store",
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.entry_id) {
+          card.querySelector(".quiz-sentence").textContent =
+            "No quizzable entries yet — add some examples first.";
+          nextBtn.hidden = true;
+          return;
+        }
+
+        card.querySelector(".quiz-sentence").textContent = data.blanked_sentence;
+
+        const answerEl = card.querySelector(".quiz-answer");
+        answerEl.hidden = true;
+        answerEl.querySelector("strong").textContent = data.word;
+        answerEl.querySelector("a").href = "/entry/" + data.entry_id;
+
+        const revealBtn = card.querySelector(".quiz-reveal-btn");
+        revealBtn.textContent = "Show answer";
+
+        nextBtn.href = "/quiz?exclude=" + encodeURIComponent(data.next_exclude);
+      });
+  });
+});
+
 const editPagePattern = /\/edit_.*?|add_.*/;
 
 if (editPagePattern.test(window.location.href)) {

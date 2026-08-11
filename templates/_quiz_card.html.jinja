@@ -1,10 +1,10 @@
-{% macro quiz_card(question, action_href=None, action_label=None) %}
+{% macro quiz_card(question, action_href=None, action_label=None, action_id=None) %}
 {% if question %}
 <div class="quiz-card">
     <p class="quiz-sentence">{{ question.blanked_sentence }}</p>
     <div class="quiz-actions">
         <button type="button" class="button button-primary quiz-reveal-btn" onclick="toggleQuizAnswer(this)">Show answer</button>
-        {% if action_href %}<a class="button button-ghost" href="{{ action_href }}">{{ action_label }}</a>{% endif %}
+        {% if action_href %}<a class="button button-ghost" href="{{ action_href }}"{% if action_id %} id="{{ action_id }}"{% endif %}>{{ action_label }}</a>{% endif %}
     </div>
     <p class="quiz-answer" hidden>
         <strong>{{ question.word }}</strong>

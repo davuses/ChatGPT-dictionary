@@ -52,6 +52,7 @@ from utils import (
     normalize_pronoun_casing,
     pick_daily_question,
     pick_random_question,
+    QuizQuestion,
     safe_path_note,
 )
 
@@ -159,10 +160,10 @@ async def root_page(request: Request):
 QUIZ_EXCLUDE_HISTORY_SIZE = 15
 
 
-@app.get("/quiz", response_class=HTMLResponse)
-async def quiz_page(request: Request, exclude: str = Query("")):
-    # Order matters here (oldest-first) so the trailing slice below keeps the
-    # *most recently seen* entries, not an arbitrary subset.
+def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
+    """Shared by the page route and the JSON route. Order matters in the
+    exclude list (oldest-first) so the trailing slice keeps the *most
+    recently seen* entries, not an arbitrary subset."""
     exclude_ids_ordered = [int(x) for x in exclude.split(",") if x.strip().isdigit()]
     exclude_ids_ordered = list(dict.fromkeys(exclude_ids_ordered))
 
@@ -175,10 +176,31 @@ async def quiz_page(request: Request, exclude: str = Query("")):
     next_exclude = ",".join(
         str(i) for i in next_exclude_ids[-QUIZ_EXCLUDE_HISTORY_SIZE:]
     )
+    return question, next_exclude
 
+
+@app.get("/quiz", response_class=HTMLResponse)
+async def quiz_page(request: Request, exclude: str = Query("")):
+    question, next_exclude = _next_quiz_question(exclude)
     context = {"question": question, "next_exclude": next_exclude}
     return templates.TemplateResponse(
         request=request, name="quiz.html.jinja", context=context
+    )
+
+
+@app.get("/quiz/next")
+async def quiz_next(exclude: str = Query("")):
+    question, next_exclude = _next_quiz_question(exclude)
+    if not question:
+        return JSONResponse({"question": None})
+    return JSONResponse(
+        {
+            "entry_id": question.entry_id,
+            "word": question.word,
+            "blanked_sentence": question.blanked_sentence,
+            "next_exclude": next_exclude,
+        },
+        headers={"Cache-Control": "no-store"},
     )
 
 
