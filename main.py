@@ -1,3 +1,4 @@
+import time
 from typing import Optional
 
 import markdown2
@@ -16,15 +17,19 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.templating import _TemplateResponse
 
 from database import (
+    ENTRIES_PAGE_SIZE,
     db_add_definition,
     db_add_entry,
+    db_count_entries,
+    db_count_entries_visited_since,
     db_delete_definition,
     db_delete_entry,
     db_entry_increment_visit_count,
     db_entry_last_visit_old_enough,
     db_get_definition_by_id,
+    db_get_entries_page,
     db_get_entry_by_id,
-    db_get_homepage_entries,
+    db_get_entry_page_number,
     db_clear_review_bookmark,
     db_set_review_bookmark,
     db_update_definition_text,
@@ -129,14 +134,31 @@ async def static_file(file_name):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root_page(
+async def root_page(request: Request):
+    review_bookmark_entry_id = get_review_bookmark()
+    seven_days_ago = int(time.time()) - 7 * 86400
+    context = {
+        "entries_count": db_count_entries(),
+        "visited_last_7_days": db_count_entries_visited_since(seven_days_ago),
+        "review_bookmark_entry_id": review_bookmark_entry_id,
+    }
+    return templates.TemplateResponse(
+        request=request, name="root.html.jinja", context=context
+    )
+
+
+@app.get("/entries", response_class=HTMLResponse)
+async def entries_page(
     request: Request,
     show_example: bool = Query(False),
     entries_only: bool = Query(False),
+    q: str = Query(""),
+    page: int = Query(1, ge=1),
 ):
-    entries = db_get_homepage_entries(include_examples=show_example)
+    entries, total_count = db_get_entries_page(
+        query=q, include_examples=show_example, page=page
+    )
     review_bookmark_entry_id = get_review_bookmark()
-    entries_count = len(entries)
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
         entry_text = entry.text
@@ -154,15 +176,21 @@ async def root_page(
             )
         )
 
+    total_pages = max(1, -(-total_count // ENTRIES_PAGE_SIZE))  # ceil div
     context = {
-        "entries_count": entries_count,
+        "entries_count": total_count,
         "entry_displays": entry_displays,
         "entries_only": entries_only,
         "show_example": show_example,
         "review_bookmark_entry_id": review_bookmark_entry_id,
+        "search_query": q,
+        "page": page,
+        "total_pages": total_pages,
+        "has_prev_page": page > 1,
+        "has_next_page": page < total_pages,
     }
     return templates.TemplateResponse(
-        request=request, name="root.html.jinja", context=context
+        request=request, name="entries.html.jinja", context=context
     )
 
 
@@ -365,6 +393,17 @@ async def review_bookmark():
     return JSONResponse(
         {"entry_id": get_review_bookmark()},
         headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.get("/resume_review")
+async def resume_review():
+    entry_id = get_review_bookmark()
+    if not entry_id:
+        return RedirectResponse(url="/entries", status_code=303)
+    page = db_get_entry_page_number(entry_id) or 1
+    return RedirectResponse(
+        url=f"/entries?page={page}#{entry_id}", status_code=303
     )
 
 

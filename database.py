@@ -9,6 +9,8 @@ from sqlalchemy import (
     String,
     create_engine,
     event,
+    func,
+    or_,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import (
@@ -123,21 +125,82 @@ def db_get_all_entries():
 
 
 
-def db_get_homepage_entries(include_examples: bool = False):
+ENTRIES_PAGE_SIZE = 200
+
+
+def db_count_entries() -> int:
+    with Session(engine) as session:
+        return (
+            session.query(func.count(Entry.id))
+            .filter(Entry.is_hidden == False)
+            .scalar()
+        )
+
+
+def db_get_entry_page_number(
+    entry_id: int, page_size: int = ENTRIES_PAGE_SIZE
+) -> int | None:
+    """Which page (1-indexed) `entry_id` falls on in the default, unfiltered,
+    newest-first /entries listing. Returns None if the entry doesn't exist
+    or is hidden."""
+    with Session(engine) as session:
+        entry = (
+            session.query(Entry)
+            .filter(Entry.id == entry_id, Entry.is_hidden == False)
+            .first()
+        )
+        if not entry:
+            return None
+        rank = (
+            session.query(func.count(Entry.id))
+            .filter(Entry.is_hidden == False)
+            .filter(Entry.id > entry_id)
+            .scalar()
+        )
+        return rank // page_size + 1
+
+
+def db_get_entries_page(
+    query: str = "",
+    include_examples: bool = False,
+    page: int = 1,
+    page_size: int = ENTRIES_PAGE_SIZE,
+) -> tuple[list[EntrySummary], int]:
+    """Return (entries for this page, total matching count), newest first.
+
+    `query` is matched case-insensitively against both the entry text
+    (word + context) and the example, so it works as a single search box
+    over everything a user is likely to remember about an entry.
+    """
     with Session(engine) as session:
         columns = [Entry.id, Entry.text, Entry.visit_count]
         if include_examples:
             columns.append(Entry.example)
 
+        base_query = session.query(*columns).filter(Entry.is_hidden == False)
+
+        query = query.strip()
+        if query:
+            like_pattern = f"%{query}%"
+            base_query = base_query.filter(
+                or_(
+                    Entry.text.ilike(like_pattern),
+                    Entry.example.ilike(like_pattern),
+                )
+            )
+
+        total = base_query.order_by(None).count()
+
+        page = max(page, 1)
         rows = (
-            session.query(*columns)
-            .filter(Entry.is_hidden == False)
-            .order_by(Entry.id.desc())
+            base_query.order_by(Entry.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
             .all()
         )
 
         if include_examples:
-            return [
+            entries = [
                 EntrySummary(
                     id=row.id,
                     text=row.text,
@@ -146,15 +209,28 @@ def db_get_homepage_entries(include_examples: bool = False):
                 )
                 for row in rows
             ]
+        else:
+            entries = [
+                EntrySummary(
+                    id=row.id,
+                    text=row.text,
+                    visit_count=row.visit_count or 0,
+                )
+                for row in rows
+            ]
 
-        return [
-            EntrySummary(
-                id=row.id,
-                text=row.text,
-                visit_count=row.visit_count or 0,
-            )
-            for row in rows
-        ]
+        return entries, total
+
+
+def db_count_entries_visited_since(cutoff_timestamp: int) -> int:
+    with Session(engine) as session:
+        return (
+            session.query(Entry)
+            .filter(Entry.is_hidden == False)
+            .filter(Entry.last_visit != None)
+            .filter(Entry.last_visit >= cutoff_timestamp)
+            .count()
+        )
 
 
 def db_get_entry_by_id(entry_id: int):
