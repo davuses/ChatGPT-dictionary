@@ -93,6 +93,20 @@ def _blank_word(sentence: str, word: str) -> tuple[str, str]:
     return pattern.sub("_____", sentence), display_word
 
 
+# Lexicographic metadata labels seen in this data ("Related: rosy, ...",
+# "ADJ: ...", "SYN: pillage, plunder"), as opposed to a real sentence.
+# Deliberately a specific denylist rather than a general "Word:" pattern —
+# some paragraphs are legitimate speaker-attributed quotes ("Jack Barsky:
+# KGB Spy, I threw myself into..."), which a blanket pattern would wrongly
+# discard too.
+_NON_SENTENCE_LABEL_RE = re.compile(
+    r"^(related|also(?:\s+verb)?|noun|adj|verb|syn(?:onyms?)?|adv|opp|"
+    r"origin|plural|pronunciation|note|easily confused|always plural|"
+    r"generally|figuratively)\s*:",
+    re.IGNORECASE,
+)
+
+
 def _example_sentences(example: str | None) -> list[str]:
     """Split an Entry.example field into individual candidate sentences.
 
@@ -102,7 +116,9 @@ def _example_sentences(example: str | None) -> list[str]:
     or "* "). Only the quoted usage paragraphs make good quiz material —
     the leading gloss is a definition, not a sentence to blank — so quote
     paragraphs are extracted individually and preferred; the raw field is
-    only used as-is when it has no such structure at all.
+    only used as-is when it has no such structure at all. Paragraphs that
+    are themselves lexicographic labels/notes, not sentences, are dropped
+    regardless.
     """
     if not example:
         return []
@@ -120,7 +136,7 @@ def _example_sentences(example: str | None) -> list[str]:
             continue
         is_quote = all(line.startswith((">", "*")) for line in lines)
         cleaned = " ".join(line.lstrip("> *").strip() for line in lines).strip()
-        if not cleaned:
+        if not cleaned or _NON_SENTENCE_LABEL_RE.match(cleaned):
             continue
         (quote_paragraphs if is_quote else plain_paragraphs).append(cleaned)
 
