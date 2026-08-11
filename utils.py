@@ -6,7 +6,6 @@ import tomllib
 import urllib
 import urllib.parse
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
 from typing import cast
 
@@ -229,17 +228,6 @@ def pick_random_question(exclude_entry_ids: set[int] = frozenset()) -> QuizQuest
         return None
     candidates = [c for c in pool if c.entry_id not in exclude_entry_ids] or pool
     return _question_from_candidate(candidates[random.randrange(len(candidates))], random)
-
-
-def pick_daily_question() -> QuizQuestion | None:
-    """Same question all day (and for every session that day), seeded by
-    today's date so it acts like a lightweight daily prompt."""
-    pool = get_quiz_pool()
-    if not pool:
-        return None
-    rng = random.Random(date.today().isoformat())
-    candidate = pool[rng.randrange(len(pool))]
-    return _question_from_candidate(candidate, rng)
 
 
 def get_how_long_ago(timestamp: int | None) -> str:

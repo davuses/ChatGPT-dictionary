@@ -9,8 +9,8 @@
 
 {% block dashboard_widgets %}
 <section class="card">
-    <h2>Today's word</h2>
-    {{ quiz_card(question, action_href="/quiz", action_label="Try another") }}
+    <h2>Fill in the blank</h2>
+    {{ quiz_card(question, action_href="/quiz/next?exclude=" ~ next_exclude, action_label="Try another", action_id="quiz-next-btn") }}
 </section>
 {% endblock dashboard_widgets %}
 

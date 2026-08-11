@@ -18,10 +18,12 @@ function toggleQuizAnswer(button) {
   button.textContent = isHidden ? "Hide answer" : "Show answer";
 }
 
-// "Next question" on /quiz: fetch a fresh question in place instead of a
-// full page reload. The button's href is kept in sync with the server's
-// exclude-list response as a fallback (new tab / JS failure still works,
-// just as a normal navigation).
+// The quiz card's "next question" button (dashboard's "Try another", or
+// anywhere else quiz_card() is used with an action_id): fetch a fresh
+// question in place instead of a full page reload. The button's href is
+// kept in sync with the server's exclude-list response as a fallback (new
+// tab / JS failure still shows a fresh question via GET /quiz/next, just
+// as a normal navigation).
 document.addEventListener("DOMContentLoaded", function () {
   const nextBtn = document.getElementById("quiz-next-btn");
   if (!nextBtn) return;
@@ -56,7 +58,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const revealBtn = card.querySelector(".quiz-reveal-btn");
         revealBtn.textContent = "Show answer";
 
-        nextBtn.href = "/quiz?exclude=" + encodeURIComponent(data.next_exclude);
+        nextBtn.href = "/quiz/next?exclude=" + encodeURIComponent(data.next_exclude);
       });
   });
 });

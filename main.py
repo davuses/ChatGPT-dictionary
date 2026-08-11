@@ -50,7 +50,6 @@ from utils import (
     invalidate_quiz_pool_cache,
     invalidate_words_cache,
     normalize_pronoun_casing,
-    pick_daily_question,
     pick_random_question,
     QuizQuestion,
     safe_path_note,
@@ -139,31 +138,14 @@ async def static_file(file_name):
     return FileResponse(f"./static/{file_name}")
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root_page(request: Request):
-    review_bookmark_entry_id = get_review_bookmark()
-    seven_days_ago = int(time.time()) - 7 * 86400
-    daily_question = pick_daily_question()
-    if daily_question and db_entry_last_visit_old_enough(daily_question.entry_id):
-        db_entry_increment_visit_count(daily_question.entry_id)
-    context = {
-        "entries_count": db_count_entries(),
-        "visited_last_7_days": db_count_entries_visited_since(seven_days_ago),
-        "review_bookmark_entry_id": review_bookmark_entry_id,
-        "question": daily_question,
-    }
-    return templates.TemplateResponse(
-        request=request, name="root.html.jinja", context=context
-    )
-
-
 QUIZ_EXCLUDE_HISTORY_SIZE = 15
 
 
 def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
-    """Shared by the page route and the JSON route. Order matters in the
-    exclude list (oldest-first) so the trailing slice keeps the *most
-    recently seen* entries, not an arbitrary subset."""
+    """Shared by the dashboard's initial render and the JSON route it polls
+    for "Try another". Order matters in the exclude list (oldest-first) so
+    the trailing slice keeps the *most recently seen* entries, not an
+    arbitrary subset."""
     exclude_ids_ordered = [int(x) for x in exclude.split(",") if x.strip().isdigit()]
     exclude_ids_ordered = list(dict.fromkeys(exclude_ids_ordered))
 
@@ -179,12 +161,20 @@ def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
     return question, next_exclude
 
 
-@app.get("/quiz", response_class=HTMLResponse)
-async def quiz_page(request: Request, exclude: str = Query("")):
-    question, next_exclude = _next_quiz_question(exclude)
-    context = {"question": question, "next_exclude": next_exclude}
+@app.get("/", response_class=HTMLResponse)
+async def root_page(request: Request):
+    review_bookmark_entry_id = get_review_bookmark()
+    seven_days_ago = int(time.time()) - 7 * 86400
+    question, next_exclude = _next_quiz_question("")
+    context = {
+        "entries_count": db_count_entries(),
+        "visited_last_7_days": db_count_entries_visited_since(seven_days_ago),
+        "review_bookmark_entry_id": review_bookmark_entry_id,
+        "question": question,
+        "next_exclude": next_exclude,
+    }
     return templates.TemplateResponse(
-        request=request, name="quiz.html.jinja", context=context
+        request=request, name="root.html.jinja", context=context
     )
 
 
