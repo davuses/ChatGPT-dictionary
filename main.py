@@ -156,12 +156,27 @@ async def root_page(request: Request):
     )
 
 
+QUIZ_EXCLUDE_HISTORY_SIZE = 15
+
+
 @app.get("/quiz", response_class=HTMLResponse)
-async def quiz_page(request: Request, exclude: Optional[int] = Query(None)):
-    question = pick_random_question(exclude_entry_id=exclude)
+async def quiz_page(request: Request, exclude: str = Query("")):
+    # Order matters here (oldest-first) so the trailing slice below keeps the
+    # *most recently seen* entries, not an arbitrary subset.
+    exclude_ids_ordered = [int(x) for x in exclude.split(",") if x.strip().isdigit()]
+    exclude_ids_ordered = list(dict.fromkeys(exclude_ids_ordered))
+
+    question = pick_random_question(exclude_entry_ids=set(exclude_ids_ordered))
     if question and db_entry_last_visit_old_enough(question.entry_id):
         db_entry_increment_visit_count(question.entry_id)
-    context = {"question": question}
+
+    next_exclude_ids = exclude_ids_ordered + ([question.entry_id] if question else [])
+    next_exclude_ids = list(dict.fromkeys(next_exclude_ids))
+    next_exclude = ",".join(
+        str(i) for i in next_exclude_ids[-QUIZ_EXCLUDE_HISTORY_SIZE:]
+    )
+
+    context = {"question": question, "next_exclude": next_exclude}
     return templates.TemplateResponse(
         request=request, name="quiz.html.jinja", context=context
     )
@@ -259,6 +274,7 @@ async def entry_page(entry_id: int, request: Request):
         "definition_html": definition_html,
         "definition_id": definition_id,
         "example_html": example_html,
+        "needs_markdown_css": True,
     }
     return templates.TemplateResponse(
         request=request, name="entry.html.jinja", context=context
@@ -271,7 +287,7 @@ async def edit_entry_page(entry_id: int, request: Request):
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    context = {"entry_id": entry_id, "entry_text": entry.text}
+    context = {"entry_id": entry_id, "entry_text": entry.text, "needs_editor": True}
     return templates.TemplateResponse(
         request=request, name="edit_entry.html.jinja", context=context
     )
@@ -285,6 +301,7 @@ async def edit_definition_page(definition_id: int, request: Request):
     context = {
         "definition_text": definition.text,
         "definition_id": definition_id,
+        "needs_editor": True,
     }
     return templates.TemplateResponse(
         request=request, name="edit_definition.html.jinja", context=context
@@ -300,6 +317,7 @@ async def edit_example_page(entry_id: int, request: Request):
     context = {
         "entry_id": entry_id,
         "entry_example": entry.example or "",
+        "needs_editor": True,
     }
     return templates.TemplateResponse(
         request=request, name="edit_example.html.jinja", context=context
@@ -309,13 +327,15 @@ async def edit_example_page(entry_id: int, request: Request):
 @app.get("/add_entry", response_class=HTMLResponse)
 async def add_entry_page(request: Request):
     return templates.TemplateResponse(
-        request=request, name="add_entry.html.jinja"
+        request=request,
+        name="add_entry.html.jinja",
+        context={"needs_editor": True},
     )
 
 
 @app.get("/add_definition", response_class=HTMLResponse)
 async def add_definition_page(entry_id: int, request: Request):
-    context = {"entry_id": entry_id}
+    context = {"entry_id": entry_id, "needs_editor": True}
     return templates.TemplateResponse(
         request=request, name="add_definition.html.jinja", context=context
     )
@@ -480,6 +500,7 @@ async def notes(request: Request):
         "note_html": note_html,
         "is_dir": True,
         "toc_exist": toc_exist,
+        "needs_markdown_css": True,
     }
     return templates.TemplateResponse(
         request=request, name="notes.html.jinja", context=context
@@ -504,6 +525,7 @@ def view_note(note_path: str, request: Request) -> _TemplateResponse:
         "note_html": note_html,
         "is_dir": False,
         "toc_exist": toc_exist,
+        "needs_markdown_css": True,
     }
     return templates.TemplateResponse(
         request=request, name="notes.html.jinja", context=context
@@ -514,7 +536,11 @@ def view_note(note_path: str, request: Request) -> _TemplateResponse:
 async def edit_note_page(note_path: str, request: Request):
     full_path = safe_path_note(note_path)
     content = full_path.read_text(encoding="utf-8")
-    context = {"note_text": content, "note_path": note_path}
+    context = {
+        "note_text": content,
+        "note_path": note_path,
+        "needs_editor": True,
+    }
     return templates.TemplateResponse(
         request=request, name="edit_note.html.jinja", context=context
     )

@@ -214,11 +214,11 @@ def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> Qu
     )
 
 
-def pick_random_question(exclude_entry_id: int | None = None) -> QuizQuestion | None:
+def pick_random_question(exclude_entry_ids: set[int] = frozenset()) -> QuizQuestion | None:
     pool = get_quiz_pool()
     if not pool:
         return None
-    candidates = [c for c in pool if c.entry_id != exclude_entry_id] or pool
+    candidates = [c for c in pool if c.entry_id not in exclude_entry_ids] or pool
     return _question_from_candidate(candidates[random.randrange(len(candidates))], random)
 
 

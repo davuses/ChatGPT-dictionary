@@ -1,13 +1,13 @@
 {% extends "base.html.jinja" %}
-{% block title %}
-{% if entries_only %}
+{% block title -%}
+{%- if entries_only -%}
 Entries Only
-{% elif show_example %}
+{%- elif show_example -%}
 Show Example
-{% else %}
+{%- else -%}
 My Dictionary
-{% endif %}
-{% endblock title %}
+{%- endif -%}
+{%- endblock title %}
 
 {% block body %}
 
