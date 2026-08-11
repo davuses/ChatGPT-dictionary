@@ -323,6 +323,7 @@ async def edit_definition_page(definition_id: int, request: Request):
     context = {
         "definition_text": definition.text,
         "definition_id": definition_id,
+        "entry_id": definition.question_id,
         "needs_editor": True,
     }
     return templates.TemplateResponse(

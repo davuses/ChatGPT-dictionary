@@ -1,13 +1,10 @@
 {% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header %}
 {% block title %}Edit Example{% endblock title %}
 
 {% block body %}
-<nav class="page-toolbar" aria-label="Form navigation">
-    <div class="page-toolbar-actions">
-        <a class="button button-ghost" href="/entry/{{ entry_id }}">Entry</a>
-        <a class="button button-ghost" href="/entries">Dictionary</a>
-    </div>
-</nav>
+{% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">Entry</a>{% endset %}
+{{ page_header(extra_nav=entry_link) }}
 <main class="form-page">
 <h1>Edit Example</h1>
 <form method="post"

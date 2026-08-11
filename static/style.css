@@ -355,7 +355,12 @@ tr.selected {
   content: attr(data-content);
 }
 
-.home-header {
+/* Shared by every page (see templates/_page_header.html.jinja). The site
+ * brand is normally a styled paragraph, not a heading - only the dashboard
+ * passes brand_as_h1, since "My Dictionary" is that page's actual subject;
+ * everywhere else the page's own content (a word, "Add Entry", "Not
+ * Found"...) is the real <h1>. */
+.page-header {
   align-items: center;
   display: flex;
   gap: 16px;
@@ -363,39 +368,40 @@ tr.selected {
   margin: 8px 0 10px;
 }
 
-.home-header h1 {
+.page-header h1,
+.brand-title {
   font-family: "BBC Reith Serif", serif;
   font-size: 30px;
   line-height: 1.1;
   margin: 0;
 }
 
-.home-header h1 a {
+.page-header h1 a,
+.brand-title a {
   color: #162b34;
 }
 
-.home-header h1 a:visited {
+.page-header h1 a:visited,
+.brand-title a:visited {
   color: #162b34;
 }
 
-.home-header h1 a:hover {
+.page-header h1 a:hover,
+.brand-title a:hover {
   text-decoration: none;
 }
 
-.home-actions {
+.page-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
 }
 
-.page-toolbar {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: space-between;
-  margin: 8px 0 14px;
+.page-nav .active {
+  background: var(--surface);
+  border-color: var(--accent);
+  font-weight: bold;
 }
 
 .page-subtitle {
@@ -412,7 +418,7 @@ tr.selected {
   max-width: 68ch;
 }
 
-.dashboard-card {
+.card {
   border: 1px solid var(--border);
   border-radius: 8px;
   margin: 16px 0;
@@ -420,11 +426,11 @@ tr.selected {
   padding: 16px;
 }
 
-.dashboard-card h2 {
+.card h2 {
   margin: 0 0 6px;
 }
 
-.dashboard-card p {
+.card p {
   color: var(--muted);
   margin: 0 0 12px;
 }
@@ -454,12 +460,6 @@ tr.selected {
 
 .quiz-empty {
   color: var(--muted);
-}
-
-.page-toolbar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .content-section {
@@ -675,10 +675,6 @@ input[type="submit"]:hover {
   background: var(--accent-dark);
 }
 
-.notes-nav {
-  justify-content: flex-start;
-}
-
 .error-page {
   margin-top: 40px;
   max-width: 720px;
@@ -693,7 +689,7 @@ input[type="submit"]:hover {
     padding: 8px;
   }
 
-  .home-header {
+  .page-header {
     align-items: flex-start;
     flex-direction: column;
   }

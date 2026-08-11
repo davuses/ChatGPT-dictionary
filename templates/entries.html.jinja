@@ -1,4 +1,5 @@
 {% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header %}
 {% block title -%}
 {%- if entries_only -%}
 Entries Only
@@ -13,20 +14,8 @@ My Dictionary
 
 {% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
 
-<header class="home-header" id="top">
-    <div>
-        <h1><a href="/">My Dictionary</a></h1>
-        <p class="page-subtitle">{{ entries_count }} {% if search_query %}matching {% endif %}entries</p>
-    </div>
-    <nav class="home-actions" aria-label="Main navigation">
-        <a class="button button-primary" href="/add_entry">Add</a>
-        <a class="button button-ghost"
-            id="resume-bookmark-link"
-            href="/resume_review"
-            {% if not review_bookmark_entry_id %}hidden{% endif %}>Resume from last mark</a>
-        <a class="button button-ghost" href="/notes/">Notes</a>
-    </nav>
-</header>
+{% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>Resume from last mark</a>{% endset %}
+{{ page_header(subtitle=(entries_count|string) ~ " " ~ ("matching " if search_query else "") ~ "entries", active="browse", id="top", extra_nav=resume_link) }}
 
 <form class="search-form" role="search" action="/entries" method="get">
     {% if entries_only %}<input type="hidden" name="entries_only" value="true">{% endif %}

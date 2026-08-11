@@ -1,20 +1,13 @@
 {% extends "base.html.jinja" %}
 {% from "_quiz_card.html.jinja" import quiz_card %}
+{% from "_page_header.html.jinja" import page_header %}
 {% block title %}Quiz{% endblock title %}
 
 {% block body %}
 
-<header class="home-header">
-    <div>
-        <h1><a href="/">My Dictionary</a></h1>
-        <p class="page-subtitle">Fill in the blank</p>
-    </div>
-    <nav class="home-actions" aria-label="Main navigation">
-        <a class="button button-ghost" href="/entries">Browse</a>
-    </nav>
-</header>
+{{ page_header(subtitle="Fill in the blank", active="quiz") }}
 
-<section class="dashboard-card">
+<section class="card">
     {% if question %}
     {{ quiz_card(question, action_href="/quiz?exclude=" ~ next_exclude, action_label="Next question", action_id="quiz-next-btn") }}
     {% else %}

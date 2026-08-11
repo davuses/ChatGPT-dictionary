@@ -1,12 +1,13 @@
 {% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header %}
 {% block title %}Not Found{% endblock title %}
 
 {% block body %}
+{{ page_header() }}
 <main class="error-page">
 <h1>Not Found</h1>
 
 <p>{{ detail }}</p>
-<p><a class="button button-ghost" href="/">Dictionary</a></p>
 </main>
 
 {% endblock body %}

@@ -1,0 +1,28 @@
+{#
+  Shared global header, used by every page so nav items/order/labels can't
+  drift per-template. `active` highlights the current section (browse/quiz/
+  notes/add, or omitted on pages that aren't one of the four - an entry
+  page, a form, an error page). `brand_as_h1` is true only on the
+  dashboard, where "My Dictionary" is the actual subject of the page;
+  everywhere else the page's own content is the real <h1> and the brand is
+  a styled (non-heading) link back home.
+#}
+{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="") %}
+<header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
+    <div>
+        {% if brand_as_h1 %}
+        <h1><a href="/">My Dictionary</a></h1>
+        {% else %}
+        <p class="brand-title"><a href="/">My Dictionary</a></p>
+        {% endif %}
+        {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
+    </div>
+    <nav class="page-nav" aria-label="Main navigation">
+        <a class="button button-ghost{% if active == 'browse' %} active{% endif %}" href="/entries">Browse</a>
+        <a class="button button-ghost{% if active == 'quiz' %} active{% endif %}" href="/quiz">Quiz</a>
+        <a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>
+        <a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>
+        {{ extra_nav | safe }}
+    </nav>
+</header>
+{% endmacro %}

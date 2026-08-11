@@ -1,4 +1,5 @@
 {% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header %}
 {% block title %}{{ word }}{% endblock title %}
 
 {% block head %}
@@ -26,13 +27,8 @@
 {% endblock head %}
 
 {% block body %}
-    <nav class="page-toolbar" aria-label="Entry actions">
-        <div class="page-toolbar-actions">
-            <a class="button button-ghost" href="/entries">Dictionary</a>
-            <a class="button button-ghost" href="/show_synonyms/{{ entry_id }}">Synonyms</a>
-        </div>
-        <a class="button button-primary" href="/add_entry">Add</a>
-    </nav>
+    {% set synonyms_link %}<a class="button button-ghost" href="/show_synonyms/{{ entry_id }}">Synonyms</a>{% endset %}
+    {{ page_header(extra_nav=synonyms_link) }}
     <article class="entry-page">
         <h1 class="word-title"> {{ word }} </h1>
         <p class="word-meta">
