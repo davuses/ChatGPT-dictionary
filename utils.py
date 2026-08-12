@@ -12,6 +12,7 @@ from typing import cast
 import markdown2
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
+from markupsafe import Markup, escape
 from phonemizer import phonemize
 
 from database import Entry, EntrySummary, db_get_all_entries
@@ -22,10 +23,40 @@ def normalize_pronoun_casing(text: str) -> str:
     """Capitalize the standalone pronoun "i" (common in casually-typed
     source text, e.g. "i think it helps") without touching any other
     lowercase word. Display-time fix only — the stored data is left as
-    saved."""
+    saved.
+
+    Must run before highlight_matches(), never after: this returns a plain
+    str (re.sub doesn't preserve Markup), so calling it on an
+    already-highlighted value would silently drop the "already escaped"
+    flag and the literal <mark> tags would come out escaped on the page."""
     if not text:
         return text
     return re.sub(r"(?<!\w)i(?!\w)", "I", text)
+
+
+def highlight_matches(text: str, query: str) -> Markup:
+    """Wrap every case-insensitive occurrence of `query` in `text` with
+    <mark>, HTML-escaping everything else. Used by /entries live search to
+    show why a row matched (main.py's entries_page).
+
+    Matches against the raw, unescaped `text` and only escapes each
+    fragment while reassembling the result — escaping `text` up front and
+    then regex-matching the *raw* query against the escaped string would
+    silently fail to find/highlight any match that straddles an
+    HTML-special character (e.g. an entry containing "&", "<", ">"): the
+    row would still show up (the SQL ILIKE match runs on raw text) but
+    with no highlight at all."""
+    if not query:
+        return escape(text)
+
+    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    parts = pattern.split(text)
+    matches = pattern.findall(text)
+
+    result = escape(parts[0])
+    for match, rest in zip(matches, parts[1:]):
+        result += Markup("<mark>") + escape(match) + Markup("</mark>") + escape(rest)
+    return result
 
 
 def get_IPA(word) -> str:

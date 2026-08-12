@@ -47,6 +47,7 @@ from utils import (
     get_IPA,
     get_thesaurus_senses,
     highlight_ipa,
+    highlight_matches,
     invalidate_quiz_pool_cache,
     invalidate_words_cache,
     normalize_pronoun_casing,
@@ -205,6 +206,11 @@ async def entries_page(
     entries, total_count = db_get_entries_page(
         query=q, include_examples=show_example, page=page
     )
+    # Stripped once here to match what db_get_entries_page() actually
+    # searched on (it strips internally) - highlight_matches() below needs
+    # the same value or a leading/trailing-space query would match rows
+    # (DB search already stripped it) but fail to highlight anything.
+    q_stripped = q.strip()
     review_bookmark_entry_id = get_review_bookmark()
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
@@ -218,6 +224,15 @@ async def entries_page(
 
         if show_example and entry.example:
             entry = replace(entry, example=normalize_pronoun_casing(entry.example))
+
+        # highlight_matches() is a no-op (just escapes) when q is empty, so
+        # this always runs rather than branching on whether there's a
+        # search - must come after normalize_pronoun_casing() above, never
+        # before (see that function's docstring).
+        display_text = highlight_matches(display_text, q_stripped)
+        context_text = highlight_matches(context_text, q_stripped)
+        if show_example and entry.example:
+            entry = replace(entry, example=highlight_matches(entry.example, q_stripped))
 
         entry_displays.append(
             EntryDisplay(
@@ -253,8 +268,8 @@ async def entries_page(
         return JSONResponse(
             {
                 "count": total_count,
-                "matching": bool(q.strip()),
-                "query": q.strip(),
+                "matching": bool(q_stripped),
+                "query": q_stripped,
                 "results_html": results_html,
             },
             headers={"Cache-Control": "no-store"},

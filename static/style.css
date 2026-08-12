@@ -216,6 +216,13 @@ tr:hover {
   animation: resume-target-first-cell-flash 1.8s ease-out;
 }
 
+.entries-table mark {
+  background: #fff3a3;
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
 @keyframes resume-target-flash {
   0%,
   65% {
