@@ -11,8 +11,11 @@
   not something every page needs a shortcut to. Quiz isn't in this nav at
   all - the dashboard already features it as an on-page card, and it isn't
   a frequent-enough destination from everywhere else to earn a global slot.
+  `show_add` is true only on the dashboard and Browse: Add is a starting
+  point reachable from those two hubs, not something every entry/edit/note
+  page needs a shortcut to.
 #}
-{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False, subtitle_id=None) %}
+{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False, subtitle_id=None, show_add=False) %}
 <header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
     <div>
         {% if brand_as_h1 %}
@@ -25,7 +28,7 @@
     <nav class="page-nav" aria-label="Main navigation">
         <a class="button button-ghost{% if active == 'browse' %} active{% endif %}" href="/entries">Browse</a>
         {% if show_notes %}<a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>{% endif %}
-        <a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>
+        {% if show_add %}<a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>{% endif %}
         {{ extra_nav | safe }}
     </nav>
 </header>

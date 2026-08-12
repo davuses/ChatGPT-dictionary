@@ -15,7 +15,7 @@ My Dictionary
 {% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
 
 {% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>Resume from last mark</a>{% endset %}
-{{ page_header(subtitle=(entries_count|string) ~ " " ~ ("matching " if search_query else "") ~ "entries", active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count") }}
+{{ page_header(subtitle=(entries_count|string) ~ " " ~ ("matching " if search_query else "") ~ "entries", active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
 
 <form class="search-form" role="search" action="/entries" method="get">
     {% if entries_only %}<input type="hidden" name="entries_only" value="true">{% endif %}

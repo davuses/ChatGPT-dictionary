@@ -4,7 +4,7 @@
 
 {% block body %}
 {% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">Entry</a>{% endset %}
-{{ page_header(active="add", extra_nav=entry_link) }}
+{{ page_header(extra_nav=entry_link) }}
 <main class="form-page">
 <h1>Add Definition</h1>
 <form method="post"
