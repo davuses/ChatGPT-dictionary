@@ -1,0 +1,44 @@
+{#
+  The table + pagination for /entries. Extracted so it can be rendered
+  standalone as the live-search JSON response's results_html (see
+  entries_page() in main.py) as well as included normally inside
+  entries.html.jinja for a full page load. Self-contained (defines its own
+  view_qs) since a standalone render has no access to macros defined in the
+  including template.
+#}
+{% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
+
+<table class="entries-table">
+    {% if entries_only %}
+    <caption>Entries Only</caption>
+    {% include "entries_only_table.html.jinja" %}
+    {% elif show_example %}
+    <caption>Entries with Examples</caption>
+    {% include "entries_with_examples.html.jinja" %}
+    {% else %}
+    <caption>My Entries</caption>
+    {% include "entries_default.html.jinja" %}
+    {% endif %}
+
+</table>
+
+{% if total_pages > 1 %}
+<nav class="pagination" aria-label="Pagination">
+    {% set base_qs = view_qs('&') %}
+    {% if has_prev_page %}
+    <a class="button button-ghost" href="/entries?{% if entries_only %}entries_only=true&{% elif show_example %}show_example=true&{% endif %}page=1{{ base_qs }}">&laquo; First</a>
+    <a class="button button-ghost" href="/entries?{% if entries_only %}entries_only=true&{% elif show_example %}show_example=true&{% endif %}page={{ page - 1 }}{{ base_qs }}">&larr; Prev</a>
+    {% else %}
+    <span class="button button-ghost" aria-disabled="true">&laquo; First</span>
+    <span class="button button-ghost" aria-disabled="true">&larr; Prev</span>
+    {% endif %}
+    <span class="pagination-status">Page {{ page }} of {{ total_pages }}</span>
+    {% if has_next_page %}
+    <a class="button button-ghost" href="/entries?{% if entries_only %}entries_only=true&{% elif show_example %}show_example=true&{% endif %}page={{ page + 1 }}{{ base_qs }}">Next &rarr;</a>
+    <a class="button button-ghost" href="/entries?{% if entries_only %}entries_only=true&{% elif show_example %}show_example=true&{% endif %}page={{ total_pages }}{{ base_qs }}">Last &raquo;</a>
+    {% else %}
+    <span class="button button-ghost" aria-disabled="true">Next &rarr;</span>
+    <span class="button button-ghost" aria-disabled="true">Last &raquo;</span>
+    {% endif %}
+</nav>
+{% endif %}

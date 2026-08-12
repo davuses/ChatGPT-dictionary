@@ -240,6 +240,26 @@ async def entries_page(
         "has_prev_page": page > 1,
         "has_next_page": page < total_pages,
     }
+
+    # Live search (static/script.js, initLiveSearch): the same route,
+    # tagged with this header instead of a separate endpoint, so the query
+    # logic above doesn't have to be duplicated. Returns just the bits the
+    # page updates in place, rendering the table/pagination via the same
+    # partial the full page includes.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        results_html = templates.env.get_template(
+            "_entries_results.html.jinja"
+        ).render(context)
+        return JSONResponse(
+            {
+                "count": total_count,
+                "matching": bool(q.strip()),
+                "query": q.strip(),
+                "results_html": results_html,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
     return templates.TemplateResponse(
         request=request, name="entries.html.jinja", context=context
     )

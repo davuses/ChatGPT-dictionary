@@ -12,7 +12,7 @@
   all - the dashboard already features it as an on-page card, and it isn't
   a frequent-enough destination from everywhere else to earn a global slot.
 #}
-{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False) %}
+{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False, subtitle_id=None) %}
 <header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
     <div>
         {% if brand_as_h1 %}
@@ -20,7 +20,7 @@
         {% else %}
         <p class="brand-title"><a href="/">My Dictionary</a></p>
         {% endif %}
-        {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
+        {% if subtitle %}<p class="page-subtitle"{% if subtitle_id %} id="{{ subtitle_id }}"{% endif %}>{{ subtitle }}</p>{% endif %}
     </div>
     <nav class="page-nav" aria-label="Main navigation">
         <a class="button button-ghost{% if active == 'browse' %} active{% endif %}" href="/entries">Browse</a>
