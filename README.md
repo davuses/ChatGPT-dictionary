@@ -53,19 +53,59 @@ Requires Python 3.12+.
    - `notes_folder` — a local directory of Markdown notes to browse under `/notes/`
    - `mw_thesaurus_api_key` — a free API key from the [Merriam-Webster Developer Center](https://dictionaryapi.com/) (used for the synonyms feature)
 
-3. Create the database tables:
+3. Configure the administrator account. Generate an Argon2 password hash and
+   a random session secret:
+
+   ```bash
+   uv run python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(input('Admin password: ')))"
+   uv run python -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+
+   Provide the resulting values to the service as environment variables:
+
+   ```bash
+   export DICTIONARY_ADMIN_USERNAME="admin"
+   export DICTIONARY_ADMIN_PASSWORD_HASH="the-argon2-hash"
+   export DICTIONARY_SESSION_SECRET="the-random-session-secret"
+   ```
+
+   Production uses secure HTTPS-only session cookies by default. For an
+   HTTP-only local-network test, also set `DICTIONARY_HTTPS_ONLY=false`.
+   Never use that override on the public deployment.
+
+4. Create the database tables:
 
    ```bash
    python database.py create-table
    ```
 
-4. Run the app:
+5. Run the app:
 
    ```bash
    uvicorn main:app --reload
    ```
 
    Then open `http://localhost:8000`.
+
+   To test from another device on the same trusted local network:
+
+   ```bash
+   export DICTIONARY_HTTPS_ONLY=false
+   uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+
+   Open `http://<computer-lan-ip>:8000`. Restore
+   `DICTIONARY_HTTPS_ONLY=true` (or remove the override) for production.
+
+## Access control
+
+- Browsing entries, viewing entry details, synonyms, and quizzes is public.
+- Adding, editing, deleting, review bookmarks, and all notes routes require
+  the administrator session.
+- Every state-changing request also requires a CSRF token.
+- Anonymous browsing and quizzes do not update visit counters, keeping public
+  access read-only.
+- FastAPI's `/docs`, `/redoc`, and `/openapi.json` endpoints are disabled.
 
 ## Notes
 

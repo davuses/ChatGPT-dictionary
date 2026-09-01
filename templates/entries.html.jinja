@@ -1,5 +1,5 @@
 {% extends "base.html.jinja" %}
-{% from "_page_header.html.jinja" import page_header %}
+{% from "_page_header.html.jinja" import page_header with context %}
 {% block title -%}
 {%- if entries_only -%}
 Entries Only
@@ -85,7 +85,7 @@ My Dictionary
         });
 
         initLiveSearch(results);
-        refreshReviewBookmarkLink();
+        {% if is_authenticated %}refreshReviewBookmarkLink();{% endif %}
         flashIncomingHashTarget();
     });
 
@@ -162,6 +162,7 @@ My Dictionary
         }
     }
 
+    {% if is_authenticated %}
     window.addEventListener("pageshow", refreshReviewBookmarkLink);
     window.addEventListener("focus", refreshReviewBookmarkLink);
     document.addEventListener("visibilitychange", function () {
@@ -177,6 +178,7 @@ My Dictionary
             .then((response) => response.json())
             .catch(() => ({ entry_id: null }));
     }
+    {% endif %}
 
     function updateReviewBookmarkLink(data) {
         const resumeLink = document.getElementById("resume-bookmark-link");
@@ -218,7 +220,10 @@ My Dictionary
         if (
             confirm("Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText)
         ) {
-            fetch("/delete_entry/" + selectedEntryId, { method: "DELETE" }).then((Response) => {
+            fetch("/delete_entry/" + selectedEntryId, {
+                method: "DELETE",
+                headers: csrfHeaders()
+            }).then(handleProtectedResponse).then((Response) => {
                 if (Response.ok) {
                     selectedRow.parentNode.removeChild(selectedRow);
                 }

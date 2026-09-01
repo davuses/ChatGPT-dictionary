@@ -1,4 +1,5 @@
 import time
+import urllib.parse
 from dataclasses import replace
 from typing import Optional
 
@@ -15,7 +16,24 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.templating import _TemplateResponse
+
+from auth import (
+    SESSION_MAX_AGE,
+    auth_template_context,
+    authenticate,
+    end_admin_session,
+    get_auth_settings,
+    get_csrf_token,
+    is_admin,
+    require_admin,
+    require_admin_with_form_csrf,
+    require_admin_with_header_csrf,
+    safe_next_path,
+    start_admin_session,
+    verify_csrf_value,
+)
 
 from database import (
     ENTRIES_PAGE_SIZE,
@@ -56,79 +74,183 @@ from utils import (
     safe_path_note,
 )
 
-app = FastAPI()
+auth_settings = get_auth_settings()
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=auth_settings.session_secret,
+    session_cookie="dictionary_session",
+    max_age=SESSION_MAX_AGE,
+    same_site="lax",
+    https_only=auth_settings.https_only,
+)
 
 
 app.mount("/static", StaticFiles(directory="./static"), name="static")
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(
+    directory="templates", context_processors=[auth_template_context]
+)
 
 
-class EditDefinitionForm(BaseModel):
+class CsrfForm(BaseModel):
+    csrf_token: str
+
+
+class EditDefinitionForm(CsrfForm):
     definition_text: str
 
     @classmethod
-    def as_form(cls, definition_text: str = Form(...)):
-        return cls(definition_text=definition_text)
+    async def as_form(
+        cls, definition_text: str = Form(...), csrf_token: str = Form(...)
+    ):
+        return cls(definition_text=definition_text, csrf_token=csrf_token)
 
 
-class EditEntryForm(BaseModel):
+class EditEntryForm(CsrfForm):
     entry_text: str
 
     @classmethod
-    def as_form(cls, entry_text: str = Form(...)):
-        return cls(entry_text=entry_text)
+    async def as_form(cls, entry_text: str = Form(...), csrf_token: str = Form(...)):
+        return cls(entry_text=entry_text, csrf_token=csrf_token)
 
 
-class EditExampleForm(BaseModel):
+class EditExampleForm(CsrfForm):
     example_text: Optional[str] = Field(default="", description="Example text")
 
     @classmethod
-    def as_form(cls, example_text: str = Form(None)):
-        return cls(example_text=example_text)
+    async def as_form(
+        cls, example_text: str = Form(None), csrf_token: str = Form(...)
+    ):
+        return cls(example_text=example_text, csrf_token=csrf_token)
 
 
-class EditNoteForm(BaseModel):
+class EditNoteForm(CsrfForm):
     note_text: Optional[str] = Field(default="", description="Note text")
 
     @classmethod
-    def as_form(cls, note_text: str = Form(None)):
-        return cls(note_text=note_text)
+    async def as_form(cls, note_text: str = Form(None), csrf_token: str = Form(...)):
+        return cls(note_text=note_text, csrf_token=csrf_token)
 
 
-class AddEntryForm(BaseModel):
+class AddEntryForm(CsrfForm):
     entry_text: str
 
     @classmethod
-    def as_form(cls, entry_text: str = Form(...)):
-        return cls(entry_text=entry_text)
+    async def as_form(cls, entry_text: str = Form(...), csrf_token: str = Form(...)):
+        return cls(entry_text=entry_text, csrf_token=csrf_token)
 
 
-class AddDefinitionForm(BaseModel):
+class AddDefinitionForm(CsrfForm):
     definition_text: str
     entry_id: int
 
     @classmethod
-    def as_form(
-        cls, definition_text: str = Form(...), entry_id: int = Form(...)
+    async def as_form(
+        cls,
+        definition_text: str = Form(...),
+        entry_id: int = Form(...),
+        csrf_token: str = Form(...),
     ):
-        return cls(definition_text=definition_text, entry_id=entry_id)
+        return cls(
+            definition_text=definition_text,
+            entry_id=entry_id,
+            csrf_token=csrf_token,
+        )
+
+
+class LoginForm(CsrfForm):
+    username: str
+    password: str
+    next_path: str = "/"
+
+    @classmethod
+    async def as_form(
+        cls,
+        username: str = Form(...),
+        password: str = Form(...),
+        next_path: str = Form("/"),
+        csrf_token: str = Form(...),
+    ):
+        return cls(
+            username=username,
+            password=password,
+            next_path=next_path,
+            csrf_token=csrf_token,
+        )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, next_path: str = Query("/", alias="next")):
+    destination = safe_next_path(next_path)
+    if is_admin(request):
+        return RedirectResponse(url=destination, status_code=303)
+    context = {
+        "next_path": destination,
+        "login_csrf_token": get_csrf_token(request),
+        "error": None,
+    }
+    return templates.TemplateResponse(
+        request=request, name="login.html.jinja", context=context
+    )
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login(
+    request: Request,
+    form_data: LoginForm = Depends(LoginForm.as_form),
+):
+    verify_csrf_value(request, form_data.csrf_token)
+    destination = safe_next_path(form_data.next_path)
+    if authenticate(form_data.username, form_data.password):
+        start_admin_session(request)
+        return RedirectResponse(url=destination, status_code=303)
+    context = {
+        "next_path": destination,
+        "login_csrf_token": get_csrf_token(request),
+        "error": "Invalid username or password",
+    }
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html.jinja",
+        context=context,
+        status_code=401,
+    )
+
+
+@app.post("/logout")
+async def logout(
+    request: Request, _: None = Depends(require_admin_with_form_csrf)
+):
+    end_admin_session(request)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ):
+    if exc.status_code == 401 and request.method in {"GET", "HEAD"}:
+        next_path = safe_next_path(request.url.path)
+        if request.url.query:
+            next_path += f"?{request.url.query}"
+        return RedirectResponse(
+            url=f"/login?next={urllib.parse.quote(next_path, safe='')}",
+            status_code=303,
+        )
     if exc.status_code == 404:
         return templates.TemplateResponse(
-            "404.html.jinja",
-            {"request": request, "detail": exc.detail},
+            request=request,
+            name="404.html.jinja",
+            context={"detail": exc.detail},
             status_code=404,
         )
     if exc.status_code == 500:
         return templates.TemplateResponse(
-            "500.html.jinja",
-            {"request": request, "detail": exc.detail},
+            request=request,
+            name="500.html.jinja",
+            context={"detail": exc.detail},
             status_code=500,
         )
     return HTMLResponse(content=str(exc.detail), status_code=exc.status_code)
@@ -142,7 +264,9 @@ async def static_file(file_name):
 QUIZ_EXCLUDE_HISTORY_SIZE = 15
 
 
-def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
+def _next_quiz_question(
+    exclude: str, track_visit: bool = False
+) -> tuple[Optional[QuizQuestion], str]:
     """Shared by the dashboard's initial render and the JSON route it polls
     for "Try another". Order matters in the exclude list (oldest-first) so
     the trailing slice keeps the *most recently seen* entries, not an
@@ -151,7 +275,11 @@ def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
     exclude_ids_ordered = list(dict.fromkeys(exclude_ids_ordered))
 
     question = pick_random_question(exclude_entry_ids=set(exclude_ids_ordered))
-    if question and db_entry_last_visit_old_enough(question.entry_id):
+    if (
+        track_visit
+        and question
+        and db_entry_last_visit_old_enough(question.entry_id)
+    ):
         db_entry_increment_visit_count(question.entry_id)
 
     next_exclude_ids = exclude_ids_ordered + ([question.entry_id] if question else [])
@@ -164,9 +292,10 @@ def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
 
 @app.get("/", response_class=HTMLResponse)
 async def root_page(request: Request):
-    review_bookmark_entry_id = get_review_bookmark()
+    authenticated = is_admin(request)
+    review_bookmark_entry_id = get_review_bookmark() if authenticated else None
     seven_days_ago = int(time.time()) - 7 * 86400
-    question, next_exclude = _next_quiz_question("")
+    question, next_exclude = _next_quiz_question("", track_visit=authenticated)
     context = {
         "entries_count": db_count_entries(),
         "visited_last_7_days": db_count_entries_visited_since(seven_days_ago),
@@ -180,8 +309,10 @@ async def root_page(request: Request):
 
 
 @app.get("/quiz/next")
-async def quiz_next(exclude: str = Query("")):
-    question, next_exclude = _next_quiz_question(exclude)
+async def quiz_next(request: Request, exclude: str = Query("")):
+    question, next_exclude = _next_quiz_question(
+        exclude, track_visit=is_admin(request)
+    )
     if not question:
         return JSONResponse({"question": None})
     return JSONResponse(
@@ -211,7 +342,7 @@ async def entries_page(
     # the same value or a leading/trailing-space query would match rows
     # (DB search already stripped it) but fail to highlight anything.
     q_stripped = q.strip()
-    review_bookmark_entry_id = get_review_bookmark()
+    review_bookmark_entry_id = get_review_bookmark() if is_admin(request) else None
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
         entry_text = entry.text
@@ -286,7 +417,7 @@ async def entry_page(entry_id: int, request: Request):
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
     visit_count = entry.visit_count
-    if db_entry_last_visit_old_enough(entry.id):
+    if is_admin(request) and db_entry_last_visit_old_enough(entry.id):
         db_entry_increment_visit_count(entry.id)
         # a bit of hack
         visit_count += 1
@@ -329,7 +460,9 @@ async def entry_page(entry_id: int, request: Request):
 
 
 @app.get("/edit_entry/{entry_id}", response_class=HTMLResponse)
-async def edit_entry_page(entry_id: int, request: Request):
+async def edit_entry_page(
+    entry_id: int, request: Request, _: None = Depends(require_admin)
+):
     entry = db_get_entry_by_id(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -341,7 +474,9 @@ async def edit_entry_page(entry_id: int, request: Request):
 
 
 @app.get("/edit_definition/{definition_id}", response_class=HTMLResponse)
-async def edit_definition_page(definition_id: int, request: Request):
+async def edit_definition_page(
+    definition_id: int, request: Request, _: None = Depends(require_admin)
+):
     definition = db_get_definition_by_id(definition_id)
     if not definition:
         raise HTTPException(status_code=404, detail="Definition not found")
@@ -357,7 +492,9 @@ async def edit_definition_page(definition_id: int, request: Request):
 
 
 @app.get("/edit_example/{entry_id}", response_class=HTMLResponse)
-async def edit_example_page(entry_id: int, request: Request):
+async def edit_example_page(
+    entry_id: int, request: Request, _: None = Depends(require_admin)
+):
     entry = db_get_entry_by_id(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -373,7 +510,7 @@ async def edit_example_page(entry_id: int, request: Request):
 
 
 @app.get("/add_entry", response_class=HTMLResponse)
-async def add_entry_page(request: Request):
+async def add_entry_page(request: Request, _: None = Depends(require_admin)):
     return templates.TemplateResponse(
         request=request,
         name="add_entry.html.jinja",
@@ -382,7 +519,9 @@ async def add_entry_page(request: Request):
 
 
 @app.get("/add_definition", response_class=HTMLResponse)
-async def add_definition_page(entry_id: int, request: Request):
+async def add_definition_page(
+    entry_id: int, request: Request, _: None = Depends(require_admin)
+):
     context = {"entry_id": entry_id, "needs_editor": True}
     return templates.TemplateResponse(
         request=request, name="add_definition.html.jinja", context=context
@@ -392,8 +531,11 @@ async def add_definition_page(entry_id: int, request: Request):
 @app.post("/edit_entry/{entry_id}", response_class=HTMLResponse)
 async def edit_entry(
     entry_id: int,
+    request: Request,
     form_data: EditEntryForm = Depends(EditEntryForm.as_form),
+    _: None = Depends(require_admin),
 ):
+    verify_csrf_value(request, form_data.csrf_token)
     updated_text = form_data.entry_text.strip()
     if not updated_text:
         raise HTTPException(status_code=400, detail="Entry text cannot be empty")
@@ -409,8 +551,11 @@ async def edit_entry(
 @app.post("/edit_definition/{definition_id}", response_class=HTMLResponse)
 async def edit_definition(
     definition_id: int,
+    request: Request,
     form_data: EditDefinitionForm = Depends(EditDefinitionForm.as_form),
+    _: None = Depends(require_admin),
 ):
+    verify_csrf_value(request, form_data.csrf_token)
     updated_text = form_data.definition_text
     if entry_id := db_update_definition_text(definition_id, updated_text):
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
@@ -419,8 +564,11 @@ async def edit_definition(
 @app.post("/edit_example/{entry_id}", response_class=HTMLResponse)
 async def edit_example(
     entry_id: int,
+    request: Request,
     form_data: EditExampleForm = Depends(EditExampleForm.as_form),
+    _: None = Depends(require_admin),
 ):
+    verify_csrf_value(request, form_data.csrf_token)
     if not (updated_text := form_data.example_text):
         updated_text = ""
     if updated_eid := db_update_example(entry_id, updated_text):
@@ -429,7 +577,9 @@ async def edit_example(
 
 
 @app.delete("/delete_entry/{entry_id}")
-async def delete_entry(entry_id: int):
+async def delete_entry(
+    entry_id: int, _: None = Depends(require_admin_with_header_csrf)
+):
     db_delete_entry(entry_id)
     invalidate_words_cache()
     invalidate_quiz_pool_cache()
@@ -437,15 +587,20 @@ async def delete_entry(entry_id: int):
 
 
 @app.delete("/delete_definition/{definition_id}", response_class=HTMLResponse)
-async def delete_definition(definition_id: int):
+async def delete_definition(
+    definition_id: int, _: None = Depends(require_admin_with_header_csrf)
+):
     if entry_id := db_delete_definition(definition_id):
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
 
 
 @app.post("/add_entry", response_class=HTMLResponse)
 async def add_entry(
+    request: Request,
     form_data: AddEntryForm = Depends(AddEntryForm.as_form),
+    _: None = Depends(require_admin),
 ):
+    verify_csrf_value(request, form_data.csrf_token)
     updated_text = form_data.entry_text.strip()
     if not updated_text:
         raise HTTPException(status_code=400, detail="Entry text cannot be empty")
@@ -460,8 +615,11 @@ async def add_entry(
 
 @app.post("/add_definition", response_class=HTMLResponse)
 async def add_definition(
+    request: Request,
     form_data: AddDefinitionForm = Depends(AddDefinitionForm.as_form),
+    _: None = Depends(require_admin),
 ):
+    verify_csrf_value(request, form_data.csrf_token)
     updated_text = form_data.definition_text
     entry_id = form_data.entry_id
     if entry := db_get_entry_by_id(entry_id):
@@ -471,7 +629,9 @@ async def add_definition(
 
 
 @app.post("/entry/{entry_id}/set_review_bookmark")
-async def set_review_bookmark(entry_id: int):
+async def set_review_bookmark(
+    entry_id: int, _: None = Depends(require_admin_with_header_csrf)
+):
     success = db_set_review_bookmark(entry_id)
     if not success:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -479,7 +639,9 @@ async def set_review_bookmark(entry_id: int):
 
 
 @app.post("/entry/{entry_id}/clear_review_bookmark")
-async def clear_review_bookmark(entry_id: int):
+async def clear_review_bookmark(
+    entry_id: int, _: None = Depends(require_admin_with_header_csrf)
+):
     success = db_clear_review_bookmark(entry_id)
     if not success:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -487,7 +649,7 @@ async def clear_review_bookmark(entry_id: int):
 
 
 @app.get("/review_bookmark")
-async def review_bookmark():
+async def review_bookmark(_: None = Depends(require_admin)):
     return JSONResponse(
         {"entry_id": get_review_bookmark()},
         headers={"Cache-Control": "no-store"},
@@ -495,7 +657,7 @@ async def review_bookmark():
 
 
 @app.get("/resume_review")
-async def resume_review():
+async def resume_review(_: None = Depends(require_admin)):
     entry_id = get_review_bookmark()
     if not entry_id:
         return RedirectResponse(url="/entries", status_code=303)
@@ -532,7 +694,7 @@ def show_synonyms(entry_id: int, request: Request):
 
 
 @app.get("/notes/", response_class=HTMLResponse)
-async def notes(request: Request):
+async def notes(request: Request, _: None = Depends(require_admin)):
     toc_html = ""
     text = build_directory_tree_markdown(NOTES_DIR)
     note_html = markdown2.markdown(
@@ -556,7 +718,9 @@ async def notes(request: Request):
 
 
 @app.get("/view_note/{note_path:path}", response_class=HTMLResponse)
-def view_note(note_path: str, request: Request) -> _TemplateResponse:
+def view_note(
+    note_path: str, request: Request, _: None = Depends(require_admin)
+) -> _TemplateResponse:
     """Return the rendered HTML of a markdown note by relative path."""
     full_path = safe_path_note(note_path)
     content = full_path.read_text(encoding="utf-8")
@@ -581,7 +745,9 @@ def view_note(note_path: str, request: Request) -> _TemplateResponse:
 
 
 @app.get("/edit_note/{note_path:path}", response_class=HTMLResponse)
-async def edit_note_page(note_path: str, request: Request):
+async def edit_note_page(
+    note_path: str, request: Request, _: None = Depends(require_admin)
+):
     full_path = safe_path_note(note_path)
     content = full_path.read_text(encoding="utf-8")
     context = {
@@ -599,7 +765,9 @@ async def edit_note(
     note_path: str,
     request: Request,
     form_data: EditNoteForm = Depends(EditNoteForm.as_form),
+    _: None = Depends(require_admin),
 ):
+    verify_csrf_value(request, form_data.csrf_token)
     full_path = safe_path_note(note_path)
     updated_text = form_data.note_text or ""
     try:

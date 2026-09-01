@@ -1,5 +1,5 @@
 {% extends "base.html.jinja" %}
-{% from "_page_header.html.jinja" import page_header %}
+{% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}Add Definition{% endblock title %}
 
 {% block body %}
@@ -9,6 +9,7 @@
 <h1>Add Definition</h1>
 <form method="post"
     action="/add_definition">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <textarea name="definition_text"></textarea><br>
     <input value="{{ entry_id }}"
         name="entry_id"

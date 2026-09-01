@@ -1,6 +1,22 @@
+function csrfHeaders() {
+  const token = document.querySelector('meta[name="csrf-token"]');
+  return token ? { "X-CSRF-Token": token.content } : {};
+}
+
+function handleProtectedResponse(response) {
+  if (response.status === 401) {
+    const next = window.location.pathname + window.location.search;
+    window.location.href = "/login?next=" + encodeURIComponent(next);
+  }
+  return response;
+}
+
 function deleteEntry(entryId) {
   if (confirm("Are you sure you want to delete this entry?")) {
-    fetch("/delete_entry/" + entryId, { method: "DELETE" }).then((Response) => {
+    fetch("/delete_entry/" + entryId, {
+      method: "DELETE",
+      headers: csrfHeaders(),
+    }).then(handleProtectedResponse).then((Response) => {
       if (Response.ok) {
         location.reload();
       }

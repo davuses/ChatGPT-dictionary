@@ -712,3 +712,54 @@ input[type="submit"]:hover {
     padding: 4px;
   }
 }
+/* Small state-changing forms used in the global navigation. */
+.inline-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.account-controls {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.auth-status {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: #20333d;
+  display: inline-flex;
+  font-size: 14px;
+  gap: 7px;
+  line-height: 1;
+  min-height: 34px;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+
+.auth-avatar {
+  align-items: center;
+  background: var(--accent);
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: bold;
+  height: 21px;
+  justify-content: center;
+  width: 21px;
+}
+
+.auth-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.form-error {
+    color: #a40000;
+}

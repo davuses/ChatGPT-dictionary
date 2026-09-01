@@ -1,5 +1,5 @@
 {% extends "base.html.jinja" %}
-{% from "_page_header.html.jinja" import page_header %}
+{% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}Edit Example{% endblock title %}
 
 {% block body %}
@@ -9,6 +9,7 @@
 <h1>Edit Example</h1>
 <form method="post"
     action="/edit_example/{{ entry_id }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <textarea name="example_text">{{ entry_example }}</textarea><br>
     <div class="form-actions">
         <input type="submit"

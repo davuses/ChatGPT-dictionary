@@ -1,5 +1,5 @@
 {% extends "base.html.jinja" %}
-{% from "_page_header.html.jinja" import page_header %}
+{% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ title }}{% endblock title %}
 
 {% block body %}
@@ -146,7 +146,7 @@
     }
 </style>
 
-{% set edit_link %}{% if not is_dir %}<a class="button button-ghost" href="/edit_note/{{ request.path_params.note_path }}" id="edit-note">Edit</a>{% endif %}{% endset %}
+{% set edit_link %}{% if is_authenticated and not is_dir %}<a class="button button-ghost" href="/edit_note/{{ request.path_params.note_path }}" id="edit-note">Edit</a>{% endif %}{% endset %}
 {{ page_header(extra_nav=edit_link) }}
 
 <script>
