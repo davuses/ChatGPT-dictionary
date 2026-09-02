@@ -61,17 +61,20 @@ Requires Python 3.12+.
    uv run python -c "import secrets; print(secrets.token_urlsafe(48))"
    ```
 
-   Provide the resulting values to the service as environment variables:
+   Add the resulting values to the `[auth]` section of `config.toml`:
 
-   ```bash
-   export DICTIONARY_ADMIN_USERNAME="admin"
-   export DICTIONARY_ADMIN_PASSWORD_HASH="the-argon2-hash"
-   export DICTIONARY_SESSION_SECRET="the-random-session-secret"
+   ```toml
+   [auth]
+   admin_username = "admin"
+   admin_password_hash = "$argon2id$..."
+   session_secret = "the-random-session-secret"
+   https_only = true
    ```
 
-   Production uses secure HTTPS-only session cookies by default. For an
-   HTTP-only local-network test, also set `DICTIONARY_HTTPS_ONLY=false`.
-   Never use that override on the public deployment.
+   Production uses secure HTTPS-only session cookies. For an HTTP-only
+   local-network test, temporarily set `https_only = false`; never use that
+   value on the public deployment. The `DICTIONARY_*` environment variables
+   remain optional overrides for deployments that prefer them.
 
 4. Create the database tables:
 

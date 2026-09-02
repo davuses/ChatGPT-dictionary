@@ -2,6 +2,7 @@ import re
 
 import pytest
 
+import auth
 import main
 from auth import safe_next_path
 
@@ -156,3 +157,57 @@ def test_next_redirect_must_stay_on_this_site():
     assert safe_next_path("///attacker.example/") == "/"
     assert safe_next_path("/\\attacker.example/") == "/"
     assert safe_next_path("/entry/1\r\nLocation: https://attacker.example") == "/"
+
+
+def test_auth_settings_can_come_from_toml(monkeypatch, tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """[auth]
+admin_username = "toml-admin"
+admin_password_hash = "$argon2id$test-hash"
+session_secret = "toml-session-secret-at-least-32-chars"
+https_only = false
+"""
+    )
+    monkeypatch.setattr(auth, "AUTH_CONFIG_PATH", config_path)
+    for variable in (
+        "DICTIONARY_ADMIN_USERNAME",
+        "DICTIONARY_ADMIN_PASSWORD_HASH",
+        "DICTIONARY_SESSION_SECRET",
+        "DICTIONARY_HTTPS_ONLY",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    auth.get_auth_settings.cache_clear()
+    try:
+        settings = auth.get_auth_settings()
+        assert settings.username == "toml-admin"
+        assert settings.password_hash == "$argon2id$test-hash"
+        assert settings.session_secret == "toml-session-secret-at-least-32-chars"
+        assert settings.https_only is False
+    finally:
+        auth.get_auth_settings.cache_clear()
+
+
+def test_environment_overrides_toml_auth_settings(monkeypatch):
+    monkeypatch.setattr(
+        auth,
+        "load_auth_config",
+        lambda: {
+            "admin_username": "toml-admin",
+            "admin_password_hash": "toml-hash",
+            "session_secret": "toml-session-secret-at-least-32-chars",
+            "https_only": True,
+        },
+    )
+    monkeypatch.setenv("DICTIONARY_ADMIN_USERNAME", "environment-admin")
+    monkeypatch.setenv("DICTIONARY_HTTPS_ONLY", "false")
+    monkeypatch.delenv("DICTIONARY_ADMIN_PASSWORD_HASH", raising=False)
+    monkeypatch.delenv("DICTIONARY_SESSION_SECRET", raising=False)
+    auth.get_auth_settings.cache_clear()
+    try:
+        settings = auth.get_auth_settings()
+        assert settings.username == "environment-admin"
+        assert settings.password_hash == "toml-hash"
+        assert settings.https_only is False
+    finally:
+        auth.get_auth_settings.cache_clear()

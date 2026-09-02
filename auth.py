@@ -1,7 +1,9 @@
 import os
 import secrets
+import tomllib
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import Depends, Form, HTTPException, Request
@@ -11,6 +13,7 @@ from pwdlib import PasswordHash
 SESSION_AUTH_KEY = "admin_authenticated"
 SESSION_CSRF_KEY = "csrf_token"
 SESSION_MAX_AGE = 8 * 60 * 60
+AUTH_CONFIG_PATH = Path(__file__).with_name("config.toml")
 
 password_hash = PasswordHash.recommended()
 
@@ -23,31 +26,66 @@ class AuthSettings:
     https_only: bool
 
 
+def load_auth_config() -> dict[str, object]:
+    """Load the optional [auth] section from the local, gitignored config."""
+    try:
+        with AUTH_CONFIG_PATH.open("rb") as config_file:
+            config = tomllib.load(config_file)
+    except FileNotFoundError:
+        return {}
+    except tomllib.TOMLDecodeError as error:
+        raise RuntimeError("config.toml contains invalid TOML") from error
+
+    auth_config = config.get("auth", {})
+    if not isinstance(auth_config, dict):
+        raise RuntimeError("[auth] in config.toml must be a table")
+    return auth_config
+
+
+def _auth_text(auth_config: dict[str, object], name: str) -> str:
+    value = auth_config.get(name, "")
+    if not isinstance(value, str):
+        raise RuntimeError(f"auth.{name} in config.toml must be a string")
+    return value.strip()
+
+
 @lru_cache
 def get_auth_settings() -> AuthSettings:
-    username = os.environ.get("DICTIONARY_ADMIN_USERNAME", "").strip()
-    admin_password_hash = os.environ.get(
-        "DICTIONARY_ADMIN_PASSWORD_HASH", ""
+    auth_config = load_auth_config()
+    username = os.environ.get(
+        "DICTIONARY_ADMIN_USERNAME", _auth_text(auth_config, "admin_username")
     ).strip()
-    session_secret = os.environ.get("DICTIONARY_SESSION_SECRET", "")
-    https_only_value = os.environ.get("DICTIONARY_HTTPS_ONLY", "true").lower()
+    admin_password_hash = os.environ.get(
+        "DICTIONARY_ADMIN_PASSWORD_HASH",
+        _auth_text(auth_config, "admin_password_hash"),
+    ).strip()
+    session_secret = os.environ.get(
+        "DICTIONARY_SESSION_SECRET", _auth_text(auth_config, "session_secret")
+    )
+
+    config_https_only = auth_config.get("https_only", True)
+    if not isinstance(config_https_only, bool):
+        raise RuntimeError("auth.https_only in config.toml must be true or false")
+    https_only_value = os.environ.get(
+        "DICTIONARY_HTTPS_ONLY", str(config_https_only)
+    ).lower()
 
     missing = [
         name
         for name, value in (
-            ("DICTIONARY_ADMIN_USERNAME", username),
-            ("DICTIONARY_ADMIN_PASSWORD_HASH", admin_password_hash),
-            ("DICTIONARY_SESSION_SECRET", session_secret),
+            ("admin_username", username),
+            ("admin_password_hash", admin_password_hash),
+            ("session_secret", session_secret),
         )
         if not value
     ]
     if missing:
         raise RuntimeError(
-            "Missing required authentication environment variables: "
+            "Missing required authentication settings: "
             + ", ".join(missing)
         )
     if len(session_secret) < 32:
-        raise RuntimeError("DICTIONARY_SESSION_SECRET must be at least 32 characters")
+        raise RuntimeError("The session secret must be at least 32 characters")
     if https_only_value not in {"true", "false"}:
         raise RuntimeError("DICTIONARY_HTTPS_ONLY must be 'true' or 'false'")
 
@@ -77,7 +115,7 @@ def authenticate(username: str, password: str) -> bool:
     try:
         password_matches = password_hash.verify(password, settings.password_hash)
     except (TypeError, ValueError):
-        raise RuntimeError("DICTIONARY_ADMIN_PASSWORD_HASH is not a valid hash")
+        raise RuntimeError("Configured admin password hash is not valid")
     return username_matches and password_matches
 
 
