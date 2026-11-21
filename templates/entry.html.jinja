@@ -34,14 +34,14 @@
         <p class="word-meta">
             <span>{{ visit_count }} visits</span>
             <span>Last visit: {{ last_visit_elapsed }}</span>
-            {% if is_authenticated %}<span class="flex-center">
+            <span class="flex-center">
                 {% if is_review_bookmark %}
                 <span>Resume point</span>
                 <button class="button-danger" id="clear-review-bookmark" onclick="handleClearReviewBookmark()">Clear</button>
                 {% else %}
                 <button id="set-review-bookmark" onclick="handleSetReviewBookmark()">Mark here</button>
                 {% endif %}
-            </span>{% endif %}
+            </span>
         </p>
         <div class="pronunciation-row IPA-player">
             /{{ IPA_transcript }}/
@@ -260,7 +260,6 @@
             <div class="section-header">
                 <h2>Entry</h2>
                 <div class="section-actions">
-                    {% if is_authenticated %}
                     <button class="entry-button"
                         onclick="location.href='/edit_entry/{{ entry_id }}'"
                         type="button">Edit</button>
@@ -268,7 +267,6 @@
                         onclick="deleteEntry({{ entry_id }})"
                         type="button"
                         id="dbt">Delete</button>
-                    {% endif %}
                 </div>
             </div>
             <p class="entry-value" id="entry">{{ entry_text }}</p>
@@ -277,7 +275,6 @@
             <div class="section-header">
                 <h2>Definition</h2>
                 {% if definition_exists %}
-                {% if is_authenticated %}
                 <div class="section-actions">
                     <button class="entry-button"
                         onclick="location.href='/edit_definition/{{ definition_id }}'"
@@ -286,9 +283,8 @@
                         onclick="deleteDefinition(this,{{ definition_id }})">Delete</button>
                 </div>
                 {% endif %}
-                {% endif %}
             </div>
-        {% if not definition_exists and is_authenticated %}
+        {% if not definition_exists %}
         <button class="entry-button"
             onclick="location.href='/add_definition?entry_id={{ entry_id }}'"
             type="button">Add definition</button>
@@ -302,13 +298,11 @@
         <section class="content-section">
             <div class="section-header">
                 <h2>Example</h2>
-                {% if is_authenticated %}
                 <button class="entry-button"
                     onclick="location.href='/edit_example/{{ entry_id }}'"
                     type="button"
                     id="edit-example">
                     Edit</button>
-                {% endif %}
             </div>
             <div class="markdown-body">{{ example_html | safe }}</div>
         </section>

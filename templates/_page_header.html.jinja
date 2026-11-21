@@ -25,25 +25,17 @@
         {% endif %}
         {% if subtitle %}<p class="page-subtitle"{% if subtitle_id %} id="{{ subtitle_id }}"{% endif %}>{{ subtitle }}</p>{% endif %}
     </div>
+    {% if is_authenticated %}
     <nav class="page-nav" aria-label="Main navigation">
         <a class="button button-ghost{% if active == 'browse' %} active{% endif %}" href="/entries">Browse</a>
-        {% if show_notes and is_authenticated %}<a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>{% endif %}
-        {% if show_add and is_authenticated %}<a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>{% endif %}
+        {% if show_notes %}<a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>{% endif %}
+        {% if show_add %}<a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>{% endif %}
         {{ extra_nav | safe }}
-        {% if is_authenticated %}
-        <span class="account-controls">
-            <span class="auth-status" aria-label="Signed in as admin">
-                <span class="auth-avatar" aria-hidden="true">A</span>
-                <span><span class="auth-label">User</span> admin</span>
-            </span>
-            <form class="inline-form" method="post" action="/logout">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button class="button button-ghost" type="submit">Log out</button>
-            </form>
-        </span>
-        {% else %}
-        <a class="button button-ghost" href="/login">Admin login</a>
-        {% endif %}
+        <form class="inline-form" method="post" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="button button-ghost" type="submit">Log out</button>
+        </form>
     </nav>
+    {% endif %}
 </header>
 {% endmacro %}

@@ -2,20 +2,22 @@
 
 [中文说明](README.zh-CN.md)
 
-A personal vocabulary web app for IELTS study, built with FastAPI and SQLite. Add words and phrases, write your own definitions in Markdown, attach usage examples, and review them later — with phonetic transcription, thesaurus lookups, and a built-in Markdown notes browser thrown in.
+A private, personal English vocabulary builder and active-recall web app, built with FastAPI and SQLite. Add words and phrases, curate your own definitions in Markdown, attach real-world usage examples, and reinforce them with fill-in-the-blank quizzes, phonetic transcription, cross-linked thesaurus lookups, and a built-in Markdown study notes browser.
 
 ![Entry list](docs/screenshot-list.png)
 ![Word detail](docs/screenshot-entry.png)
 
 ## Features
 
-- **Entries & definitions** — add words/phrases, attach one or more Markdown-formatted definitions and an example sentence
-- **IPA transcription** — automatic phonetic transcription of each word via [phonemizer](https://github.com/bootphon/phonemizer)
-- **Thesaurus lookup** — pull synonyms and sense definitions from the Merriam-Webster Thesaurus API
+- **Entries & definitions** — add words/phrases, write your own Markdown-formatted definitions, and attach real-world context and usage examples
+- **Fill-in-the-blank quiz** — low-pressure active-recall cards right on the dashboard, pulling sentences from your own saved contexts and examples
+- **Live search** — instant search across words, contexts, and examples with match highlighting
+- **IPA transcription & audio** — automatic phonetic transcription via [phonemizer](https://github.com/bootphon/phonemizer) with pronunciation playback
+- **Thesaurus lookup** — pull synonyms and sense definitions from the Merriam-Webster Thesaurus API, cross-linked to words already in your dictionary
 - **Review bookmark** — mark your place in the entry list and jump back to it later
 - **Visit tracking** — each entry tracks visit count and last-visited time
 - **Multiple views** — browse all entries, entries-only, or entries with examples
-- **Notes section** — browse and edit a folder of Markdown notes (e.g. IELTS study notes) with a generated table of contents
+- **Study notes** — browse and edit a folder of personal English study Markdown notes with a generated table of contents
 - **Markdown editing** — entries, definitions, examples, and notes are all edited with [EasyMDE](https://github.com/Ionaru/easy-markdown-editor)
 
 ## Tech stack
@@ -53,11 +55,11 @@ Requires Python 3.12+.
    - `notes_folder` — a local directory of Markdown notes to browse under `/notes/`
    - `mw_thesaurus_api_key` — a free API key from the [Merriam-Webster Developer Center](https://dictionaryapi.com/) (used for the synonyms feature)
 
-3. Configure the administrator account. Generate an Argon2 password hash and
+3. Configure your personal login account. Generate an Argon2 password hash and
    a random session secret:
 
    ```bash
-   uv run python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(input('Admin password: ')))"
+   uv run python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(input('Password: ')))"
    uv run python -c "import secrets; print(secrets.token_urlsafe(48))"
    ```
 
@@ -71,10 +73,10 @@ Requires Python 3.12+.
    https_only = true
    ```
 
-   Production uses secure HTTPS-only session cookies. For an HTTP-only
-   local-network test, temporarily set `https_only = false`; never use that
-   value on the public deployment. The `DICTIONARY_*` environment variables
-   remain optional overrides for deployments that prefer them.
+   Production uses secure HTTPS-only session cookies (valid for 30 days). For
+   an HTTP-only local-network test, temporarily set `https_only = false`; never
+   use that value on a public-facing deployment. The `DICTIONARY_*` environment
+   variables remain optional overrides for deployments that prefer them.
 
 4. Create the database tables:
 
@@ -102,12 +104,12 @@ Requires Python 3.12+.
 
 ## Access control
 
-- Browsing entries, viewing entry details, synonyms, and quizzes is public.
-- Adding, editing, deleting, review bookmarks, and all notes routes require
-  the administrator session.
+- The entire app is private: all dictionary pages, quizzes, synonyms,
+  bookmarks, notes, and mutation endpoints require signing in at `/login`.
+- Only `/login` and `/static/*` assets are accessible before authentication.
+- Signed sessions use `HttpOnly`, `SameSite=Lax` cookies (and `Secure` when
+  `https_only = true`) with a 30-day lifetime.
 - Every state-changing request also requires a CSRF token.
-- Anonymous browsing and quizzes do not update visit counters, keeping public
-  access read-only.
 - FastAPI's `/docs`, `/redoc`, and `/openapi.json` endpoints are disabled.
 
 ## Notes

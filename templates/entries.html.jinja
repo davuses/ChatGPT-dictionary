@@ -85,7 +85,7 @@ My Dictionary
         });
 
         initLiveSearch(results);
-        {% if is_authenticated %}refreshReviewBookmarkLink();{% endif %}
+        refreshReviewBookmarkLink();
         flashIncomingHashTarget();
     });
 
@@ -126,12 +126,10 @@ My Dictionary
             if (entriesOnlyInput) url.searchParams.set("entries_only", "true");
             if (showExampleInput) url.searchParams.set("show_example", "true");
 
-            fetch(url, {
+            fetchJson(url, {
                 headers: { "X-Requested-With": "XMLHttpRequest" },
                 signal: abortController.signal,
-                cache: "no-store",
             })
-                .then((response) => response.json())
                 .then((data) => applyResults(data, url))
                 .catch((err) => {
                     if (err.name !== "AbortError") console.error(err);
@@ -162,7 +160,6 @@ My Dictionary
         }
     }
 
-    {% if is_authenticated %}
     window.addEventListener("pageshow", refreshReviewBookmarkLink);
     window.addEventListener("focus", refreshReviewBookmarkLink);
     document.addEventListener("visibilitychange", function () {
@@ -174,11 +171,8 @@ My Dictionary
     }
 
     function fetchReviewBookmark() {
-        return fetch("/review_bookmark", { cache: "no-store" })
-            .then((response) => response.json())
-            .catch(() => ({ entry_id: null }));
+        return fetchJson("/review_bookmark").catch(() => ({ entry_id: null }));
     }
-    {% endif %}
 
     function updateReviewBookmarkLink(data) {
         const resumeLink = document.getElementById("resume-bookmark-link");

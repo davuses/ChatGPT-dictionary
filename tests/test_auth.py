@@ -1,6 +1,7 @@
 import re
 
 import pytest
+from fastapi.routing import APIRoute
 
 import auth
 import main
@@ -16,8 +17,8 @@ def _csrf_from_html(html: str) -> str:
     return match.group(1)
 
 
-async def _login(client):
-    login_page = await client.get("/login?next=/add_entry")
+async def _login(client, next_path: str = "/add_entry"):
+    login_page = await client.get(f"/login?next={next_path}")
     assert login_page.status_code == 200
     csrf_token = _csrf_from_html(login_page.text)
     response = await client.post(
@@ -25,41 +26,90 @@ async def _login(client):
         data={
             "username": "test-admin",
             "password": "correct horse battery staple",
-            "next_path": "/add_entry",
+            "next_path": next_path,
             "csrf_token": csrf_token,
         },
     )
     assert response.status_code == 303
-    assert response.headers["location"] == "/add_entry"
+    assert response.headers["location"] == next_path
     cookie = response.headers["set-cookie"].lower()
     assert "secure" in cookie
     assert "httponly" in cookie
     assert "samesite=lax" in cookie
 
 
-async def test_public_editor_redirects_to_login(client):
-    response = await client.get("/add_entry")
+def test_all_non_login_routes_require_authentication():
+    public_routes = {("GET", "/login"), ("POST", "/login")}
+    for route in main.app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        dep_calls = {dep.call for dep in route.dependant.dependencies}
+        for method in route.methods:
+            if (method, route.path) in public_routes:
+                assert auth.require_admin not in dep_calls
+            else:
+                assert auth.require_admin in dep_calls, (
+                    f"Route {method} {route.path} is missing require_admin"
+                )
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_next"),
+    [
+        ("/", "%2F"),
+        ("/entries", "%2Fentries"),
+        ("/entries?q=hello", "%2Fentries%3Fq%3Dhello"),
+        ("/entry/1", "%2Fentry%2F1"),
+        ("/show_synonyms/1", "%2Fshow_synonyms%2F1"),
+        ("/add_entry", "%2Fadd_entry"),
+        ("/resume_review", "%2Fresume_review"),
+        ("/notes/", "%2Fnotes%2F"),
+    ],
+)
+async def test_unauthenticated_pages_redirect_to_login(client, path, expected_next):
+    response = await client.get(path)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login?next=%2Fadd_entry"
+    assert response.headers["location"] == f"/login?next={expected_next}"
+
+
+async def test_login_page_and_static_assets_stay_public(client):
     login_page = await client.get("/login")
-    assert "Admin login" in login_page.text
+    assert login_page.status_code == 200
+    assert "Log in" in login_page.text
+    assert "Admin login" not in login_page.text
+    assert 'href="/entries"' not in login_page.text
+
+    css = await client.get("/static/style.css")
+    assert css.status_code == 200
 
 
-async def test_notes_are_private(client):
-    response = await client.get("/notes/")
-    assert response.status_code == 303
-    assert response.headers["location"] == "/login?next=%2Fnotes%2F"
+async def test_unauthenticated_json_and_xhr_requests_return_401_json(client):
+    for path, headers in (
+        ("/quiz/next", {}),
+        ("/review_bookmark", {}),
+        ("/entries?q=test", {"X-Requested-With": "XMLHttpRequest"}),
+        ("/entries?q=test", {"Accept": "application/json"}),
+        ("/entries", {"Sec-Fetch-Mode": "cors"}),
+    ):
+        response = await client.get(path, headers=headers)
+        assert response.status_code == 401
+        assert response.json() == {"detail": "Authentication required"}
 
 
-async def test_unauthenticated_mutation_is_rejected(client):
+async def test_unauthenticated_mutation_is_rejected_before_form_validation(client):
     response = await client.post(
         "/add_entry",
         data={"entry_text": "must not exist", "csrf_token": "invalid"},
     )
     assert response.status_code == 401
+    assert response.json() == {"detail": "Authentication required"}
+
+    malformed = await client.post("/add_entry", data={})
+    assert malformed.status_code == 401
+    assert malformed.json() == {"detail": "Authentication required"}
 
 
-async def test_login_rejects_bad_credentials_without_creating_admin_session(client):
+async def test_login_rejects_bad_credentials_without_creating_session(client):
     login_page = await client.get("/login")
     csrf_token = _csrf_from_html(login_page.text)
     response = await client.post(
@@ -73,22 +123,32 @@ async def test_login_rejects_bad_credentials_without_creating_admin_session(clie
     )
     assert response.status_code == 401
     assert "Invalid username or password" in response.text
-    assert (await client.get("/add_entry")).status_code == 303
+    assert (await client.get("/")).status_code == 303
 
 
-async def test_authenticated_editor_has_csrf_and_logout_requires_it(client):
+async def test_authenticated_editor_has_csrf_and_logout_redirects_to_login(client):
     await _login(client)
     editor = await client.get("/add_entry")
     assert editor.status_code == 200
     assert "Log out" in editor.text
-    assert "Signed in as admin" in editor.text
+    assert "Signed in as admin" not in editor.text
     assert 'href="/login"' not in editor.text
     csrf_token = _csrf_from_html(editor.text)
 
     assert (await client.post("/logout")).status_code == 403
     logout = await client.post("/logout", data={"csrf_token": csrf_token})
     assert logout.status_code == 303
-    assert (await client.get("/add_entry")).status_code == 303
+    assert logout.headers["location"] == "/login"
+    assert (await client.get("/")).status_code == 303
+
+
+async def test_authenticated_notes_uses_study_notes_title(client, monkeypatch):
+    await _login(client, next_path="/notes/")
+    monkeypatch.setattr(main, "build_directory_tree_markdown", lambda _: "- [Demo](/view_note/demo.md)")
+    response = await client.get("/notes/")
+    assert response.status_code == 200
+    assert "<title>Study Notes</title>" in response.text
+    assert "IELTS Notes" not in response.text
 
 
 async def test_authenticated_javascript_mutation_requires_csrf_header(client):
@@ -129,25 +189,13 @@ async def test_authenticated_form_mutation_requires_csrf(client, monkeypatch):
     assert calls == ["test entry"]
 
 
-def test_anonymous_quiz_does_not_update_visit_tracking(monkeypatch):
-    question = main.QuizQuestion(1, "word", "A _____ in context")
-    monkeypatch.setattr(main, "pick_random_question", lambda **_: question)
-    visits = []
-    monkeypatch.setattr(
-        main, "db_entry_last_visit_old_enough", lambda entry_id: visits.append(entry_id)
-    )
-    monkeypatch.setattr(
-        main, "db_entry_increment_visit_count", lambda entry_id: visits.append(entry_id)
-    )
-
-    returned, _ = main._next_quiz_question("", track_visit=False)
-    assert returned == question
-    assert visits == []
-
-
 async def test_api_documentation_is_disabled(client):
     assert (await client.get("/docs")).status_code == 404
     assert (await client.get("/openapi.json")).status_code == 404
+
+
+def test_session_max_age_is_30_days():
+    assert auth.SESSION_MAX_AGE == 30 * 24 * 60 * 60
 
 
 def test_next_redirect_must_stay_on_this_site():

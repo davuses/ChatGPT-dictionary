@@ -7,8 +7,24 @@ function handleProtectedResponse(response) {
   if (response.status === 401) {
     const next = window.location.pathname + window.location.search;
     window.location.href = "/login?next=" + encodeURIComponent(next);
+    return new Promise(() => {});
   }
   return response;
+}
+
+function fetchJson(url, options = {}) {
+  const headers = Object.assign(
+    { Accept: "application/json" },
+    options.headers || {}
+  );
+  return fetch(url, Object.assign({ cache: "no-store" }, options, { headers }))
+    .then(handleProtectedResponse)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Request failed with status " + response.status);
+      }
+      return response.json();
+    });
 }
 
 function deleteEntry(entryId) {
@@ -52,10 +68,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const url = new URL(nextBtn.href, window.location.href);
     const exclude = url.searchParams.get("exclude") || "";
 
-    fetch("/quiz/next?exclude=" + encodeURIComponent(exclude), {
-      cache: "no-store",
-    })
-      .then((response) => response.json())
+    fetchJson("/quiz/next?exclude=" + encodeURIComponent(exclude))
       .then((data) => {
         if (!data.entry_id) {
           card.querySelector(".quiz-sentence").textContent =
@@ -75,13 +88,16 @@ document.addEventListener("DOMContentLoaded", function () {
         revealBtn.textContent = "Show answer";
 
         nextBtn.href = "/quiz/next?exclude=" + encodeURIComponent(data.next_exclude);
+      })
+      .catch((err) => {
+        console.error(err);
       });
   });
 });
 
-const editPagePattern = /\/edit_.*?|add_.*/;
+const editPagePattern = /^\/(?:edit_|add_)/;
 
-if (editPagePattern.test(window.location.href)) {
+if (editPagePattern.test(window.location.pathname)) {
   document.addEventListener("DOMContentLoaded", function () {
     var editor = new EasyMDE({
       autofocus: true,

@@ -12,7 +12,7 @@ from pwdlib import PasswordHash
 
 SESSION_AUTH_KEY = "admin_authenticated"
 SESSION_CSRF_KEY = "csrf_token"
-SESSION_MAX_AGE = 8 * 60 * 60
+SESSION_MAX_AGE = 30 * 24 * 60 * 60
 AUTH_CONFIG_PATH = Path(__file__).with_name("config.toml")
 
 password_hash = PasswordHash.recommended()
@@ -161,6 +161,10 @@ async def verify_form_csrf(
     request: Request, csrf_token: str | None = Form(None)
 ) -> None:
     verify_csrf_value(request, csrf_token)
+
+
+async def verify_header_csrf(request: Request) -> None:
+    verify_csrf_value(request, request.headers.get("X-CSRF-Token"))
 
 
 async def require_admin_with_form_csrf(
