@@ -1,3 +1,4 @@
+import logging
 import time
 import urllib.parse
 from dataclasses import replace
@@ -57,13 +58,13 @@ from database import (
 )
 from utils import (
     ENTRY_TEXT_SEPARATOR,
-    NOTES_DIR,
     EntryDisplay,
     build_directory_tree_markdown,
     format_entry_text,
     get_all_words,
     get_how_long_ago,
     get_IPA,
+    get_notes_dir,
     get_thesaurus_senses,
     highlight_ipa,
     highlight_matches,
@@ -76,6 +77,7 @@ from utils import (
     safe_path_note,
 )
 
+logger = logging.getLogger(__name__)
 auth_settings = get_auth_settings()
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -232,7 +234,7 @@ async def login_page(request: Request, next_path: str = Query("/", alias="next")
 
 
 @app.post("/login", response_class=HTMLResponse)
-async def login(
+def login(
     request: Request,
     form_data: LoginForm = Depends(LoginForm.as_form),
 ):
@@ -260,7 +262,7 @@ async def logout(request: Request, _: None = Depends(verify_form_csrf)):
     return RedirectResponse(url="/login", status_code=303)
 
 
-def _wants_json_auth_error(request: Request) -> bool:
+def _wants_json_error(request: Request) -> bool:
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return True
     sec_fetch_mode = request.headers.get("Sec-Fetch-Mode")
@@ -271,10 +273,11 @@ def _wants_json_auth_error(request: Request) -> bool:
         return True
     route = request.scope.get("route")
     route_response_class = getattr(route, "response_class", None)
-    if route_response_class is not None and route_response_class not in {
+    route_response_class = getattr(route_response_class, "value", route_response_class)
+    if route_response_class is not None and route_response_class not in (
         HTMLResponse,
         RedirectResponse,
-    }:
+    ):
         return True
     return False
 
@@ -284,7 +287,7 @@ async def custom_http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ):
     if exc.status_code == 401:
-        if request.method in {"GET", "HEAD"} and not _wants_json_auth_error(request):
+        if request.method in {"GET", "HEAD"} and not _wants_json_error(request):
             next_path = safe_next_path(request.url.path)
             if request.url.query:
                 next_path += f"?{request.url.query}"
@@ -293,6 +296,8 @@ async def custom_http_exception_handler(
                 status_code=303,
             )
         return JSONResponse({"detail": exc.detail}, status_code=401)
+    if _wants_json_error(request):
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
     if exc.status_code == 404:
         return templates.TemplateResponse(
             request=request,
@@ -333,7 +338,7 @@ def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
 
 
 @protected_router.get("/", response_class=HTMLResponse)
-async def root_page(request: Request):
+def root_page(request: Request):
     review_bookmark_entry_id = get_review_bookmark()
     seven_days_ago = int(time.time()) - 7 * 86400
     question, next_exclude = _next_quiz_question("")
@@ -350,7 +355,7 @@ async def root_page(request: Request):
 
 
 @protected_router.get("/quiz/next", response_class=JSONResponse)
-async def quiz_next(exclude: str = Query("")):
+def quiz_next(exclude: str = Query("")):
     question, next_exclude = _next_quiz_question(exclude)
     if not question:
         return JSONResponse({"question": None})
@@ -366,7 +371,7 @@ async def quiz_next(exclude: str = Query("")):
 
 
 @protected_router.post("/quiz/{entry_id}/seen")
-async def quiz_mark_seen(
+def quiz_mark_seen(
     entry_id: int, _: None = Depends(verify_header_csrf)
 ):
     recorded = db_record_entry_visit(entry_id)
@@ -376,7 +381,7 @@ async def quiz_mark_seen(
 
 
 @protected_router.get("/entries", response_class=HTMLResponse)
-async def entries_page(
+def entries_page(
     request: Request,
     show_example: bool = Query(False),
     entries_only: bool = Query(False),
@@ -456,7 +461,7 @@ async def entries_page(
 
 
 @protected_router.get("/entry/{entry_id}", response_class=HTMLResponse)
-async def entry_page(entry_id: int, request: Request):
+def entry_page(entry_id: int, request: Request):
     entry = db_get_entry_by_id(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -473,6 +478,8 @@ async def entry_page(entry_id: int, request: Request):
         definition_id = d.id
     _, word = parse_entry_text(entry.text)
     IPA_transcript = get_IPA(word)
+    oxford_audio_slug = urllib.parse.quote(word.lower(), safe="")
+    tts_audio_query = urllib.parse.quote_plus(word)
     example_html = (
         markdown2.markdown(
             normalize_pronoun_casing(entry.example), extras=["strike", "tables"]
@@ -490,6 +497,8 @@ async def entry_page(entry_id: int, request: Request):
         "entry_id": entry_id,
         "IPA_transcript": IPA_transcript,
         "word": word,
+        "oxford_audio_slug": oxford_audio_slug,
+        "tts_audio_query": tts_audio_query,
         "definition_exists": definition_exists,
         "definition_html": definition_html,
         "definition_id": definition_id,
@@ -502,7 +511,7 @@ async def entry_page(entry_id: int, request: Request):
 
 
 @protected_router.get("/edit_entry/{entry_id}", response_class=HTMLResponse)
-async def edit_entry_page(entry_id: int, request: Request):
+def edit_entry_page(entry_id: int, request: Request):
     entry = db_get_entry_by_id(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -521,7 +530,7 @@ async def edit_entry_page(entry_id: int, request: Request):
 
 
 @protected_router.get("/edit_definition/{definition_id}", response_class=HTMLResponse)
-async def edit_definition_page(definition_id: int, request: Request):
+def edit_definition_page(definition_id: int, request: Request):
     definition = db_get_definition_by_id(definition_id)
     if not definition:
         raise HTTPException(status_code=404, detail="Definition not found")
@@ -537,7 +546,7 @@ async def edit_definition_page(definition_id: int, request: Request):
 
 
 @protected_router.get("/edit_example/{entry_id}", response_class=HTMLResponse)
-async def edit_example_page(entry_id: int, request: Request):
+def edit_example_page(entry_id: int, request: Request):
     entry = db_get_entry_by_id(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -578,7 +587,7 @@ async def add_definition_page(entry_id: int, request: Request):
 
 
 @protected_router.post("/edit_entry/{entry_id}", response_class=HTMLResponse)
-async def edit_entry(
+def edit_entry(
     entry_id: int,
     request: Request,
     form_data: EditEntryForm = Depends(EditEntryForm.as_form),
@@ -621,7 +630,7 @@ async def edit_entry(
 
 
 @protected_router.post("/edit_definition/{definition_id}", response_class=HTMLResponse)
-async def edit_definition(
+def edit_definition(
     definition_id: int,
     request: Request,
     form_data: EditDefinitionForm = Depends(EditDefinitionForm.as_form),
@@ -634,7 +643,7 @@ async def edit_definition(
 
 
 @protected_router.post("/edit_example/{entry_id}", response_class=HTMLResponse)
-async def edit_example(
+def edit_example(
     entry_id: int,
     request: Request,
     form_data: EditExampleForm = Depends(EditExampleForm.as_form),
@@ -649,25 +658,27 @@ async def edit_example(
 
 
 @protected_router.delete("/delete_entry/{entry_id}")
-async def delete_entry(
+def delete_entry(
     entry_id: int, _: None = Depends(verify_header_csrf)
 ):
-    db_delete_entry(entry_id)
+    if not db_delete_entry(entry_id):
+        raise HTTPException(status_code=404, detail="Entry not found")
     invalidate_words_cache()
     invalidate_quiz_pool_cache()
     return {"message": "deleted"}
 
 
-@protected_router.delete("/delete_definition/{definition_id}", response_class=HTMLResponse)
-async def delete_definition(
+@protected_router.delete("/delete_definition/{definition_id}")
+def delete_definition(
     definition_id: int, _: None = Depends(verify_header_csrf)
 ):
-    if entry_id := db_delete_definition(definition_id):
-        return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
+    if not db_delete_definition(definition_id):
+        raise HTTPException(status_code=404, detail="Definition not found")
+    return {"message": "deleted"}
 
 
 @protected_router.post("/add_entry", response_class=HTMLResponse)
-async def add_entry(
+def add_entry(
     request: Request,
     form_data: AddEntryForm = Depends(AddEntryForm.as_form),
 ):
@@ -714,7 +725,7 @@ async def add_entry(
 
 
 @protected_router.post("/add_definition", response_class=HTMLResponse)
-async def add_definition(
+def add_definition(
     request: Request,
     form_data: AddDefinitionForm = Depends(AddDefinitionForm.as_form),
 ):
@@ -728,7 +739,7 @@ async def add_definition(
 
 
 @protected_router.post("/entry/{entry_id}/set_review_bookmark")
-async def set_review_bookmark(
+def set_review_bookmark(
     entry_id: int, _: None = Depends(verify_header_csrf)
 ):
     success = db_set_review_bookmark(entry_id)
@@ -738,7 +749,7 @@ async def set_review_bookmark(
 
 
 @protected_router.post("/entry/{entry_id}/clear_review_bookmark")
-async def clear_review_bookmark(
+def clear_review_bookmark(
     entry_id: int, _: None = Depends(verify_header_csrf)
 ):
     success = db_clear_review_bookmark(entry_id)
@@ -748,7 +759,7 @@ async def clear_review_bookmark(
 
 
 @protected_router.get("/review_bookmark", response_class=JSONResponse)
-async def review_bookmark():
+def review_bookmark():
     return JSONResponse(
         {"entry_id": get_review_bookmark()},
         headers={"Cache-Control": "no-store"},
@@ -756,7 +767,7 @@ async def review_bookmark():
 
 
 @protected_router.get("/resume_review", response_class=RedirectResponse)
-async def resume_review():
+def resume_review():
     entry_id = get_review_bookmark()
     if not entry_id:
         return RedirectResponse(url="/entries", status_code=303)
@@ -777,8 +788,11 @@ def show_synonyms(entry_id: int, request: Request):
     try:
         senses = get_thesaurus_senses(word)
     except Exception as e:
+        logger.error(
+            "Error fetching thesaurus senses for %r: %s", word, type(e).__name__
+        )
         raise HTTPException(
-            status_code=500, detail=f"Error fetching thesaurus senses: {e}"
+            status_code=500, detail="Error fetching thesaurus senses"
         )
     context = {
         "entry_id": entry_id,
@@ -792,9 +806,9 @@ def show_synonyms(entry_id: int, request: Request):
 
 
 @protected_router.get("/notes/", response_class=HTMLResponse)
-async def notes(request: Request):
+def notes(request: Request):
     toc_html = ""
-    text = build_directory_tree_markdown(NOTES_DIR)
+    text = build_directory_tree_markdown(get_notes_dir())
     note_html = markdown2.markdown(
         text,
         extras=["strike", "tables", "toc", "fenced-code-blocks"],
@@ -841,7 +855,7 @@ def view_note(note_path: str, request: Request) -> _TemplateResponse:
 
 
 @protected_router.get("/edit_note/{note_path:path}", response_class=HTMLResponse)
-async def edit_note_page(note_path: str, request: Request):
+def edit_note_page(note_path: str, request: Request):
     full_path = safe_path_note(note_path)
     content = full_path.read_text(encoding="utf-8")
     context = {
@@ -855,7 +869,7 @@ async def edit_note_page(note_path: str, request: Request):
 
 
 @protected_router.post("/edit_note/{note_path:path}", response_class=HTMLResponse)
-async def edit_note(
+def edit_note(
     note_path: str,
     request: Request,
     form_data: EditNoteForm = Depends(EditNoteForm.as_form),
@@ -869,12 +883,9 @@ async def edit_note(
             url=request.url_for("view_note", note_path=note_path),
             status_code=303,
         )
-    except (OSError, IOError):
-        return templates.TemplateResponse(
-            request=request,
-            name="404.html.jinja",
-            context={"message": "Unable to edit the file"},
-        )
+    except OSError:
+        logger.exception("Failed to write note %r", note_path)
+        raise HTTPException(status_code=500, detail="Unable to save the note")
 
 
 app.include_router(protected_router)

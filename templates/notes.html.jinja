@@ -150,14 +150,15 @@
 {{ page_header(extra_nav=edit_link) }}
 
 <script>
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "e") {
-            const editLink = document.getElementById("edit-note");
-            if (editLink) editLink.click();
-        }
-    });
-
     document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("keydown", (event) => {
+            if (shouldIgnoreShortcut(event)) return;
+            if (event.key === "e") {
+                const editLink = document.getElementById("edit-note");
+                if (editLink) editLink.click();
+            }
+        });
+
         const toc = document.querySelector(".toc");
         const button = document.getElementById("toggle-toc");
         if (!toc || !button) return;

@@ -51,11 +51,9 @@
                 style="display: none;"
                 class="ipa-audio"
                 oncanplay="myOnCanPlayFunction(this)">
-                <source src="
-                    https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ word }}--_us_1.mp3"
+                <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_1.mp3"
                     type="audio/mp3">
-                <source src="
-                    https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ word }}--_us_1.mp3"
+                <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ oxford_audio_slug }}--_us_1.mp3"
                     type="audio/mp3">
             </audio>
             <span class="material-symbols-outlined audio-icon"
@@ -71,8 +69,7 @@
                 class="ipa-audio"
                 oncanplay="myOnCanPlayFunction(this)">
                 <source id="2nd-ipa-source"
-                    src="
-                    https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ word }}--_us_2.mp3"
+                    src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_2.mp3"
                     type="audio/mp3">
             </audio>
             <span class="material-symbols-outlined audio-icon"
@@ -87,8 +84,7 @@
                 style="display: none;"
                 oncanplay="check_IPA_audio()">
                 <source
-                    src="
-                    https://www.google.com/speech-api/v1/synthesize?text={{ word }}&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1"
+                    src="https://www.google.com/speech-api/v1/synthesize?text={{ tts_audio_query }}&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1"
                     type="audio/mp3">
             </audio>
             <span class="material-symbols-outlined audio-icon"
@@ -153,73 +149,80 @@
                         icon.style.display = "inline";
                     }
                 }
-                document.addEventListener("keydown", (event) => {
-                    if (event.key === "p") {
-                        let audioElems;
-                        const ipaAudios = document.querySelectorAll('.ipa-audio');
-                        if (!ipaAudios[0].readyState && !ipaAudios[1].readyState) {
-                            audioElems = [document.getElementById("google-translate-audio")]
-                        } else { audioElems = ipaAudios }
-                        let preAudio;
-                        audioElems.forEach((audio, index) => {
-                            let duration = 0;
-                            if (typeof preAudio !== 'undefined') {
-                                duration = preAudio.duration
+                document.addEventListener("DOMContentLoaded", () => {
+                    document.addEventListener("keydown", (event) => {
+                        if (event.altKey && event.key === "v") {
+                            if (shouldIgnoreShortcut(event, { allowAlt: true })) return;
+                            event.preventDefault();
+                            const definitionDiv = document.getElementById("definition-div");
+                            if (!definitionDiv) {
+                                navigator.clipboard
+                                    .readText()
+                                    .then((text) => {
+                                        const definitionForm = document.createElement("form");
+                                        definitionForm.method = "post";
+                                        definitionForm.action = "/add_definition";
+                                        let formData = { entry_id: entryId, definition_text: text, csrf_token: "{{ csrf_token or '' }}" };
+                                        for (const key in formData) {
+                                            const hiddenField = document.createElement("input");
+                                            hiddenField.type = "hidden";
+                                            hiddenField.name = key;
+                                            hiddenField.value = formData[key];
+                                            definitionForm.appendChild(hiddenField);
+                                        }
+                                        document.body.appendChild(definitionForm);
+                                        definitionForm.submit();
+                                    })
+                                    .catch((error) => {
+                                        console.error("Failed to read clipboard: ", error);
+                                    });
                             }
-                            setTimeout(function () {
-                                audio.play(); // Play the audio after the duration
-                            }, duration * 1000);
-                            preAudio = audio
-                        })
-                    }
-                })
-                document.addEventListener("keydown", (event) => {
-                    if (event.altKey && event.key === "v") {
-                        event.preventDefault();
-                        const definitionDiv = document.getElementById("definition-div");
-                        if (!definitionDiv) {
-                            navigator.clipboard
-                                .readText()
-                                .then((text) => {
-                                    const definitionForm = document.createElement("form");
-                                    definitionForm.method = "post";
-                                    definitionForm.action = "/add_definition";
-                                    let formData = { entry_id: entryId, definition_text: text, csrf_token: "{{ csrf_token or '' }}" };
-                                    for (const key in formData) {
-                                        const hiddenField = document.createElement("input");
-                                        hiddenField.type = "hidden";
-                                        hiddenField.name = key;
-                                        hiddenField.value = formData[key];
-                                        definitionForm.appendChild(hiddenField);
-                                    }
-                                    document.body.appendChild(definitionForm);
-                                    definitionForm.submit();
-                                })
-                                .catch((error) => {
-                                    console.error("Failed to read clipboard: ", error);
-                                });
+                            return;
                         }
-                    } else if (event.key === "b") {
-                        let length = history.length;
-                        for (step = length - 1; step > 0; step--) {
-                            history.back(step);
+                        if (shouldIgnoreShortcut(event)) return;
+                        if (event.key === "p") {
+                            let audioElems;
+                            const ipaAudios = document.querySelectorAll('.ipa-audio');
+                            if (!ipaAudios[0].readyState && !ipaAudios[1].readyState) {
+                                audioElems = [document.getElementById("google-translate-audio")];
+                            } else {
+                                audioElems = ipaAudios;
+                            }
+                            let preAudio;
+                            audioElems.forEach((audio) => {
+                                let duration = 0;
+                                if (typeof preAudio !== 'undefined') {
+                                    duration = preAudio.duration;
+                                }
+                                setTimeout(function () {
+                                    audio.play();
+                                }, duration * 1000);
+                                preAudio = audio;
+                            });
+                        } else if (event.key === "b") {
+                            let length = history.length;
+                            for (let step = length - 1; step > 0; step--) {
+                                history.back(step);
+                            }
+                        } else if (event.key === "e") {
+                            const editBtn = document.getElementById("edit-example");
+                            if (editBtn) editBtn.click();
+                        } else if (event.key === "D") {
+                            const delBtn = document.getElementById("dbt");
+                            if (delBtn) delBtn.click();
+                        } else if (event.key === "a") {
+                            window.open("/add_entry", "_blank").focus();
+                        } else if (event.key === "Q") {
+                            const textToCopy = document.getElementById('entry').innerText;
+                            navigator.clipboard.writeText(textToCopy).then(() => {
+                                console.log('Text copied to clipboard!');
+                            }).catch(err => {
+                                console.error('Failed to copy text: ', err);
+                            });
+                        } else if (event.key === "A") {
+                            window.location.href = "/add_entry";
                         }
-                    } else if (event.key === "e") {
-                        document.getElementById("edit-example").click();
-                    } else if (event.key === "D") {
-                        document.getElementById("dbt").click();
-                    } else if (event.key === "a") {
-                        window.open("/add_entry", "_blank").focus();
-                    } else if (event.key === "Q") {
-                        const textToCopy = document.getElementById('entry').innerText;
-                        navigator.clipboard.writeText(textToCopy).then(() => {
-                            console.log('Text copied to clipboard!');
-                        }).catch(err => {
-                            console.error('Failed to copy text: ', err);
-                        });
-                    } else if (event.key === "A") {
-                        window.location.href = "/add_entry";
-                    }
+                    });
                 });
                 function deleteDefinition(button, definitionId) {
                     if (confirm("Are you sure you want to delete this definition?")) {

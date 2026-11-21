@@ -1,3 +1,21 @@
+function shouldIgnoreShortcut(event, { allowAlt = false } = {}) {
+  if (event.defaultPrevented || event.isComposing) return true;
+  if (event.ctrlKey || event.metaKey || (!allowAlt && event.altKey)) {
+    return true;
+  }
+  const target = event.target;
+  if (target instanceof Element) {
+    if (
+      target.matches("input, textarea, select") ||
+      target.isContentEditable ||
+      target.closest(".CodeMirror")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function csrfHeaders() {
   const token = document.querySelector('meta[name="csrf-token"]');
   return token ? { "X-CSRF-Token": token.content } : {};

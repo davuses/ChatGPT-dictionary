@@ -35,6 +35,8 @@ class EntrySummary:
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()
 
 
@@ -205,11 +207,16 @@ def db_get_entries_page(
 
         query = query.strip()
         if query:
-            like_pattern = f"%{query}%"
+            escaped_query = (
+                query.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            like_pattern = f"%{escaped_query}%"
             base_query = base_query.filter(
                 or_(
-                    Entry.text.ilike(like_pattern),
-                    Entry.example.ilike(like_pattern),
+                    Entry.text.ilike(like_pattern, escape="\\"),
+                    Entry.example.ilike(like_pattern, escape="\\"),
                 )
             )
 
@@ -267,10 +274,11 @@ def db_get_entry_by_text(entry_text: str):
         return session.query(Entry).filter(Entry.text == entry_text).first()
 
 
-def db_delete_entry(entry_id: int):
+def db_delete_entry(entry_id: int) -> bool:
     with Session(engine) as session:
-        session.query(Entry).filter(Entry.id == entry_id).delete()
+        deleted = session.query(Entry).filter(Entry.id == entry_id).delete()
         session.commit()
+        return deleted > 0
 
 
 def db_update_entry_text(entry_id: int, text: str):

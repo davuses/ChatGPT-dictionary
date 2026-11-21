@@ -53,13 +53,13 @@ My Dictionary
         style="font-size:20px">top</i>
 </a>
 <script>
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "D") {
-            delete_selected_entry()
-        }
-
-    });
     document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("keydown", (event) => {
+            if (shouldIgnoreShortcut(event)) return;
+            if (event.key === "D") {
+                delete_selected_entry();
+            }
+        });
         // Bound to the #results wrapper, not .entries-table directly: live
         // search (below) replaces the table's HTML on every keystroke, and
         // a listener on the table node itself would be destroyed along with

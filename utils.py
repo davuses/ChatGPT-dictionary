@@ -2,12 +2,14 @@ import math
 import os
 import random
 import re
+import threading
 import time
 import tomllib
 import urllib
 import urllib.parse
 from collections.abc import Collection
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
@@ -88,36 +90,50 @@ def highlight_matches(text: str, query: str) -> Markup:
     return result
 
 
-def get_IPA(word) -> str:
-    a = phonemize(word, strip=True, with_stress=True)
+_ipa_lock = threading.Lock()
+_words_cache_lock = threading.Lock()
+_quiz_pool_lock = threading.Lock()
+
+
+@lru_cache(maxsize=2048)
+def get_IPA(word: str) -> str:
+    # libespeak-ng is not thread-safe, so serialize phonemize() on cache misses.
+    with _ipa_lock:
+        a = phonemize(word, strip=True, with_stress=True)
     if isinstance(a, str):
-        a = a.replace("ɹ", "r").replace("ɐ", "ə")
-        return a
-    else:
-        return str(a)
+        return a.replace("ɹ", "r").replace("ɐ", "ə")
+    return str(a)
 
 
-cached_all_words: dict[str, list[int]] = {}
+cached_all_words: dict[str, list[int]] | None = None
 
 
 def invalidate_words_cache() -> None:
-    cached_all_words.clear()
+    global cached_all_words
+    with _words_cache_lock:
+        cached_all_words = None
 
 
-def get_all_words():
-    if cached_all_words:
-        return cached_all_words
+def get_all_words() -> dict[str, list[int]]:
+    global cached_all_words
+    snapshot = cached_all_words
+    if snapshot is not None:
+        return snapshot
 
-    all_entries = db_get_all_entries()
-    for entry in all_entries:
-        _, word = parse_entry_text(entry.text)
-        if not word:
-            continue
-        if ids := cached_all_words.get(word):
-            ids.append(entry.id)
-        else:
-            cached_all_words[word] = [entry.id]
-    return cached_all_words
+    with _words_cache_lock:
+        if cached_all_words is not None:
+            return cached_all_words
+        words: dict[str, list[int]] = {}
+        for entry in db_get_all_entries():
+            _, word = parse_entry_text(entry.text)
+            if not word:
+                continue
+            if ids := words.get(word):
+                ids.append(entry.id)
+            else:
+                words[word] = [entry.id]
+        cached_all_words = words
+        return words
 
 
 QUIZ_MIN_SENTENCE_WORDS = 5
@@ -236,11 +252,13 @@ class QuizQuestion:
     blanked_sentence: str
 
 
-cached_quiz_pool: list[QuizCandidate] = []
+cached_quiz_pool: list[QuizCandidate] | None = None
 
 
 def invalidate_quiz_pool_cache() -> None:
-    cached_quiz_pool.clear()
+    global cached_quiz_pool
+    with _quiz_pool_lock:
+        cached_quiz_pool = None
 
 
 def get_quiz_pool() -> list[QuizCandidate]:
@@ -248,26 +266,32 @@ def get_quiz_pool() -> list[QuizCandidate]:
     appear as a whole word in the entry's own context clause and/or its
     example. Entries without a clean match are left out rather than
     guessed at (no stemming, no LLM-generated sentences)."""
-    if cached_quiz_pool:
-        return cached_quiz_pool
+    global cached_quiz_pool
+    snapshot = cached_quiz_pool
+    if snapshot is not None:
+        return snapshot
 
-    for entry_id, entry_text, entry_example in db_get_quiz_source_entries():
-        context, word = parse_entry_text(entry_text)
-        if not word:
-            continue
+    with _quiz_pool_lock:
+        if cached_quiz_pool is not None:
+            return cached_quiz_pool
+        pool: list[QuizCandidate] = []
+        for entry_id, entry_text, entry_example in db_get_quiz_source_entries():
+            context, word = parse_entry_text(entry_text)
+            if not word:
+                continue
 
-        sentences = [
-            s for s in _example_sentences(entry_example)
-            if _is_quizzable_sentence(word, s)
-        ]
-        if context and _is_quizzable_sentence(word, context):
-            sentences.insert(0, context)
-        if sentences:
-            cached_quiz_pool.append(
-                QuizCandidate(entry_id=entry_id, word=word, sentences=sentences)
-            )
-
-    return cached_quiz_pool
+            sentences = [
+                s for s in _example_sentences(entry_example)
+                if _is_quizzable_sentence(word, s)
+            ]
+            if context and _is_quizzable_sentence(word, context):
+                sentences.insert(0, context)
+            if sentences:
+                pool.append(
+                    QuizCandidate(entry_id=entry_id, word=word, sentences=sentences)
+                )
+        cached_quiz_pool = pool
+        return pool
 
 
 QUIZ_UNSEEN_BASE_WEIGHT = 4.5
@@ -423,18 +447,49 @@ def build_directory_tree_markdown(
     return "\n".join(markdown_lines)
 
 
-with open("config.toml", "rb") as fp:
-    toml_config = tomllib.load(fp)
-    NOTES_DIR = Path(toml_config["notes_folder"]).resolve()
-    NOTES_DIR.mkdir(exist_ok=True)
-    MW_THESAURUS_API_KEY = toml_config["mw_thesaurus_api_key"]
+CONFIG_PATH = Path(__file__).with_name("config.toml")
+
+
+@lru_cache
+def _load_app_config() -> dict[str, object]:
+    try:
+        with CONFIG_PATH.open("rb") as fp:
+            return tomllib.load(fp)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Missing configuration file: {CONFIG_PATH}") from error
+    except tomllib.TOMLDecodeError as error:
+        raise RuntimeError("config.toml contains invalid TOML") from error
+
+
+@lru_cache
+def get_notes_dir() -> Path:
+    config = _load_app_config()
+    raw_folder = config.get("notes_folder")
+    if not isinstance(raw_folder, str) or not raw_folder.strip():
+        raise RuntimeError("notes_folder in config.toml must be a non-empty string")
+    folder = Path(raw_folder)
+    if not folder.is_absolute():
+        folder = CONFIG_PATH.parent / folder
+    notes_dir = folder.resolve()
+    notes_dir.mkdir(exist_ok=True)
+    return notes_dir
+
+
+@lru_cache
+def get_mw_thesaurus_api_key() -> str:
+    config = _load_app_config()
+    api_key = config.get("mw_thesaurus_api_key", "")
+    if not isinstance(api_key, str):
+        raise RuntimeError("mw_thesaurus_api_key in config.toml must be a string")
+    return api_key
 
 
 def safe_path_note(subpath: str) -> Path:
-    """Ensure subpath is within NOTES_DIR to avoid directory traversal."""
+    """Ensure subpath is within the configured notes directory to avoid directory traversal."""
+    notes_dir = get_notes_dir()
     decoded = urllib.parse.unquote(subpath)
-    final_path = (NOTES_DIR / decoded).resolve()
-    if not final_path.is_relative_to(NOTES_DIR):
+    final_path = (notes_dir / decoded).resolve()
+    if not final_path.is_relative_to(notes_dir):
         raise HTTPException(status_code=400, detail="Invalid path")
     if not final_path.exists() or not final_path.suffix == ".md":
         raise HTTPException(status_code=404, detail="Note not found")
@@ -458,7 +513,7 @@ class EntryDisplay:
 def get_synonyms(word):
     synonym = Synonyms(
         search_string=word,
-        api_key=MW_THESAURUS_API_KEY,
+        api_key=get_mw_thesaurus_api_key(),
     )
     synonyms = cast(
         list[tuple[str, str, str, list[str]]], synonym.find_synonyms()

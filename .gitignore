@@ -163,6 +163,8 @@ cython_debug/
 .vscode/
 *conversations.json
 *.db
+*.db-shm
+*.db-wal
 *.ipynb
 *.wav
 *.txt
