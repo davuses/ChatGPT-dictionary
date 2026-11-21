@@ -10,10 +10,11 @@
 <form method="post"
     action="/edit_note/{{ note_path }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <textarea name="note_text">{{ note_text }}</textarea><br>
+    <textarea class="markdown-editor" name="note_text">{{ note_text }}</textarea><br>
     <div class="form-actions">
         <input type="submit"
             value="Submit">
+        <a class="button button-ghost" href="/view_note/{{ note_path }}">Cancel</a>
     </div>
 </form>
 </main>

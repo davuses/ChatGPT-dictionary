@@ -45,6 +45,7 @@ from database import (
     db_get_definition_by_id,
     db_get_entries_page,
     db_get_entry_by_id,
+    db_get_entry_by_text,
     db_get_entry_page_number,
     db_clear_review_bookmark,
     db_record_entry_visit,
@@ -55,9 +56,11 @@ from database import (
     get_review_bookmark,
 )
 from utils import (
+    ENTRY_TEXT_SEPARATOR,
     NOTES_DIR,
     EntryDisplay,
     build_directory_tree_markdown,
+    format_entry_text,
     get_all_words,
     get_how_long_ago,
     get_IPA,
@@ -67,6 +70,7 @@ from utils import (
     invalidate_quiz_pool_cache,
     invalidate_words_cache,
     normalize_pronoun_casing,
+    parse_entry_text,
     pick_random_question,
     QuizQuestion,
     safe_path_note,
@@ -109,11 +113,17 @@ class EditDefinitionForm(CsrfForm):
 
 
 class EditEntryForm(CsrfForm):
-    entry_text: str
+    word: str = ""
+    context: str = ""
 
     @classmethod
-    async def as_form(cls, entry_text: str = Form(...), csrf_token: str = Form(...)):
-        return cls(entry_text=entry_text, csrf_token=csrf_token)
+    async def as_form(
+        cls,
+        word: str = Form(""),
+        context: str = Form(""),
+        csrf_token: str = Form(...),
+    ):
+        return cls(word=word, context=context, csrf_token=csrf_token)
 
 
 class EditExampleForm(CsrfForm):
@@ -135,11 +145,36 @@ class EditNoteForm(CsrfForm):
 
 
 class AddEntryForm(CsrfForm):
-    entry_text: str
+    word: str = ""
+    context: str = ""
+    definition_text: str = ""
+    example_text: str = ""
 
     @classmethod
-    async def as_form(cls, entry_text: str = Form(...), csrf_token: str = Form(...)):
-        return cls(entry_text=entry_text, csrf_token=csrf_token)
+    async def as_form(
+        cls,
+        word: str = Form(""),
+        context: str = Form(""),
+        definition_text: str = Form(""),
+        example_text: str = Form(""),
+        csrf_token: str = Form(...),
+    ):
+        return cls(
+            word=word,
+            context=context,
+            definition_text=definition_text,
+            example_text=example_text,
+            csrf_token=csrf_token,
+        )
+
+
+def _validate_entry_fields(word: str, context: str) -> tuple[str | None, str | None]:
+    clean_word = word.strip()
+    if not clean_word:
+        return None, "Word cannot be empty."
+    if ENTRY_TEXT_SEPARATOR in clean_word:
+        return None, 'Word cannot contain " - " (reserved as the context separator).'
+    return format_entry_text(clean_word, context), None
 
 
 class AddDefinitionForm(CsrfForm):
@@ -359,12 +394,7 @@ async def entries_page(
     review_bookmark_entry_id = get_review_bookmark()
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
-        entry_text = entry.text
-        context_text = ""
-        display_text = entry_text
-        if " - " in entry_text:
-            display_text = entry_text.split(" - ")[-1].strip()
-            context_text = entry_text.split(" - ")[0]
+        context_text, display_text = parse_entry_text(entry.text)
         context_text = normalize_pronoun_casing(context_text)
 
         if show_example and entry.example:
@@ -441,7 +471,7 @@ async def entry_page(entry_id: int, request: Request):
         d = entry.definitions[0]
         definition_html = markdown2.markdown(d.text, extras=["strike"])
         definition_id = d.id
-    word = entry.text.split(" - ")[-1].strip()
+    _, word = parse_entry_text(entry.text)
     IPA_transcript = get_IPA(word)
     example_html = (
         markdown2.markdown(
@@ -477,7 +507,14 @@ async def edit_entry_page(entry_id: int, request: Request):
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    context = {"entry_id": entry_id, "entry_text": entry.text, "needs_editor": True}
+    context_text, word = parse_entry_text(entry.text)
+    context = {
+        "entry_id": entry_id,
+        "word": word,
+        "context": context_text,
+        "error": None,
+        "existing_entry_id": None,
+    }
     return templates.TemplateResponse(
         request=request, name="edit_entry.html.jinja", context=context
     )
@@ -517,10 +554,18 @@ async def edit_example_page(entry_id: int, request: Request):
 
 @protected_router.get("/add_entry", response_class=HTMLResponse)
 async def add_entry_page(request: Request):
+    context = {
+        "word": "",
+        "context": "",
+        "definition_text": "",
+        "example_text": "",
+        "error": None,
+        "existing_entry_id": None,
+    }
     return templates.TemplateResponse(
         request=request,
         name="add_entry.html.jinja",
-        context={"needs_editor": True},
+        context=context,
     )
 
 
@@ -539,16 +584,40 @@ async def edit_entry(
     form_data: EditEntryForm = Depends(EditEntryForm.as_form),
 ):
     verify_csrf_value(request, form_data.csrf_token)
-    updated_text = form_data.entry_text.strip()
-    if not updated_text:
-        raise HTTPException(status_code=400, detail="Entry text cannot be empty")
+    updated_text, error = _validate_entry_fields(form_data.word, form_data.context)
+    if error or not updated_text:
+        return templates.TemplateResponse(
+            request=request,
+            name="edit_entry.html.jinja",
+            context={
+                "entry_id": entry_id,
+                "word": form_data.word,
+                "context": form_data.context,
+                "error": error,
+                "existing_entry_id": None,
+            },
+            status_code=400,
+        )
     try:
         if e_id := db_update_entry_text(entry_id, updated_text):
             invalidate_words_cache()
             invalidate_quiz_pool_cache()
             return RedirectResponse(url=f"/entry/{e_id}", status_code=303)
     except IntegrityError:
-        raise HTTPException(status_code=409, detail="An entry with that text already exists")
+        existing = db_get_entry_by_text(updated_text)
+        return templates.TemplateResponse(
+            request=request,
+            name="edit_entry.html.jinja",
+            context={
+                "entry_id": entry_id,
+                "word": form_data.word,
+                "context": form_data.context,
+                "error": "An entry with that text already exists.",
+                "existing_entry_id": existing.id if existing else None,
+            },
+            status_code=409,
+        )
+    raise HTTPException(status_code=404, detail="Entry not found")
 
 
 @protected_router.post("/edit_definition/{definition_id}", response_class=HTMLResponse)
@@ -561,6 +630,7 @@ async def edit_definition(
     updated_text = form_data.definition_text
     if entry_id := db_update_definition_text(definition_id, updated_text):
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
+    raise HTTPException(status_code=404, detail="Definition not found")
 
 
 @protected_router.post("/edit_example/{entry_id}", response_class=HTMLResponse)
@@ -575,6 +645,7 @@ async def edit_example(
     if updated_eid := db_update_example(entry_id, updated_text):
         invalidate_quiz_pool_cache()
         return RedirectResponse(url=f"/entry/{updated_eid}", status_code=303)
+    raise HTTPException(status_code=404, detail="Entry not found")
 
 
 @protected_router.delete("/delete_entry/{entry_id}")
@@ -601,16 +672,45 @@ async def add_entry(
     form_data: AddEntryForm = Depends(AddEntryForm.as_form),
 ):
     verify_csrf_value(request, form_data.csrf_token)
-    updated_text = form_data.entry_text.strip()
-    if not updated_text:
-        raise HTTPException(status_code=400, detail="Entry text cannot be empty")
+    updated_text, error = _validate_entry_fields(form_data.word, form_data.context)
+    if error or not updated_text:
+        return templates.TemplateResponse(
+            request=request,
+            name="add_entry.html.jinja",
+            context={
+                "word": form_data.word,
+                "context": form_data.context,
+                "definition_text": form_data.definition_text,
+                "example_text": form_data.example_text,
+                "error": error,
+                "existing_entry_id": None,
+            },
+            status_code=400,
+        )
     try:
-        if e_id := db_add_entry(updated_text):
+        if e_id := db_add_entry(
+            updated_text,
+            definition_text=form_data.definition_text,
+            example_text=form_data.example_text,
+        ):
             invalidate_words_cache()
             invalidate_quiz_pool_cache()
             return RedirectResponse(url=f"/entry/{e_id}", status_code=303)
     except IntegrityError:
-        raise HTTPException(status_code=409, detail="An entry with that text already exists")
+        existing = db_get_entry_by_text(updated_text)
+        return templates.TemplateResponse(
+            request=request,
+            name="add_entry.html.jinja",
+            context={
+                "word": form_data.word,
+                "context": form_data.context,
+                "definition_text": form_data.definition_text,
+                "example_text": form_data.example_text,
+                "error": "An entry with that text already exists.",
+                "existing_entry_id": existing.id if existing else None,
+            },
+            status_code=409,
+        )
 
 
 @protected_router.post("/add_definition", response_class=HTMLResponse)
@@ -671,9 +771,8 @@ def show_synonyms(entry_id: int, request: Request):
     entry = db_get_entry_by_id(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    entry_text: str = entry.text
-    word = entry_text.split(" - ")[-1]
-    if " " in word:
+    _, word = parse_entry_text(entry.text)
+    if not word or " " in word:
         raise HTTPException(status_code=404, detail="Word not valid")
     try:
         senses = get_thesaurus_senses(word)

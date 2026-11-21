@@ -27,6 +27,27 @@ from database import (
 from wordhoard import Synonyms
 
 
+ENTRY_TEXT_SEPARATOR = " - "
+
+
+def parse_entry_text(text: str) -> tuple[str, str]:
+    """Split stored entry text ("<context> - <word>" or "<word>") into
+    (context, word). Uses rsplit so contexts containing " - " stay intact."""
+    if ENTRY_TEXT_SEPARATOR in text:
+        context, word = text.rsplit(ENTRY_TEXT_SEPARATOR, 1)
+        return context.strip(), word.strip()
+    return "", text.strip()
+
+
+def format_entry_text(word: str, context: str = "") -> str:
+    """Combine word and optional context into the stored entry text format."""
+    clean_word = word.strip()
+    clean_context = context.strip()
+    if clean_context:
+        return f"{clean_context}{ENTRY_TEXT_SEPARATOR}{clean_word}"
+    return clean_word
+
+
 def normalize_pronoun_casing(text: str) -> str:
     """Capitalize the standalone pronoun "i" (common in casually-typed
     source text, e.g. "i think it helps") without touching any other
@@ -89,12 +110,9 @@ def get_all_words():
 
     all_entries = db_get_all_entries()
     for entry in all_entries:
-        entry_text = entry.text
-        if " - " in entry_text:
-            word = entry_text.split(" - ")[-1]
-        else:
-            word = entry_text
-        word = word.strip()
+        _, word = parse_entry_text(entry.text)
+        if not word:
+            continue
         if ids := cached_all_words.get(word):
             ids.append(entry.id)
         else:
@@ -118,8 +136,12 @@ def _is_quizzable_sentence(word: str, text: str | None) -> bool:
     """Whole-word match is necessary but not sufficient: some "examples"
     are really just usage notes or alternate phrasings ("Or well-balanced",
     "grind away at*"), too short to give a test-taker enough to work with.
-    Require a minimum amount of surrounding context."""
-    return _word_in_text(word, text) and len(text.split()) >= QUIZ_MIN_SENTENCE_WORDS
+    Require enough surrounding context beyond the headword itself so a
+    multi-word entry never blanks out the entire sentence."""
+    if not _word_in_text(word, text):
+        return False
+    min_words = max(QUIZ_MIN_SENTENCE_WORDS, len(word.split()) + 3)
+    return len(text.split()) >= min_words
 
 
 def _blank_word(sentence: str, word: str) -> tuple[str, str]:
@@ -230,10 +252,7 @@ def get_quiz_pool() -> list[QuizCandidate]:
         return cached_quiz_pool
 
     for entry_id, entry_text, entry_example in db_get_quiz_source_entries():
-        if " - " not in entry_text:
-            continue
-        context, word = entry_text.rsplit(" - ", 1)
-        word = word.strip()
+        context, word = parse_entry_text(entry_text)
         if not word:
             continue
 
@@ -241,7 +260,7 @@ def get_quiz_pool() -> list[QuizCandidate]:
             s for s in _example_sentences(entry_example)
             if _is_quizzable_sentence(word, s)
         ]
-        if _is_quizzable_sentence(word, context):
+        if context and _is_quizzable_sentence(word, context):
             sentences.insert(0, context)
         if sentences:
             cached_quiz_pool.append(

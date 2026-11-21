@@ -291,10 +291,20 @@ def db_update_example(entry_id: int, example_text: str):
             return entry.id
 
 
-def db_add_entry(text: str):
+def db_add_entry(
+    text: str, definition_text: str = "", example_text: str = ""
+):
     with Session(engine) as session:
         text = text.strip()
-        entry = Entry(text=text, last_visit=int(time.time()))
+        clean_definition = definition_text.strip()
+        clean_example = example_text.strip() or None
+        entry = Entry(
+            text=text,
+            example=clean_example,
+            last_visit=int(time.time()),
+        )
+        if clean_definition:
+            entry.definitions.append(Definition(text=clean_definition))
         session.add(entry)
         session.commit()
         return entry.id

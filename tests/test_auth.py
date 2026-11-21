@@ -99,7 +99,7 @@ async def test_unauthenticated_json_and_xhr_requests_return_401_json(client):
 async def test_unauthenticated_mutation_is_rejected_before_form_validation(client):
     response = await client.post(
         "/add_entry",
-        data={"entry_text": "must not exist", "csrf_token": "invalid"},
+        data={"word": "must not exist", "csrf_token": "invalid"},
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication required"}
@@ -167,11 +167,15 @@ async def test_authenticated_javascript_mutation_requires_csrf_header(client):
 async def test_authenticated_form_mutation_requires_csrf(client, monkeypatch):
     await _login(client)
     calls = []
-    monkeypatch.setattr(main, "db_add_entry", lambda text: calls.append(text) or 123)
+    monkeypatch.setattr(
+        main,
+        "db_add_entry",
+        lambda text, definition_text="", example_text="": calls.append(text) or 123,
+    )
 
     rejected = await client.post(
         "/add_entry",
-        data={"entry_text": "test entry", "csrf_token": "invalid"},
+        data={"word": "test entry", "csrf_token": "invalid"},
     )
     assert rejected.status_code == 403
     assert calls == []
@@ -180,7 +184,7 @@ async def test_authenticated_form_mutation_requires_csrf(client, monkeypatch):
     accepted = await client.post(
         "/add_entry",
         data={
-            "entry_text": "test entry",
+            "word": "test entry",
             "csrf_token": _csrf_from_html(editor.text),
         },
     )

@@ -110,12 +110,15 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-const editPagePattern = /^\/(?:edit_|add_)/;
+document.addEventListener("DOMContentLoaded", function () {
+  const editors = document.querySelectorAll("textarea.markdown-editor");
+  if (!editors.length || typeof EasyMDE === "undefined") return;
 
-if (editPagePattern.test(window.location.pathname)) {
-  document.addEventListener("DOMContentLoaded", function () {
-    var editor = new EasyMDE({
-      autofocus: true,
+  const hasAutoFocusInput = Boolean(document.querySelector("input[autofocus]"));
+  editors.forEach(function (textarea, index) {
+    new EasyMDE({
+      element: textarea,
+      autofocus: !hasAutoFocusInput && index === 0,
       // Font Awesome is vendored in static/ and linked from base.html.jinja;
       // without this EasyMDE injects a maxcdn.bootstrapcdn.com <link>, which
       // leaves the toolbar as tofu boxes whenever that CDN is unreachable.
@@ -140,17 +143,18 @@ if (editPagePattern.test(window.location.pathname)) {
         "fullscreen",
       ],
     });
-    const mdEditors = document.querySelectorAll(".CodeMirror");
-    mdEditors.forEach(function (mdEditor) {
-      mdEditor.addEventListener("keydown", function (event) {
-        if (event.shiftKey && event.key === "Enter") {
-          event.preventDefault();
-          const form = mdEditor.closest("form");
-          if (form) {
-            form.submit();
-          }
+  });
+
+  const mdEditors = document.querySelectorAll(".CodeMirror");
+  mdEditors.forEach(function (mdEditor) {
+    mdEditor.addEventListener("keydown", function (event) {
+      if (event.shiftKey && event.key === "Enter") {
+        event.preventDefault();
+        const form = mdEditor.closest("form");
+        if (form) {
+          form.requestSubmit();
         }
-      });
+      }
     });
   });
-}
+});

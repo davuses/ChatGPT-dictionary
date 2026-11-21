@@ -7,13 +7,27 @@
 {{ page_header(extra_nav=entry_link) }}
 <main class="form-page">
 <h1>Edit Entry</h1>
-<form method="post"
-    action="/edit_entry/{{ entry_id }}">
+{% if error %}
+<p class="form-error" role="alert">
+    {{ error }}
+    {% if existing_entry_id %}
+    <a href="/entry/{{ existing_entry_id }}">View existing entry</a>
+    {% endif %}
+</p>
+{% endif %}
+<form method="post" action="/edit_entry/{{ entry_id }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <textarea name="entry_text">{{ entry_text }}</textarea><br>
+    <div class="form-field">
+        <label for="word">Word or phrase</label>
+        <input id="word" name="word" type="text" value="{{ word }}" required autofocus>
+    </div>
+    <div class="form-field">
+        <label for="context">Context <span class="field-hint">(optional)</span></label>
+        <input id="context" name="context" type="text" value="{{ context }}">
+    </div>
     <div class="form-actions">
-        <input type="submit"
-            value="Submit">
+        <input type="submit" value="Save changes">
+        <a class="button button-ghost" href="/entry/{{ entry_id }}">Cancel</a>
     </div>
 </form>
 </main>

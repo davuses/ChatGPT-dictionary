@@ -666,6 +666,47 @@ caption {
   margin-bottom: 12px;
 }
 
+.form-field {
+  margin-bottom: 14px;
+}
+
+.form-page label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: normal;
+}
+
+.form-page input[type="text"],
+.form-page input[type="password"],
+.form-page textarea {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 16px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.form-page textarea {
+  height: auto;
+  resize: vertical;
+}
+
+.login-form input[type="text"],
+.login-form input[type="password"] {
+  display: block;
+  margin-bottom: 12px;
+  max-width: 24rem;
+}
+
 .form-actions {
   display: flex;
   gap: 8px;

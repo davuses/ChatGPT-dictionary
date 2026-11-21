@@ -10,10 +10,11 @@
 <form method="post"
     action="/edit_definition/{{ definition_id }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <textarea name="definition_text">{{ definition_text }}</textarea><br>
+    <textarea class="markdown-editor" name="definition_text">{{ definition_text }}</textarea><br>
     <div class="form-actions">
         <input type="submit"
             value="Submit">
+        <a class="button button-ghost" href="/entry/{{ entry_id }}">Cancel</a>
     </div>
 </form>
 </main>
