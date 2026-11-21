@@ -42,13 +42,12 @@ from database import (
     db_count_entries_visited_since,
     db_delete_definition,
     db_delete_entry,
-    db_entry_increment_visit_count,
-    db_entry_last_visit_old_enough,
     db_get_definition_by_id,
     db_get_entries_page,
     db_get_entry_by_id,
     db_get_entry_page_number,
     db_clear_review_bookmark,
+    db_record_entry_visit,
     db_set_review_bookmark,
     db_update_definition_text,
     db_update_entry_text,
@@ -283,13 +282,12 @@ def _next_quiz_question(exclude: str) -> tuple[Optional[QuizQuestion], str]:
     """Shared by the dashboard's initial render and the JSON route it polls
     for "Try another". Order matters in the exclude list (oldest-first) so
     the trailing slice keeps the *most recently seen* entries, not an
-    arbitrary subset."""
+    arbitrary subset. Read-only: visit recording happens only when the user
+    reveals the answer via POST /quiz/{entry_id}/seen."""
     exclude_ids_ordered = [int(x) for x in exclude.split(",") if x.strip().isdigit()]
     exclude_ids_ordered = list(dict.fromkeys(exclude_ids_ordered))
 
     question = pick_random_question(exclude_entry_ids=set(exclude_ids_ordered))
-    if question and db_entry_last_visit_old_enough(question.entry_id):
-        db_entry_increment_visit_count(question.entry_id)
 
     next_exclude_ids = exclude_ids_ordered + ([question.entry_id] if question else [])
     next_exclude_ids = list(dict.fromkeys(next_exclude_ids))
@@ -330,6 +328,16 @@ async def quiz_next(exclude: str = Query("")):
         },
         headers={"Cache-Control": "no-store"},
     )
+
+
+@protected_router.post("/quiz/{entry_id}/seen")
+async def quiz_mark_seen(
+    entry_id: int, _: None = Depends(verify_header_csrf)
+):
+    recorded = db_record_entry_visit(entry_id)
+    if recorded is None:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"recorded": recorded}
 
 
 @protected_router.get("/entries", response_class=HTMLResponse)
@@ -422,10 +430,8 @@ async def entry_page(entry_id: int, request: Request):
     entry = db_get_entry_by_id(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    visit_count = entry.visit_count
-    if db_entry_last_visit_old_enough(entry.id):
-        db_entry_increment_visit_count(entry.id)
-        # a bit of hack
+    visit_count = entry.visit_count or 0
+    if db_record_entry_visit(entry.id):
         visit_count += 1
     # Only display the first definition
     definition_exists = bool(entry.definitions)

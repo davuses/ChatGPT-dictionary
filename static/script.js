@@ -48,6 +48,17 @@ function toggleQuizAnswer(button) {
   const isHidden = answer.hidden;
   answer.hidden = !isHidden;
   button.textContent = isHidden ? "Hide answer" : "Show answer";
+  if (isHidden && card.dataset.entryId && card.dataset.seen !== "true") {
+    card.dataset.seen = "true";
+    fetch("/quiz/" + encodeURIComponent(card.dataset.entryId) + "/seen", {
+      method: "POST",
+      headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
+    })
+      .then(handleProtectedResponse)
+      .catch((err) => {
+        console.error(err);
+      });
+  }
 }
 
 // The quiz card's "next question" button (dashboard's "Try another", or
@@ -71,12 +82,16 @@ document.addEventListener("DOMContentLoaded", function () {
     fetchJson("/quiz/next?exclude=" + encodeURIComponent(exclude))
       .then((data) => {
         if (!data.entry_id) {
+          delete card.dataset.entryId;
+          delete card.dataset.seen;
           card.querySelector(".quiz-sentence").textContent =
             "No quizzable entries yet — add some examples first.";
           nextBtn.hidden = true;
           return;
         }
 
+        card.dataset.entryId = String(data.entry_id);
+        delete card.dataset.seen;
         card.querySelector(".quiz-sentence").textContent = data.blanked_sentence;
 
         const answerEl = card.querySelector(".quiz-answer");

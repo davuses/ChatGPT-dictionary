@@ -1,3 +1,4 @@
+import math
 import os
 import random
 import re
@@ -5,6 +6,7 @@ import time
 import tomllib
 import urllib
 import urllib.parse
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
@@ -15,7 +17,13 @@ from fastapi import HTTPException
 from markupsafe import Markup, escape
 from phonemizer import phonemize
 
-from database import Entry, EntrySummary, db_get_all_entries
+from database import (
+    Entry,
+    EntrySummary,
+    db_get_all_entries,
+    db_get_entry_visit_stats,
+    db_get_quiz_source_entries,
+)
 from wordhoard import Synonyms
 
 
@@ -221,26 +229,83 @@ def get_quiz_pool() -> list[QuizCandidate]:
     if cached_quiz_pool:
         return cached_quiz_pool
 
-    for entry in db_get_all_entries():
-        if " - " not in entry.text:
+    for entry_id, entry_text, entry_example in db_get_quiz_source_entries():
+        if " - " not in entry_text:
             continue
-        context, word = entry.text.rsplit(" - ", 1)
+        context, word = entry_text.rsplit(" - ", 1)
         word = word.strip()
         if not word:
             continue
 
         sentences = [
-            s for s in _example_sentences(entry.example)
+            s for s in _example_sentences(entry_example)
             if _is_quizzable_sentence(word, s)
         ]
         if _is_quizzable_sentence(word, context):
             sentences.insert(0, context)
         if sentences:
             cached_quiz_pool.append(
-                QuizCandidate(entry_id=entry.id, word=word, sentences=sentences)
+                QuizCandidate(entry_id=entry_id, word=word, sentences=sentences)
             )
 
     return cached_quiz_pool
+
+
+QUIZ_UNSEEN_BASE_WEIGHT = 4.5
+QUIZ_MAX_RECENCY_FACTOR = 6.0
+QUIZ_RECENT_COOLDOWN_FACTOR = 0.1
+QUIZ_RECENT_COOLDOWN_SECONDS = 86400
+
+
+def _quiz_weight(visit_count: int, last_visit: int | None, now: int) -> float:
+    """Weight a quiz candidate so unvisited and long-neglected entries surface
+    more often while every entry keeps a positive weight.
+
+    - Anything visited (or newly created) within the last 24h gets a strong
+      cooldown so it doesn't bounce right back.
+    - All visit_count == 0 entries past that cooldown share one high baseline
+      weight, avoiding a mismatch between legacy rows (last_visit=None) and
+      entries added via the UI (last_visit=created_at).
+    - Previously visited entries decay by visit_count and grow smoothly with
+      log1p(days since last visit).
+    """
+    visits = max(visit_count, 0)
+    if last_visit is not None:
+        elapsed = max(0, now - last_visit)
+        if elapsed < QUIZ_RECENT_COOLDOWN_SECONDS:
+            return QUIZ_RECENT_COOLDOWN_FACTOR / (1.0 + visits)
+        if visits == 0:
+            return QUIZ_UNSEEN_BASE_WEIGHT
+        days = elapsed / 86400
+        recency_factor = min(math.log1p(days), QUIZ_MAX_RECENCY_FACTOR)
+    else:
+        if visits == 0:
+            return QUIZ_UNSEEN_BASE_WEIGHT
+        recency_factor = QUIZ_UNSEEN_BASE_WEIGHT
+
+    visit_factor = 1.0 / ((1.0 + visits) ** 1.5)
+    return visit_factor * recency_factor
+
+
+def _pick_weighted_candidate(
+    pool: list[QuizCandidate],
+    visit_stats: dict[int, tuple[int, int | None]],
+    exclude_entry_ids: Collection[int] = frozenset(),
+    *,
+    now: int | None = None,
+    rng: random.Random = random,
+) -> QuizCandidate | None:
+    active_pool = [c for c in pool if c.entry_id in visit_stats]
+    if not active_pool:
+        return None
+    excluded = set(exclude_entry_ids)
+    candidates = [c for c in active_pool if c.entry_id not in excluded] or active_pool
+    current_time = int(time.time()) if now is None else now
+    weights = [
+        _quiz_weight(*visit_stats[c.entry_id], now=current_time)
+        for c in candidates
+    ]
+    return rng.choices(candidates, weights=weights, k=1)[0]
 
 
 def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> QuizQuestion:
@@ -253,12 +318,17 @@ def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> Qu
     )
 
 
-def pick_random_question(exclude_entry_ids: set[int] = frozenset()) -> QuizQuestion | None:
+def pick_random_question(
+    exclude_entry_ids: Collection[int] = frozenset(),
+) -> QuizQuestion | None:
     pool = get_quiz_pool()
     if not pool:
         return None
-    candidates = [c for c in pool if c.entry_id not in exclude_entry_ids] or pool
-    return _question_from_candidate(candidates[random.randrange(len(candidates))], random)
+    visit_stats = db_get_entry_visit_stats()
+    candidate = _pick_weighted_candidate(pool, visit_stats, exclude_entry_ids)
+    if not candidate:
+        return None
+    return _question_from_candidate(candidate, random)
 
 
 def get_how_long_ago(timestamp: int | None) -> str:

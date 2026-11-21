@@ -18,6 +18,7 @@ from sqlalchemy.orm import (
     Mapped,
     Session,
     mapped_column,
+    noload,
     relationship,
 )
 
@@ -122,6 +123,29 @@ def db_get_all_entries():
             .all()
         )
         return entries
+
+
+def db_get_quiz_source_entries() -> list[tuple[int, str, str | None]]:
+    """Lightweight column-only fetch for building the quiz pool without
+    joined-loading Definition rows."""
+    with Session(engine) as session:
+        rows = (
+            session.query(Entry.id, Entry.text, Entry.example)
+            .filter(Entry.is_hidden == False)
+            .all()
+        )
+        return [(row.id, row.text, row.example) for row in rows]
+
+
+def db_get_entry_visit_stats() -> dict[int, tuple[int, int | None]]:
+    """Return {entry_id: (visit_count, last_visit)} for all active entries."""
+    with Session(engine) as session:
+        rows = (
+            session.query(Entry.id, Entry.visit_count, Entry.last_visit)
+            .filter(Entry.is_hidden == False)
+            .all()
+        )
+        return {row.id: (row.visit_count or 0, row.last_visit) for row in rows}
 
 
 
@@ -276,9 +300,42 @@ def db_add_entry(text: str):
         return entry.id
 
 
+VISIT_COOLDOWN_SECONDS = 3600 * 12
+
+
+def db_record_entry_visit(entry_id: int, now: int | None = None) -> bool | None:
+    """Record a visit if at least 12h have elapsed since last_visit (or it was
+    never visited). Returns True if recorded, False if still in cooldown, or
+    None if the entry does not exist (or is hidden)."""
+    current_time = int(time.time()) if now is None else now
+    with Session(engine) as session:
+        entry = (
+            session.query(Entry)
+            .options(noload(Entry.definitions))
+            .filter(Entry.id == entry_id, Entry.is_hidden == False)
+            .first()
+        )
+        if not entry:
+            return None
+        if (
+            entry.last_visit is None
+            or current_time - entry.last_visit >= VISIT_COOLDOWN_SECONDS
+        ):
+            entry.last_visit = current_time
+            entry.visit_count = (entry.visit_count or 0) + 1
+            session.commit()
+            return True
+        return False
+
+
 def db_entry_last_visit_old_enough(entry_id: int):
     with Session(engine) as session:
-        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        entry = (
+            session.query(Entry)
+            .options(noload(Entry.definitions))
+            .filter(Entry.id == entry_id)
+            .first()
+        )
         if entry:
             last_visit = entry.last_visit
             if not last_visit:
@@ -287,7 +344,7 @@ def db_entry_last_visit_old_enough(entry_id: int):
                 return True
             now = int(time.time())
             # last visit more than 12h ago
-            if now - last_visit >= 3600 * 12:
+            if now - last_visit >= VISIT_COOLDOWN_SECONDS:
                 entry.last_visit = now
                 session.commit()
                 return True
@@ -296,9 +353,14 @@ def db_entry_last_visit_old_enough(entry_id: int):
 
 def db_entry_increment_visit_count(entry_id: int):
     with Session(engine) as session:
-        entry = session.query(Entry).filter(Entry.id == entry_id).first()
+        entry = (
+            session.query(Entry)
+            .options(noload(Entry.definitions))
+            .filter(Entry.id == entry_id)
+            .first()
+        )
         if entry:
-            entry.visit_count = entry.visit_count + 1
+            entry.visit_count = (entry.visit_count or 0) + 1
             session.commit()
             return True
 
