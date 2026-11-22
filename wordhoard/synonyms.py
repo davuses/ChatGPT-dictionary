@@ -35,6 +35,7 @@ __copyright__ = "Copyright (C) 2020 John Bumgarner"
 import logging
 import re as regex
 import traceback
+import urllib.parse
 from typing import List, Tuple, Union
 
 # Third-party imports
@@ -99,10 +100,28 @@ class Synonyms:
         logger.error("An error occurred in the following code segment:")
         logger.error("".join(traceback.format_tb(error.__traceback__)))
 
+    @staticmethod
+    def _iter_senses(sseq: list):
+        """Yield sense dicts from an MW sseq list, handling sense, bs, and pseq wrappers."""
+        for sense_group in sseq:
+            for item in sense_group:
+                if not isinstance(item, list) or len(item) < 2:
+                    continue
+                tag, body = item[0], item[1]
+                if tag == "sense" and isinstance(body, dict):
+                    yield body
+                elif tag == "bs" and isinstance(body, dict):
+                    sense = body.get("sense")
+                    if isinstance(sense, dict):
+                        yield sense
+                elif tag == "pseq" and isinstance(body, list):
+                    yield from Synonyms._iter_senses([body])
+
     def _query_merriam_webster(self) -> Union[List, None]:
+        encoded_word = urllib.parse.quote(self._word.strip(), safe="")
         url = (
             f"https://www.dictionaryapi.com/api/v3/references/thesaurus/json"
-            f"/{self._word}?key={self._api_key}"
+            f"/{encoded_word}?key={self._api_key}"
         )
         try:
             response = requests.get(url, timeout=(15, 30))
@@ -123,42 +142,64 @@ class Synonyms:
             logger.info(f"No thesaurus entry found for '{self._word}'")
             return None
 
+        target = self._word.strip().lower()
         synonyms_data = []
         for entry in data:
-            # Skip compound-word entries that don't match the searched word
+            if not isinstance(entry, dict):
+                continue
+            # Match either the headword or one of MW's listed stems (handles
+            # inflections and phrasal entries like "zero (in on)" -> "zero in on")
             hw = entry.get("hwi", {}).get("hw", "").replace("*", "").lower()
-            if hw != self._word.lower():
+            stems = {
+                s.lower()
+                for s in entry.get("meta", {}).get("stems", [])
+                if isinstance(s, str)
+            }
+            if hw != target and target not in stems:
                 continue
 
             pos = entry.get("fl", "")
             shortdefs = entry.get("shortdef", [])
-            sseqs = (
-                entry["def"][0].get("sseq", []) if entry.get("def") else []
-            )
+            entry_senses_added = 0
 
-            for i, sense_group in enumerate(sseqs):
-                for item in sense_group:
-                    if item[0] != "sense":
-                        continue
-                    sense = item[1]
-
+            for def_block in entry.get("def", []):
+                for i, sense in enumerate(self._iter_senses(def_block.get("sseq", []))):
                     # Extract plain definition text, stripping MW markup
                     meaning = ""
-                    for dt_tag, dt_content in sense.get("dt", []):
-                        if dt_tag == "text":
-                            meaning = regex.sub(r"\{[^}]+\}", "", dt_content).strip()
+                    for dt_entry in sense.get("dt", []):
+                        if (
+                            isinstance(dt_entry, list)
+                            and len(dt_entry) >= 2
+                            and dt_entry[0] == "text"
+                            and isinstance(dt_entry[1], str)
+                        ):
+                            meaning = regex.sub(r"\{[^}]+\}", "", dt_entry[1]).strip()
                             break
                     if not meaning and i < len(shortdefs):
                         meaning = shortdefs[i]
 
-                    synonyms = [
-                        syn["wd"]
-                        for group in sense.get("syn_list", [])
-                        for syn in group
-                    ]
+                    # MW Collegiate Thesaurus splits matches across syn_list
+                    # ("synonyms") and sim_list ("strongest matches" / near synonyms).
+                    seen: set[str] = set()
+                    synonyms: list[str] = []
+                    for list_key in ("syn_list", "sim_list"):
+                        for group in sense.get(list_key, []):
+                            for syn in group:
+                                wd = syn.get("wd") if isinstance(syn, dict) else None
+                                if wd and wd not in seen:
+                                    seen.add(wd)
+                                    synonyms.append(wd)
 
                     if synonyms:
                         synonyms_data.append([self._word, pos, meaning, synonyms])
+                        entry_senses_added += 1
+
+            # Fallback to meta.syns if def/sseq had an unexpected shape
+            if entry_senses_added == 0:
+                for i, syn_group in enumerate(entry.get("meta", {}).get("syns", [])):
+                    if syn_group:
+                        meaning = shortdefs[i] if i < len(shortdefs) else ""
+                        synonyms_data.append([self._word, pos, meaning, list(syn_group)])
 
         if synonyms_data:
             self._update_cache(synonyms=synonyms_data)

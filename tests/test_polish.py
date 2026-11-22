@@ -247,3 +247,59 @@ async def test_dashboard_quick_search_and_entries_visit_tiers(
     assert 'class="back-to-top"' in entries.text
     assert "unselectable" not in entries.text
 
+
+async def test_synonyms_handles_sim_list_stems_and_phrases(
+    client, isolated_db, monkeypatch
+):
+    from wordhoard import Synonyms
+    from wordhoard.utilities import caching
+
+    caching.temporary_dict_synonyms.clear()
+    await _login(client)
+    e_phrase = database.db_add_entry("ctx - zero in on")
+    e_linked = database.db_add_entry("ctx - Focus")
+
+    mw_payload = [
+        {
+            "meta": {
+                "id": "zero (in on)",
+                "stems": ["zero (in on)", "zero in on"],
+                "syns": [["focus", "concentrate"]],
+            },
+            "hwi": {"hw": "zero (in on)"},
+            "fl": "verb",
+            "shortdef": ["to direct one's attention to"],
+            "def": [
+                {
+                    "sseq": [
+                        [
+                            [
+                                "sense",
+                                {
+                                    "dt": [["text", "to direct one's attention to"]],
+                                    "sim_list": [[{"wd": "focus"}, {"wd": "concentrate"}]],
+                                },
+                            ]
+                        ]
+                    ]
+                }
+            ],
+        }
+    ]
+
+    class FakeResp:
+        status_code = 200
+
+        def json(self):
+            return mw_payload
+
+    monkeypatch.setattr("wordhoard.synonyms.requests.get", lambda url, timeout: FakeResp())
+    monkeypatch.setattr(utils, "get_mw_thesaurus_api_key", lambda: "fake-key")
+
+    resp = await client.get(f"/show_synonyms/{e_phrase}")
+    assert resp.status_code == 200
+    assert "concentrate" in resp.text
+    assert f'/entry/{e_linked}">focus</a>' in resp.text
+    caching.temporary_dict_synonyms.clear()
+
+

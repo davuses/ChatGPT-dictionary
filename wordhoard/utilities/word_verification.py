@@ -45,8 +45,8 @@ def validate_word_syntax(word: str) -> bool:
     :param word: string to validate
     :return: boolean true or false
     """
-    if len(word) == 0:
+    cleaned = word.strip()
+    if not cleaned:
         return False
-    else:
-        temp = regex.match(pattern=r'^[a-zA-Z-\s]*$', string=word.strip())
-        return bool(temp)
+    temp = regex.match(pattern=r"^[a-zA-Z'\-\s]+$", string=cleaned)
+    return bool(temp)

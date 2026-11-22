@@ -126,12 +126,13 @@ def get_all_words() -> dict[str, list[int]]:
         words: dict[str, list[int]] = {}
         for entry in db_get_all_entries():
             _, word = parse_entry_text(entry.text)
-            if not word:
+            key = word.lower()
+            if not key:
                 continue
-            if ids := words.get(word):
+            if ids := words.get(key):
                 ids.append(entry.id)
             else:
-                words[word] = [entry.id]
+                words[key] = [entry.id]
         cached_all_words = words
         return words
 

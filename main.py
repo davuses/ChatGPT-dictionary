@@ -784,7 +784,7 @@ def show_synonyms(entry_id: int, request: Request):
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
     _, word = parse_entry_text(entry.text)
-    if not word or " " in word:
+    if not word:
         raise HTTPException(status_code=404, detail="Word not valid")
     try:
         senses = get_thesaurus_senses(word)

@@ -23,11 +23,13 @@ __copyright__ = "Copyright (C) 2020 John Bumgarner"
 ##################################################################################
 # Python imports required for basic operations
 ##################################################################################
+import threading
 from typing import Dict, Optional, Tuple
 
 ##################################################################################
 # in memory temporary cache for synonyms
 ##################################################################################
+_cache_lock = threading.Lock()
 temporary_dict_synonyms: Dict[str, list] = {}
 
 
@@ -40,8 +42,10 @@ def cache_synonyms(word: str) -> Tuple[bool, Optional[list]]:
     :return: A tuple indicating success (True if synonyms are cached, False otherwise) and the cached synonyms if found.
     :rtype: Tuple[bool, Optional[list]]
     """
-    success = (retrieved := temporary_dict_synonyms.get(word)) is not None
-    return success, retrieved
+    key = word.strip().lower()
+    with _cache_lock:
+        retrieved = temporary_dict_synonyms.get(key)
+    return retrieved is not None, retrieved
 
 
 def insert_word_cache_synonyms(word: str, synonyms: list) -> None:
@@ -54,5 +58,7 @@ def insert_word_cache_synonyms(word: str, synonyms: list) -> None:
     :type synonyms: list
     :return: None
     """
-    if word not in temporary_dict_synonyms:
-        temporary_dict_synonyms[word] = synonyms
+    key = word.strip().lower()
+    with _cache_lock:
+        if key not in temporary_dict_synonyms:
+            temporary_dict_synonyms[key] = synonyms

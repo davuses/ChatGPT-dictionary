@@ -24,8 +24,9 @@
             <td>{{ sense.meaning_html | safe }}</td>
             <td>
                 {% for syn in sense.synonyms %}
-                {% if syn in all_words %}
-                {% for eid in all_words[syn] %}
+                {% set syn_key = syn.lower() %}
+                {% if syn_key in all_words %}
+                {% for eid in all_words[syn_key] %}
                 <a href="{{ url_for('entry_page', entry_id=eid) }}">{{ syn }}</a>{% if not loop.last %} / {% endif
                 %}{% endfor %}{% else %}{{ syn }}{% endif %}{% if not loop.last %},{% endif %}
                 {% endfor %}
