@@ -142,8 +142,9 @@ async def test_authenticated_editor_has_csrf_and_logout_redirects_to_login(clien
     assert (await client.get("/")).status_code == 303
 
 
-async def test_authenticated_notes_uses_study_notes_title(client, monkeypatch):
+async def test_authenticated_notes_uses_study_notes_title(client, monkeypatch, tmp_path):
     await _login(client, next_path="/notes/")
+    monkeypatch.setattr(main, "get_notes_dir", lambda: tmp_path)
     monkeypatch.setattr(main, "build_directory_tree_markdown", lambda _: "- [Demo](/view_note/demo.md)")
     response = await client.get("/notes/")
     assert response.status_code == 200
