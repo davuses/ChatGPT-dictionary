@@ -156,15 +156,26 @@ async function extractPageCapture(hintWord = "") {
     return segments;
   }
 
-  async function fetchTimedTextSegments() {
+  function getCurrentYouTubeVideoId() {
     const params = new URLSearchParams(window.location.search);
-    const videoId = params.get("v") || "";
+    const vParam = params.get("v");
+    if (vParam) return vParam;
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    if (parts.length >= 2 && ["shorts", "live", "embed"].includes(parts[0])) {
+      return parts[1];
+    }
+    return "";
+  }
+
+  async function fetchTimedTextSegments() {
+    const videoId = getCurrentYouTubeVideoId();
+    if (!videoId) return [];
     const resources = performance.getEntriesByType("resource") || [];
     const timedTextEntries = resources.filter(
       (entry) =>
         typeof entry.name === "string" &&
         entry.name.includes("/api/timedtext") &&
-        (!videoId || entry.name.includes("v=" + videoId))
+        entry.name.includes("v=" + videoId)
     );
     if (!timedTextEntries.length) return [];
 

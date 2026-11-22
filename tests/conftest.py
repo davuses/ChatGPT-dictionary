@@ -2,6 +2,7 @@ import os
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine
 
 
 os.environ.setdefault("DICTIONARY_ADMIN_USERNAME", "test-admin")
@@ -15,7 +16,29 @@ os.environ.setdefault(
 )
 os.environ.setdefault("DICTIONARY_HTTPS_ONLY", "true")
 
+import database  # noqa: E402
 from main import app  # noqa: E402
+import utils  # noqa: E402
+
+
+@pytest.fixture
+def isolated_db(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    test_engine = create_engine(
+        f"sqlite:///{db_path}",
+        future=True,
+        connect_args={"check_same_thread": False},
+    )
+    database.Base.metadata.create_all(test_engine)
+    monkeypatch.setattr(database, "engine", test_engine)
+    utils.invalidate_words_cache()
+    utils.invalidate_quiz_pool_cache()
+    try:
+        yield test_engine
+    finally:
+        utils.invalidate_words_cache()
+        utils.invalidate_quiz_pool_cache()
+        test_engine.dispose()
 
 
 @pytest.fixture

@@ -157,7 +157,9 @@ async def test_authenticated_notes_uses_study_notes_title(client, monkeypatch, t
     assert "IELTS Notes" not in response.text
 
 
-async def test_authenticated_javascript_mutation_requires_csrf_header(client):
+async def test_authenticated_javascript_mutation_requires_csrf_header(
+    client, isolated_db
+):
     await _login(client)
     editor = await client.get("/add_entry")
     csrf_token = _csrf_from_html(editor.text)

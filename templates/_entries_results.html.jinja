@@ -8,6 +8,11 @@
 #}
 {% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
 
+{% if not entry_displays %}
+<p class="entries-empty">
+    {% if search_query %}No matching entries for &ldquo;{{ search_query }}&rdquo;.{% else %}No entries yet.{% endif %}
+</p>
+{% else %}
 {% set table_variant = "only" if entries_only else ("examples" if show_example else "default") %}
 <table class="entries-table entries-table--{{ table_variant }}">
     {% if entries_only %}
@@ -22,6 +27,7 @@
     {% endif %}
 
 </table>
+{% endif %}
 
 {% if total_pages > 1 %}
 <nav class="pagination" aria-label="Pagination">

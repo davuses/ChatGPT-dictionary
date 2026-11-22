@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import cast
 
 import markdown2
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from fastapi import HTTPException
 from markupsafe import Markup, escape
 from phonemizer import phonemize
@@ -529,11 +529,16 @@ def build_directory_tree_markdown(
             display_name = (
                 filename[:-3] if filename.endswith(".md") else filename
             )
+            safe_label = (
+                display_name.replace("\\", "\\\\")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+            )
             file_url = urllib.parse.quote(
                 str((Path(rel_url_base) / file_path).as_posix())
             )
             markdown_lines.append(
-                f"{indent}- [{display_name}](/view_note/{file_url})"
+                f"{indent}- [{safe_label}](/view_note/{file_url})"
             )
 
     return "\n".join(markdown_lines)
@@ -579,8 +584,7 @@ def get_mw_thesaurus_api_key() -> str:
 def safe_path_note(subpath: str) -> Path:
     """Ensure subpath is within the configured notes directory to avoid directory traversal."""
     notes_dir = get_notes_dir()
-    decoded = urllib.parse.unquote(subpath)
-    final_path = (notes_dir / decoded).resolve()
+    final_path = (notes_dir / subpath).resolve()
     if not final_path.is_relative_to(notes_dir):
         raise HTTPException(status_code=400, detail="Invalid path")
     if not final_path.exists() or not final_path.suffix == ".md":
@@ -661,12 +665,26 @@ def highlight_ipa(html: str) -> str:
     )
     soup = BeautifulSoup(html, "html.parser")
 
-    for text_node in soup.find_all(string=True):
+    for text_node in list(soup.find_all(string=True)):
         parent = text_node.parent
-        if parent.name in ["script", "style", "code", "pre"]:
+        if parent and parent.name in {"script", "style", "code", "pre"}:
             continue
 
-        new_text = ipa_pattern.sub(r'<span class="ipa">\1</span>', text_node)
-        text_node.replace_with(BeautifulSoup(new_text, "html.parser"))
+        raw_text = str(text_node)
+        if not ipa_pattern.search(raw_text):
+            continue
+
+        nodes = []
+        last_end = 0
+        for match in ipa_pattern.finditer(raw_text):
+            if match.start() > last_end:
+                nodes.append(NavigableString(raw_text[last_end : match.start()]))
+            span = soup.new_tag("span", attrs={"class": "ipa"})
+            span.string = match.group(1)
+            nodes.append(span)
+            last_end = match.end()
+        if last_end < len(raw_text):
+            nodes.append(NavigableString(raw_text[last_end:]))
+        text_node.replace_with(*nodes)
 
     return str(soup)

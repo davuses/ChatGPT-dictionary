@@ -1,6 +1,8 @@
+import os
 import time
 from argparse import ArgumentParser
 from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy import (
     Boolean,
@@ -43,8 +45,13 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = Path(
+    os.environ.get("DICTIONARY_DB_PATH", str(BASE_DIR / "dictionary.db"))
+).resolve()
+
 engine = create_engine(
-    "sqlite:///dictionary.db",
+    f"sqlite:///{DB_PATH}",
     # echo=True,
     future=True,
     pool_recycle=3600,

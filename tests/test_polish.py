@@ -303,6 +303,47 @@ async def test_synonyms_handles_sim_list_stems_and_phrases(
     caching.temporary_dict_synonyms.clear()
 
 
+def test_highlight_ipa_preserves_escaped_html_and_wraps_ipa():
+    raw = "<p>Use &lt;script&gt;alert(1)&lt;/script&gt; with /ˈkændər/ safely.</p>"
+    result = utils.highlight_ipa(raw)
+    assert "<script>" not in result
+    assert "&lt;script&gt;" in result
+    assert '<span class="ipa">/ˈkændər/</span>' in result
+
+
+async def test_notes_special_chars_and_entries_edge_cases(
+    client, isolated_db, monkeypatch, tmp_path
+):
+    await _login(client)
+    note_file = tmp_path / "C# 100% notes.md"
+    note_file.write_text("# Notes", encoding="utf-8")
+    monkeypatch.setattr(utils, "get_notes_dir", lambda: tmp_path)
+
+    view_resp = await client.get("/view_note/C%23%20100%25%20notes.md")
+    assert view_resp.status_code == 200
+    assert "/edit_note/C%23%20100%25%20notes.md" in view_resp.text
+
+    # Page clamping + empty search state
+    database.db_add_entry("ctx - alpha")
+    clamped = await client.get("/entries?page=999")
+    assert clamped.status_code == 200
+    assert "alpha" in clamped.text
+
+    empty_search = await client.get("/entries?q=zzznomatch")
+    assert empty_search.status_code == 200
+    assert "No matching entries" in empty_search.text
+
+    # Blank definition rejected with 400
+    csrf_token = _csrf_from_html((await client.get("/add_entry")).text)
+    eid = database.db_add_entry("ctx - beta")
+    blank_def = await client.post(
+        "/add_definition",
+        data={"entry_id": eid, "definition_text": "   ", "csrf_token": csrf_token},
+    )
+    assert blank_def.status_code == 400
+
+
+
 async def test_static_assets_include_content_hash_for_cache_busting(client):
     style_url = main.static_url("style.css")
     script_url = main.static_url("script.js")

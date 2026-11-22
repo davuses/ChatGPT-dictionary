@@ -514,8 +514,13 @@ tr.selected {
   padding: 10px 12px;
 }
 
-.quiz-empty {
+.quiz-empty,
+.entries-empty {
   color: var(--muted);
+}
+
+.entries-empty {
+  margin: 24px 4px;
 }
 
 .content-section {

@@ -267,9 +267,10 @@
                         }
                     });
                 } else if (event.key === "b") {
-                    let length = history.length;
-                    for (let step = length - 1; step > 0; step--) {
-                        history.back(step);
+                    if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
+                        history.back();
+                    } else {
+                        window.location.href = "/entries";
                     }
                 } else if (event.key === "e") {
                     const editBtn = document.getElementById("edit-example");

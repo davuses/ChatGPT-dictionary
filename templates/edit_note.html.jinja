@@ -3,18 +3,18 @@
 {% block title %}Edit Note{% endblock title %}
 
 {% block body %}
-{% set note_link %}<a class="button button-ghost" href="/view_note/{{ note_path }}">Note</a>{% endset %}
+{% set note_link %}<a class="button button-ghost" href="/view_note/{{ note_url_path }}">Note</a>{% endset %}
 {{ page_header(extra_nav=note_link) }}
 <main class="form-page">
 <h1>Edit Note</h1>
 <form method="post"
-    action="/edit_note/{{ note_path }}">
+    action="/edit_note/{{ note_url_path }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <textarea class="markdown-editor" name="note_text">{{ note_text }}</textarea><br>
     <div class="form-actions">
         <input type="submit"
             value="Submit">
-        <a class="button button-ghost" href="/view_note/{{ note_path }}">Cancel</a>
+        <a class="button button-ghost" href="/view_note/{{ note_url_path }}">Cancel</a>
     </div>
 </form>
 </main>

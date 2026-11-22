@@ -32,13 +32,13 @@ My Dictionary
 <nav class="view-tabs" aria-label="Entry views">
     <a class="view-tab {% if not entries_only and not show_example %}active{% endif %}"
         id="tab-all"
-        href="/entries?{{ view_qs('') }}">All</a>
+        href="/entries{{ view_qs('?') }}">All</a>
     <a class="view-tab {% if entries_only %}active{% endif %}"
         id="tab-entries-only"
-        href="/entries?entries_only=true&{{ view_qs('') }}">Entries Only</a>
+        href="/entries?entries_only=true{{ view_qs('&') }}">Entries Only</a>
     <a class="view-tab {% if show_example %}active{% endif %}"
         id="tab-examples"
-        href="/entries?show_example=true&{{ view_qs('') }}">Examples</a>
+        href="/entries?show_example=true{{ view_qs('&') }}">Examples</a>
 </nav>
 
 <div id="results">

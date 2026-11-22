@@ -123,8 +123,9 @@ def static_url(filename: str) -> str:
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(
-    directory="templates", context_processors=[auth_template_context]
+    directory=str(TEMPLATES_DIR), context_processors=[auth_template_context]
 )
 templates.env.globals["static_url"] = static_url
 
@@ -390,7 +391,9 @@ def root_page(request: Request):
 def quiz_next(exclude: str = Query("")):
     question, next_exclude = _next_quiz_question(exclude)
     if not question:
-        return JSONResponse({"question": None})
+        return JSONResponse(
+            {"question": None}, headers={"Cache-Control": "no-store"}
+        )
     return JSONResponse(
         {
             "entry_id": question.entry_id,
@@ -423,6 +426,13 @@ def entries_page(
     entries, total_count = db_get_entries_page(
         query=q, include_examples=show_example, page=page
     )
+    total_pages = max(1, -(-total_count // ENTRIES_PAGE_SIZE))  # ceil div
+    if page > total_pages:
+        page = total_pages
+        if total_count > 0:
+            entries, total_count = db_get_entries_page(
+                query=q, include_examples=show_example, page=page
+            )
     # Stripped once here to match what db_get_entries_page() actually
     # searched on (it strips internally) - highlight_matches() below needs
     # the same value or a leading/trailing-space query would match rows
@@ -454,7 +464,6 @@ def entries_page(
             )
         )
 
-    total_pages = max(1, -(-total_count // ENTRIES_PAGE_SIZE))  # ceil div
     context = {
         "entries_count": total_count,
         "entry_displays": entry_displays,
@@ -669,7 +678,9 @@ def edit_definition(
     form_data: EditDefinitionForm = Depends(EditDefinitionForm.as_form),
 ):
     verify_csrf_value(request, form_data.csrf_token)
-    updated_text = form_data.definition_text
+    updated_text = form_data.definition_text.strip()
+    if not updated_text:
+        raise HTTPException(status_code=400, detail="Definition cannot be empty")
     if entry_id := db_update_definition_text(definition_id, updated_text):
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
     raise HTTPException(status_code=404, detail="Definition not found")
@@ -763,7 +774,9 @@ def add_definition(
     form_data: AddDefinitionForm = Depends(AddDefinitionForm.as_form),
 ):
     verify_csrf_value(request, form_data.csrf_token)
-    updated_text = form_data.definition_text
+    updated_text = form_data.definition_text.strip()
+    if not updated_text:
+        raise HTTPException(status_code=400, detail="Definition cannot be empty")
     entry_id = form_data.entry_id
     if entry := db_get_entry_by_id(entry_id):
         db_add_definition(updated_text, entry=entry)
@@ -880,6 +893,7 @@ def view_note(note_path: str, request: Request) -> _TemplateResponse:
         "note_html": note_html,
         "is_dir": False,
         "toc_exist": toc_exist,
+        "note_url_path": urllib.parse.quote(note_path, safe="/"),
         "needs_markdown_css": True,
     }
     return templates.TemplateResponse(
@@ -894,6 +908,7 @@ def edit_note_page(note_path: str, request: Request):
     context = {
         "note_text": content,
         "note_path": note_path,
+        "note_url_path": urllib.parse.quote(note_path, safe="/"),
         "needs_editor": True,
     }
     return templates.TemplateResponse(
@@ -913,7 +928,7 @@ def edit_note(
     try:
         full_path.write_text(updated_text, encoding="utf-8")
         return RedirectResponse(
-            url=request.url_for("view_note", note_path=note_path),
+            url=f"/view_note/{urllib.parse.quote(note_path, safe='/')}",
             status_code=303,
         )
     except OSError:
