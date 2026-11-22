@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1f6f8b"/>
+      <stop offset="100%" stop-color="#123d4f"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14.5" fill="url(#bg)"/>
+  <!-- Outer book cover -->
+  <path d="M12 20h3v24h13.5l2 2.2h3l2-2.2H49V20h3v26a2 2 0 0 1-2 2H37l-2.2 2.4h-5.6L27 48H14a2 2 0 0 1-2-2V20z" fill="#f5f5ec"/>
+  <!-- Left page -->
+  <path d="M16.5 17.5c4.8-1.4 10.6-1 14 2.3V43c-3.4-2.5-9.2-2.9-14-1.6V17.5z" fill="#f5f5ec"/>
+  <!-- Right page -->
+  <path d="M47.5 17.5c-4.8-1.4-10.6-1-14 2.3V43c3.4-2.5 9.2-2.9 14-1.6V17.5z" fill="#f5f5ec"/>
+  <!-- Bookmark ribbon -->
+  <path d="M38.5 42.5h6.5v12.5l-3.25-3.2L38.5 55V42.5z" fill="#e5a22e"/>
+</svg>

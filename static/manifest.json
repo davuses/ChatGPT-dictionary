@@ -1,15 +1,20 @@
 {
-  "name": "Dictionary",
-  "short_name": "Dictionary",
-  "description": "Dictionary",
+  "name": "My Dictionary",
+  "short_name": "My Dictionary",
+  "description": "Personal English vocabulary builder and active-recall web app",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#1f6f8b",
   "icons": [
     {
-      "src": "/favicon.ico",
+      "src": "/static/icon-192.png",
       "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ],
