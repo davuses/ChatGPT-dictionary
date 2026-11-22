@@ -344,6 +344,17 @@ a:hover {
   padding: 8px;
 }
 
+.sp-jot-lookup {
+  margin-left: 0;
+  margin-top: 8px;
+}
+
+.sp-item-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 4px 0 0 20px;
+}
+
 .sp-lookup-ipa {
   color: var(--muted);
   font-size: 12px;

@@ -43,22 +43,27 @@
       </div>
       <form id="jot-form">
         <input id="jot-word" class="sp-input" type="text" placeholder="Word or phrase (e.g. finances)" autocomplete="off" required>
-        <textarea id="jot-context" class="sp-textarea sp-context-input" rows="3" placeholder="Context sentence (optional)"></textarea>
+        <textarea id="jot-context" class="sp-textarea sp-context-input" rows="3" placeholder="Context sentence (optional — Ctrl+Enter to save)"></textarea>
         <div id="jot-ts-row" class="sp-ts-row" hidden>
           <span id="jot-ts-label" class="sp-pill"></span>
           <button id="clear-ts-btn" class="sp-link-btn" type="button">Clear timestamp</button>
         </div>
         <div class="sp-row">
-          <button class="sp-btn sp-btn-primary" type="submit">Jot word</button>
+          <button id="jot-submit-btn" class="sp-btn sp-btn-primary" type="submit">Jot word</button>
+          <button id="jot-lookup-btn" class="sp-btn sp-btn-ghost" type="button">Lookup</button>
           <span id="jot-status" class="sp-status"></span>
         </div>
+        <div id="jot-lookup-box" class="sp-lookup-box sp-jot-lookup" hidden></div>
       </form>
     </section>
 
     <section class="sp-card">
       <div class="sp-section-head">
         <h2>Captured words <span id="items-count" class="sp-count"></span></h2>
-        <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden>Add selected</button>
+        <div class="sp-row">
+          <button id="toggle-select-all-btn" class="sp-link-btn" type="button" hidden>Select all</button>
+          <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden>Add selected</button>
+        </div>
       </div>
       <p id="items-empty" class="sp-empty">No words jotted for this page yet.</p>
       <ul id="items-list" class="sp-items"></ul>

@@ -6,12 +6,14 @@ const state = {
   canonicalUrl: "",
   title: "",
   items: [],
+  itemErrors: new Map(),
   selectedIds: new Set(),
   pendingTimestamp: null,
   notesDirty: false,
   notesSaveTimer: null,
   pendingSavePayload: null,
   loadAbortController: null,
+  loadGeneration: 0,
 };
 
 const els = {
@@ -30,6 +32,9 @@ const els = {
   jotForm: document.getElementById("jot-form"),
   jotWord: document.getElementById("jot-word"),
   jotContext: document.getElementById("jot-context"),
+  jotSubmitBtn: document.getElementById("jot-submit-btn"),
+  jotLookupBtn: document.getElementById("jot-lookup-btn"),
+  jotLookupBox: document.getElementById("jot-lookup-box"),
   jotTsRow: document.getElementById("jot-ts-row"),
   jotTsLabel: document.getElementById("jot-ts-label"),
   clearTsBtn: document.getElementById("clear-ts-btn"),
@@ -37,6 +42,7 @@ const els = {
   itemsCount: document.getElementById("items-count"),
   itemsEmpty: document.getElementById("items-empty"),
   itemsList: document.getElementById("items-list"),
+  toggleSelectAllBtn: document.getElementById("toggle-select-all-btn"),
   promoteSelectedBtn: document.getElementById("promote-selected-btn"),
   promoteStatus: document.getElementById("promote-status"),
   notesTextarea: document.getElementById("notes-textarea"),
@@ -213,7 +219,7 @@ async function saveSettings() {
   }
 }
 
-async function flushPendingNotesSave() {
+async function flushPendingNotesSave({ keepalive = false } = {}) {
   if (state.notesSaveTimer) {
     clearTimeout(state.notesSaveTimer);
     state.notesSaveTimer = null;
@@ -225,13 +231,21 @@ async function flushPendingNotesSave() {
   try {
     await apiRequest("/api/v1/page-note", {
       method: "PUT",
+      keepalive,
       body: JSON.stringify(payload),
     });
     if (state.rawUrl === payload.url || state.canonicalUrl === payload.url) {
       setStatus(els.notesStatus, "Saved");
     }
   } catch (err) {
-    setStatus(els.notesStatus, "Save failed: " + err.message, true);
+    // Restore pending payload so a failed save can be retried unless superseded
+    if (!state.notesDirty) {
+      state.notesDirty = true;
+      state.pendingSavePayload = payload;
+    }
+    if (state.rawUrl === payload.url || state.canonicalUrl === payload.url) {
+      setStatus(els.notesStatus, "Save failed: " + err.message, true);
+    }
   }
 }
 
@@ -251,10 +265,21 @@ function scheduleNotesSave() {
 }
 
 function updatePromoteButton() {
+  const unpromotedIds = state.items
+    .filter((it) => !it.promoted_entry_id)
+    .map((it) => it.id);
   const count = state.selectedIds.size;
   els.promoteSelectedBtn.hidden = count === 0;
   els.promoteSelectedBtn.textContent =
     count > 0 ? `Add selected (${count})` : "Add selected";
+
+  if (unpromotedIds.length > 0) {
+    const allSelected = unpromotedIds.every((id) => state.selectedIds.has(id));
+    els.toggleSelectAllBtn.hidden = false;
+    els.toggleSelectAllBtn.textContent = allSelected ? "Select none" : "Select all";
+  } else {
+    els.toggleSelectAllBtn.hidden = true;
+  }
 }
 
 function renderItems() {
@@ -347,6 +372,14 @@ function renderItems() {
       def.className = "sp-item-def";
       def.textContent = item.definition_text;
       li.appendChild(def);
+    }
+
+    const itemError = state.itemErrors.get(item.id);
+    if (itemError) {
+      const errP = document.createElement("p");
+      errP.className = "sp-item-error";
+      errP.textContent = itemError;
+      li.appendChild(errP);
     }
 
     li.appendChild(createDictionaryLinksRow(item.word));
@@ -480,22 +513,22 @@ function toggleEditBox(li, item) {
   li.appendChild(box);
 }
 
-async function toggleLookupBox(li, word) {
-  const existing = li.querySelector(".sp-lookup-box");
-  if (existing) {
-    existing.remove();
-    return;
-  }
-  const box = document.createElement("div");
-  box.className = "sp-lookup-box";
+async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {}) {
+  box.replaceChildren();
   box.textContent = "Looking up…";
-  li.appendChild(box);
+  box.hidden = false;
 
   try {
     const data = await apiRequest(
       "/api/v1/lookup?word=" + encodeURIComponent(word)
     );
     box.replaceChildren();
+
+    if (includeDictLinks) {
+      const linksRow = createDictionaryLinksRow(word);
+      linksRow.style.margin = "0 0 6px 0";
+      box.appendChild(linksRow);
+    }
 
     if (data.ipa) {
       const ipaEl = document.createElement("div");
@@ -567,9 +600,49 @@ async function toggleLookupBox(li, word) {
   }
 }
 
+async function toggleLookupBox(li, word) {
+  const existing = li.querySelector(".sp-lookup-box");
+  if (existing) {
+    existing.remove();
+    return;
+  }
+  const box = document.createElement("div");
+  box.className = "sp-lookup-box";
+  li.appendChild(box);
+  await renderLookupIntoBox(box, word);
+}
+
+function samePageUrl(urlA, urlB) {
+  if (!urlA || !urlB) return false;
+  if (urlA === urlB) return true;
+  try {
+    const a = new URL(urlA);
+    const b = new URL(urlB);
+    if (isYouTubeUrl(urlA) && isYouTubeUrl(urlB)) {
+      const vid = (u) => {
+        if (u.hostname.toLowerCase() === "youtu.be") {
+          return u.pathname.split("/").filter(Boolean)[0] || "";
+        }
+        if (u.searchParams.get("v")) return u.searchParams.get("v");
+        const parts = u.pathname.split("/").filter(Boolean);
+        return parts.length >= 2 && ["shorts", "live", "embed"].includes(parts[0])
+          ? parts[1]
+          : "";
+      };
+      const va = vid(a);
+      const vb = vid(b);
+      if (va && vb) return va === vb;
+    }
+    return a.origin === b.origin && a.pathname === b.pathname;
+  } catch {
+    return false;
+  }
+}
+
 async function loadPageForTab(tab) {
   await flushPendingNotesSave();
 
+  const gen = ++state.loadGeneration;
   if (state.loadAbortController) {
     state.loadAbortController.abort();
   }
@@ -579,8 +652,14 @@ async function loadPageForTab(tab) {
   state.title = tab && tab.title ? tab.title : "";
   state.canonicalUrl = "";
   state.items = [];
+  state.itemErrors.clear();
   state.selectedIds.clear();
+  els.jotWord.value = "";
+  els.jotContext.value = "";
+  els.jotLookupBox.hidden = true;
+  els.jotLookupBox.replaceChildren();
   setPendingTimestamp(null);
+  setStatus(els.jotStatus, "");
   setStatus(els.promoteStatus, "");
   setStatus(els.notesStatus, "");
 
@@ -616,7 +695,7 @@ async function loadPageForTab(tab) {
       "&title=" +
       encodeURIComponent(state.title);
     const data = await apiRequest(query, { signal: controller.signal });
-    if (controller.signal.aborted) return;
+    if (controller.signal.aborted || gen !== state.loadGeneration) return;
 
     state.canonicalUrl = data.url || state.rawUrl;
     els.pageUrl.textContent = state.canonicalUrl;
@@ -626,7 +705,7 @@ async function loadPageForTab(tab) {
     state.pendingSavePayload = null;
     renderItems();
   } catch (err) {
-    if (err.name === "AbortError") return;
+    if (err.name === "AbortError" || gen !== state.loadGeneration) return;
     showNotice("Could not load page notes: " + err.message, true);
   }
 }
@@ -636,8 +715,16 @@ async function refreshActiveTab() {
   await loadPageForTab(tab || null);
 }
 
-function applyCapturedPayload(captured) {
+function applyCapturedPayload(captured, { verifyTabUrl = false } = {}) {
   if (!captured) return;
+  if (
+    verifyTabUrl &&
+    captured.url &&
+    state.rawUrl &&
+    !samePageUrl(captured.url, state.rawUrl)
+  ) {
+    return;
+  }
   if (captured.word) els.jotWord.value = captured.word;
   if (captured.context) els.jotContext.value = captured.context;
   setPendingTimestamp(captured.timestampSeconds);
@@ -663,7 +750,7 @@ async function consumePendingCapture() {
   if (!stored.pendingCapture) return;
   const captured = stored.pendingCapture;
   await chrome.storage.session.remove("pendingCapture");
-  applyCapturedPayload(captured);
+  applyCapturedPayload(captured, { verifyTabUrl: true });
 }
 
 els.toggleSettingsBtn.addEventListener("click", () => {
@@ -673,11 +760,45 @@ els.toggleSettingsBtn.addEventListener("click", () => {
 els.saveSettingsBtn.addEventListener("click", saveSettings);
 els.clearTsBtn.addEventListener("click", () => setPendingTimestamp(null));
 
+els.jotLookupBtn.addEventListener("click", async () => {
+  const word = els.jotWord.value.trim();
+  if (!word) {
+    setStatus(els.jotStatus, "Type a word first to look it up.", true);
+    els.jotWord.focus();
+    return;
+  }
+  if (!hasConfig()) return;
+  setStatus(els.jotStatus, "");
+  await renderLookupIntoBox(els.jotLookupBox, word, { includeDictLinks: true });
+});
+
+els.jotContext.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    els.jotForm.requestSubmit();
+  }
+});
+
+els.toggleSelectAllBtn.addEventListener("click", () => {
+  const unpromotedIds = state.items
+    .filter((it) => !it.promoted_entry_id)
+    .map((it) => it.id);
+  const allSelected = unpromotedIds.every((id) => state.selectedIds.has(id));
+  if (allSelected) {
+    state.selectedIds.clear();
+  } else {
+    unpromotedIds.forEach((id) => state.selectedIds.add(id));
+  }
+  renderItems();
+});
+
 els.grabPageBtn.addEventListener("click", () => {
+  const gen = state.loadGeneration;
   setStatus(els.jotStatus, "Grabbing…");
   chrome.runtime.sendMessage(
     { type: "grabFromActiveTab", hintWord: els.jotWord.value.trim() },
     (resp) => {
+      if (gen !== state.loadGeneration) return;
       if (chrome.runtime.lastError || !resp || !resp.ok) {
         setStatus(
           els.jotStatus,
@@ -687,34 +808,37 @@ els.grabPageBtn.addEventListener("click", () => {
         return;
       }
       setStatus(els.jotStatus, "");
-      applyCapturedPayload(resp.data);
+      applyCapturedPayload(resp.data, { verifyTabUrl: true });
     }
   );
 });
 
 els.jotForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!hasConfig() || !isHttpUrl(state.rawUrl)) return;
+  if (!hasConfig() || !isHttpUrl(state.rawUrl) || els.jotSubmitBtn.disabled) return;
   const word = els.jotWord.value.trim();
   if (!word) return;
 
-  // Read fresh active tab title lazily on save (handles YouTube SPA title lag)
+  const gen = state.loadGeneration;
+  const targetUrl = state.canonicalUrl || state.rawUrl;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const freshTitle = (tab && tab.title) || state.title;
-  state.title = freshTitle;
+  if (gen === state.loadGeneration) state.title = freshTitle;
 
+  els.jotSubmitBtn.disabled = true;
   setStatus(els.jotStatus, "Saving…");
   try {
     const resp = await apiRequest("/api/v1/page-note/items", {
       method: "POST",
       body: JSON.stringify({
-        url: state.canonicalUrl || state.rawUrl,
+        url: targetUrl,
         title: freshTitle,
         word,
         context: els.jotContext.value.trim(),
         timestamp_seconds: state.pendingTimestamp,
       }),
     });
+    if (gen !== state.loadGeneration) return;
     if (resp.item) {
       state.items.push(resp.item);
       state.selectedIds.add(resp.item.id);
@@ -722,33 +846,50 @@ els.jotForm.addEventListener("submit", async (event) => {
     }
     els.jotWord.value = "";
     els.jotContext.value = "";
+    els.jotLookupBox.hidden = true;
+    els.jotLookupBox.replaceChildren();
     setPendingTimestamp(null);
     setStatus(els.jotStatus, "Saved");
     els.jotWord.focus();
   } catch (err) {
-    setStatus(els.jotStatus, err.message, true);
+    if (gen === state.loadGeneration) {
+      setStatus(els.jotStatus, err.message, true);
+    }
+  } finally {
+    els.jotSubmitBtn.disabled = false;
   }
 });
 
 els.promoteSelectedBtn.addEventListener("click", async () => {
   const itemIds = Array.from(state.selectedIds);
-  if (!itemIds.length) return;
+  if (!itemIds.length || els.promoteSelectedBtn.disabled) return;
+  const gen = state.loadGeneration;
+  els.promoteSelectedBtn.disabled = true;
   setStatus(els.promoteStatus, "Adding to dictionary…");
   try {
     const resp = await apiRequest("/api/v1/page-note/promote", {
       method: "POST",
       body: JSON.stringify({ item_ids: itemIds }),
     });
+    if (gen !== state.loadGeneration) return;
     const byId = new Map((resp.results || []).map((r) => [r.item_id, r]));
     let created = 0;
     let duplicates = 0;
-    let errors = 0;
+    const errorMessages = [];
     state.items = state.items.map((item) => {
       const r = byId.get(item.id);
       if (!r) return item;
-      if (r.status === "created") created += 1;
-      else if (r.status === "duplicate" || r.status === "already_promoted") duplicates += 1;
-      else errors += 1;
+      if (r.status === "created") {
+        created += 1;
+        state.itemErrors.delete(item.id);
+      } else if (r.status === "duplicate" || r.status === "already_promoted") {
+        duplicates += 1;
+        state.itemErrors.delete(item.id);
+      } else {
+        const msg = r.error || r.status || "Failed";
+        state.itemErrors.set(item.id, msg);
+        errorMessages.push(`${item.word}: ${msg}`);
+      }
       if (r.entry_id) {
         return Object.assign({}, item, { promoted_entry_id: r.entry_id });
       }
@@ -759,10 +900,14 @@ els.promoteSelectedBtn.addEventListener("click", async () => {
     const parts = [];
     if (created) parts.push(`${created} added`);
     if (duplicates) parts.push(`${duplicates} linked to existing`);
-    if (errors) parts.push(`${errors} failed`);
-    setStatus(els.promoteStatus, parts.join(", ") || "Done", errors > 0);
+    if (errorMessages.length) parts.push(errorMessages.join("; "));
+    setStatus(els.promoteStatus, parts.join(" · ") || "Done", errorMessages.length > 0);
   } catch (err) {
-    setStatus(els.promoteStatus, "Promote failed: " + err.message, true);
+    if (gen === state.loadGeneration) {
+      setStatus(els.promoteStatus, "Promote failed: " + err.message, true);
+    }
+  } finally {
+    els.promoteSelectedBtn.disabled = false;
   }
 });
 
@@ -770,7 +915,7 @@ els.notesTextarea.addEventListener("input", scheduleNotesSave);
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    flushPendingNotesSave();
+    flushPendingNotesSave({ keepalive: true });
   }
 });
 
