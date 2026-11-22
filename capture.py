@@ -10,7 +10,9 @@ from database import (
     CaptureItemRecord,
     PageNoteRecord,
     db_add_capture_item,
+    db_clear_promoted_items,
     db_delete_capture_item,
+    db_delete_page_note,
     db_get_entries_by_ids,
     db_get_page_note_by_url,
     db_promote_capture_items,
@@ -59,6 +61,10 @@ class UpdateCaptureItemRequest(BaseModel):
 
 class PromoteItemsRequest(BaseModel):
     item_ids: list[int] = Field(default_factory=list)
+
+
+class ClearPromotedRequest(BaseModel):
+    note_id: Optional[int] = None
 
 
 def _canonical_url_or_400(raw_url: str) -> str:
@@ -133,6 +139,20 @@ def put_page_note(payload: UpsertPageNoteRequest):
         ),
         headers={"Cache-Control": "no-store"},
     )
+
+
+@api_router.delete("/page-note/{note_id}", response_class=JSONResponse)
+def delete_page_note(note_id: int):
+    if not db_delete_page_note(note_id):
+        raise HTTPException(status_code=404, detail="Page note not found")
+    return JSONResponse({"message": "deleted"}, headers={"Cache-Control": "no-store"})
+
+
+@api_router.post("/page-note/clear-promoted", response_class=JSONResponse)
+def clear_promoted_items(payload: Optional[ClearPromotedRequest] = None):
+    note_id = payload.note_id if payload is not None else None
+    deleted = db_clear_promoted_items(note_id)
+    return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
 
 
 @api_router.post("/page-note/items", response_class=JSONResponse, status_code=201)

@@ -917,6 +917,12 @@ input[type="submit"]:hover {
 }
 
 /* Capture inbox (/inbox) */
+.inbox-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
 .inbox-note-header {
   align-items: flex-start;
   display: flex;
@@ -924,6 +930,18 @@ input[type="submit"]:hover {
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 10px;
+}
+
+.inbox-note-meta {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.inbox-note-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .inbox-note-title {
@@ -953,6 +971,11 @@ input[type="submit"]:hover {
   padding: 10px 0;
 }
 
+.inbox-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .inbox-item.is-promoted {
   opacity: 0.72;
 }
@@ -965,7 +988,8 @@ input[type="submit"]:hover {
 }
 
 .inbox-ts-badge,
-.inbox-promoted-badge {
+.inbox-promoted-badge,
+.inbox-existing-badge {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -973,11 +997,63 @@ input[type="submit"]:hover {
   padding: 2px 8px;
 }
 
+.inbox-existing-badge {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+  font-weight: 600;
+}
+
 .inbox-item-context,
 .inbox-item-def {
   color: var(--muted);
   font-size: 15px;
   margin: 4px 0 0;
+}
+
+.inbox-item-error {
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+
+.inbox-edit-form {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+}
+
+.inbox-edit-label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 4px;
+}
+
+.inbox-edit-form input,
+.inbox-edit-form textarea,
+.inbox-scratchpad-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.inbox-edit-actions,
+.inbox-scratchpad-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .inbox-dict-links {
@@ -1021,12 +1097,11 @@ input[type="submit"]:hover {
   font-weight: 600;
 }
 
-.inbox-scratchpad-body {
-  background: var(--surface);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 15px;
-  margin: 8px 0 0;
-  padding: 10px 12px;
-  white-space: pre-wrap;
+.inbox-scratchpad-editor {
+  margin-top: 8px;
+}
+
+.inbox-scratchpad-status {
+  color: var(--muted);
+  font-size: 13px;
 }

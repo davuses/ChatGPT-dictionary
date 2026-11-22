@@ -939,8 +939,17 @@ def edit_note(
 @protected_router.get("/inbox", response_class=HTMLResponse)
 def inbox_page(request: Request):
     page_notes = db_list_page_notes()
+    all_words = get_all_words()
+    promoted_count = sum(
+        1
+        for note in page_notes
+        for item in note.items
+        if item.promoted_entry_id is not None
+    )
     context = {
         "page_notes": page_notes,
+        "all_words": all_words,
+        "promoted_count": promoted_count,
     }
     return templates.TemplateResponse(
         request=request, name="inbox.html.jinja", context=context

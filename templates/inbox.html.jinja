@@ -14,6 +14,14 @@
 {{ page_header(subtitle="Per-page notes and words captured from Chrome", active="inbox", show_add=True) }}
 
 <main class="inbox-page">
+    {% if promoted_count %}
+    <div class="inbox-toolbar">
+        <button type="button" class="button button-ghost" id="inbox-clear-promoted">
+            Clear promoted ({{ promoted_count }})
+        </button>
+    </div>
+    {% endif %}
+
     {% if not page_notes %}
     <section class="card">
         <h2>Inbox is empty</h2>
@@ -21,28 +29,43 @@
     </section>
     {% else %}
     {% for note in page_notes %}
-    <section class="card inbox-note-card" data-note-id="{{ note.id }}">
+    <section class="card inbox-note-card"
+        data-note-id="{{ note.id }}"
+        data-note-url="{{ note.url }}"
+        data-note-title="{{ note.title }}">
         <div class="inbox-note-header">
-            <div>
+            <div class="inbox-note-meta">
                 <h2 class="inbox-note-title">
                     <a href="{{ note.url }}" target="_blank" rel="noopener noreferrer">{{ note.title or note.url }}</a>
                 </h2>
                 <p class="inbox-note-url">{{ note.url }}</p>
             </div>
-            {% set unpromoted = note.items | selectattr("promoted_entry_id", "none") | list %}
-            {% if unpromoted %}
-            <button type="button"
-                class="button button-primary inbox-promote-all"
-                data-item-ids="{{ unpromoted | map(attribute='id') | join(',') }}">
-                Add all ({{ unpromoted | length }})
-            </button>
-            {% endif %}
+            <div class="inbox-note-actions">
+                {% set unpromoted = note.items | selectattr("promoted_entry_id", "none") | list %}
+                {% if unpromoted %}
+                <button type="button"
+                    class="button button-primary inbox-promote-all"
+                    data-item-ids="{{ unpromoted | map(attribute='id') | join(',') }}">
+                    Add all ({{ unpromoted | length }})
+                </button>
+                {% endif %}
+                <button type="button"
+                    class="button button-danger inbox-delete-note"
+                    data-note-id="{{ note.id }}">
+                    Delete page
+                </button>
+            </div>
         </div>
 
         {% if note.items %}
         <ul class="inbox-item-list">
             {% for item in note.items %}
-            <li class="inbox-item{% if item.promoted_entry_id %} is-promoted{% endif %}" data-item-id="{{ item.id }}">
+            {% set existing_ids = all_words.get(item.word.strip().lower(), []) %}
+            <li class="inbox-item{% if item.promoted_entry_id %} is-promoted{% endif %}"
+                data-item-id="{{ item.id }}"
+                data-word="{{ item.word }}"
+                data-context="{{ item.context }}"
+                data-definition="{{ item.definition_text }}">
                 <div class="inbox-item-main">
                     <div class="inbox-item-head">
                         <strong class="inbox-item-word">{{ item.word }}</strong>
@@ -52,6 +75,10 @@
                         {% endif %}
                         {% if item.promoted_entry_id %}
                         <a class="inbox-promoted-badge" href="/entry/{{ item.promoted_entry_id }}">Added &rarr;</a>
+                        {% elif existing_ids %}
+                        {% for eid in existing_ids %}
+                        <a class="inbox-existing-badge" href="/entry/{{ eid }}">In dictionary{% if existing_ids | length > 1 %} #{{ loop.index }}{% endif %}</a>
+                        {% endfor %}
                         {% endif %}
                     </div>
                     {% if item.context %}
@@ -66,9 +93,29 @@
                         <a class="inbox-dict-link" href="https://www.ldoceonline.com/search/english/direct/?q={{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Longman Dictionary">Longman</a>
                         <a class="inbox-dict-link" href="https://www.merriam-webster.com/dictionary/{{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Merriam-Webster">MW</a>
                     </div>
+                    <p class="inbox-item-error form-error" role="alert" hidden></p>
+                    <form class="inbox-edit-form" hidden>
+                        <label class="inbox-edit-label">
+                            <span>Word</span>
+                            <input type="text" name="word" value="{{ item.word }}" required>
+                        </label>
+                        <label class="inbox-edit-label">
+                            <span>Context</span>
+                            <textarea name="context" rows="2">{{ item.context }}</textarea>
+                        </label>
+                        <label class="inbox-edit-label">
+                            <span>Definition</span>
+                            <textarea name="definition_text" rows="2" placeholder="Optional definition">{{ item.definition_text }}</textarea>
+                        </label>
+                        <div class="inbox-edit-actions">
+                            <button type="submit" class="button button-primary">Save</button>
+                            <button type="button" class="button button-ghost inbox-edit-cancel">Cancel</button>
+                        </div>
+                    </form>
                 </div>
                 <div class="inbox-item-actions">
                     {% if not item.promoted_entry_id %}
+                    <button type="button" class="button button-ghost inbox-edit-toggle">Edit</button>
                     <button type="button" class="button button-ghost inbox-promote-one" data-item-id="{{ item.id }}">Add</button>
                     {% endif %}
                     <button type="button" class="button button-danger inbox-delete-one" data-item-id="{{ item.id }}">Delete</button>
@@ -78,12 +125,16 @@
         </ul>
         {% endif %}
 
-        {% if note.notes_md %}
-        <details class="inbox-scratchpad" open>
+        <details class="inbox-scratchpad"{% if note.notes_md %} open{% endif %}>
             <summary>Page scratchpad</summary>
-            <pre class="inbox-scratchpad-body">{{ note.notes_md }}</pre>
+            <div class="inbox-scratchpad-editor">
+                <textarea class="inbox-scratchpad-input" rows="4" placeholder="Freeform Markdown notes for this page...">{{ note.notes_md }}</textarea>
+                <div class="inbox-scratchpad-actions">
+                    <button type="button" class="button button-ghost inbox-save-notes">Save notes</button>
+                    <span class="inbox-scratchpad-status" aria-live="polite"></span>
+                </div>
+            </div>
         </details>
-        {% endif %}
     </section>
     {% endfor %}
     {% endif %}
@@ -91,27 +142,132 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    function promoteIds(itemIds) {
+    function showItemError(itemId, message) {
+        const li = document.querySelector('.inbox-item[data-item-id="' + itemId + '"]');
+        if (!li) return;
+        const errEl = li.querySelector(".inbox-item-error");
+        if (!errEl) return;
+        if (message) {
+            errEl.textContent = message;
+            errEl.hidden = false;
+        } else {
+            errEl.textContent = "";
+            errEl.hidden = true;
+        }
+    }
+
+    function markItemPromoted(itemId, entryId) {
+        const li = document.querySelector('.inbox-item[data-item-id="' + itemId + '"]');
+        if (!li) return;
+        li.classList.add("is-promoted");
+        showItemError(itemId, "");
+        li.querySelectorAll(".inbox-promote-one, .inbox-edit-toggle, .inbox-existing-badge").forEach((el) => el.remove());
+        const head = li.querySelector(".inbox-item-head");
+        if (head && entryId && !head.querySelector(".inbox-promoted-badge")) {
+            const link = document.createElement("a");
+            link.className = "inbox-promoted-badge";
+            link.href = "/entry/" + encodeURIComponent(entryId);
+            link.textContent = "Added \u2192";
+            head.appendChild(link);
+        }
+    }
+
+    function promoteIds(itemIds, triggerBtn) {
+        if (triggerBtn) triggerBtn.disabled = true;
+        itemIds.forEach((id) => showItemError(id, ""));
         fetchJson("/api/v1/page-note/promote", {
             method: "POST",
             headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
             body: JSON.stringify({ item_ids: itemIds }),
         })
-            .then(() => location.reload())
+            .then((data) => {
+                const results = (data && data.results) || [];
+                const failures = results.filter((r) => r.status === "error" || r.status === "not_found");
+                if (failures.length === 0) {
+                    location.reload();
+                    return;
+                }
+                results.forEach((r) => {
+                    if (r.status === "error") {
+                        showItemError(r.item_id, r.error || "Could not add this word.");
+                    } else if (r.status === "not_found") {
+                        showItemError(r.item_id, "Item no longer exists.");
+                    } else if (r.entry_id) {
+                        markItemPromoted(r.item_id, r.entry_id);
+                    }
+                });
+                if (triggerBtn) triggerBtn.disabled = false;
+            })
             .catch((err) => {
                 console.error(err);
-                alert("Failed to promote item(s).");
+                itemIds.forEach((id) => showItemError(id, "Failed to promote item."));
+                if (triggerBtn) triggerBtn.disabled = false;
             });
     }
 
     document.querySelectorAll(".inbox-promote-one").forEach((btn) => {
-        btn.addEventListener("click", () => promoteIds([Number(btn.dataset.itemId)]));
+        btn.addEventListener("click", () => promoteIds([Number(btn.dataset.itemId)], btn));
     });
 
     document.querySelectorAll(".inbox-promote-all").forEach((btn) => {
         btn.addEventListener("click", () => {
             const ids = btn.dataset.itemIds.split(",").map(Number).filter(Boolean);
-            if (ids.length) promoteIds(ids);
+            if (ids.length) promoteIds(ids, btn);
+        });
+    });
+
+    document.querySelectorAll(".inbox-edit-toggle").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const li = btn.closest(".inbox-item");
+            if (!li) return;
+            const form = li.querySelector(".inbox-edit-form");
+            if (!form) return;
+            form.hidden = !form.hidden;
+            if (!form.hidden) {
+                const wordInput = form.querySelector('input[name="word"]');
+                if (wordInput) wordInput.focus();
+            }
+        });
+    });
+
+    document.querySelectorAll(".inbox-edit-cancel").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const form = btn.closest(".inbox-edit-form");
+            if (form) form.hidden = true;
+        });
+    });
+
+    document.querySelectorAll(".inbox-edit-form").forEach((form) => {
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const li = form.closest(".inbox-item");
+            if (!li) return;
+            const itemId = li.dataset.itemId;
+            const word = form.querySelector('input[name="word"]').value.trim();
+            const context = form.querySelector('textarea[name="context"]').value;
+            const definitionText = form.querySelector('textarea[name="definition_text"]').value;
+            if (!word) {
+                showItemError(itemId, "Word cannot be empty.");
+                return;
+            }
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+            showItemError(itemId, "");
+            fetchJson("/api/v1/page-note/items/" + encodeURIComponent(itemId), {
+                method: "PATCH",
+                headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
+                body: JSON.stringify({
+                    word: word,
+                    context: context,
+                    definition_text: definitionText,
+                }),
+            })
+                .then(() => location.reload())
+                .catch((err) => {
+                    console.error(err);
+                    showItemError(itemId, "Failed to update item.");
+                    if (submitBtn) submitBtn.disabled = false;
+                });
         });
     });
 
@@ -127,6 +283,73 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (resp.ok) location.reload();
                 })
                 .catch((err) => console.error(err));
+        });
+    });
+
+    document.querySelectorAll(".inbox-delete-note").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            if (!confirm("Delete this page note and all of its captured items?")) return;
+            fetch("/api/v1/page-note/" + encodeURIComponent(btn.dataset.noteId), {
+                method: "DELETE",
+                headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
+            })
+                .then(handleProtectedResponse)
+                .then((resp) => {
+                    if (resp.ok) location.reload();
+                })
+                .catch((err) => console.error(err));
+        });
+    });
+
+    const clearPromotedBtn = document.getElementById("inbox-clear-promoted");
+    if (clearPromotedBtn) {
+        clearPromotedBtn.addEventListener("click", () => {
+            if (!confirm("Remove all already-added items from the inbox?")) return;
+            clearPromotedBtn.disabled = true;
+            fetchJson("/api/v1/page-note/clear-promoted", {
+                method: "POST",
+                headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
+                body: JSON.stringify({}),
+            })
+                .then(() => location.reload())
+                .catch((err) => {
+                    console.error(err);
+                    clearPromotedBtn.disabled = false;
+                });
+        });
+    }
+
+    document.querySelectorAll(".inbox-save-notes").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const card = btn.closest(".inbox-note-card");
+            if (!card) return;
+            const textarea = card.querySelector(".inbox-scratchpad-input");
+            const statusEl = card.querySelector(".inbox-scratchpad-status");
+            if (!textarea) return;
+            btn.disabled = true;
+            if (statusEl) statusEl.textContent = "Saving...";
+            fetchJson("/api/v1/page-note", {
+                method: "PUT",
+                headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
+                body: JSON.stringify({
+                    url: card.dataset.noteUrl,
+                    title: card.dataset.noteTitle || "",
+                    notes_md: textarea.value,
+                }),
+            })
+                .then((data) => {
+                    if (data && data.id === null) {
+                        location.reload();
+                        return;
+                    }
+                    if (statusEl) statusEl.textContent = "Saved";
+                    btn.disabled = false;
+                })
+                .catch((err) => {
+                    console.error(err);
+                    if (statusEl) statusEl.textContent = "Save failed";
+                    btn.disabled = false;
+                });
         });
     });
 });

@@ -381,7 +381,8 @@ async def test_inbox_page_renders_captured_notes(
     client, isolated_db, configured_api_token
 ):
     headers = {"Authorization": f"Bearer {configured_api_token}"}
-    await client.post(
+    existing_id = database.db_add_entry("ctx - finances")
+    add_fin = await client.post(
         "/api/v1/page-note/items",
         json={
             "url": "https://youtu.be/VeHFu956WKE?t=2460",
@@ -390,6 +391,21 @@ async def test_inbox_page_renders_captured_notes(
             "context": "impact on their finances",
             "timestamp_seconds": 2460,
         },
+        headers=headers,
+    )
+    add_new = await client.post(
+        "/api/v1/page-note/items",
+        json={
+            "url": "https://youtu.be/VeHFu956WKE?t=2460",
+            "title": "Podcast Episode",
+            "word": "ephemeral",
+            "context": "an ephemeral trend",
+        },
+        headers=headers,
+    )
+    await client.post(
+        "/api/v1/page-note/promote",
+        json={"item_ids": [add_new.json()["item"]["id"]]},
         headers=headers,
     )
 
@@ -403,3 +419,84 @@ async def test_inbox_page_renders_captured_notes(
     assert "https://www.oxfordlearnersdictionaries.com/search/english/?q=finances" in resp.text
     assert "https://www.ldoceonline.com/search/english/direct/?q=finances" in resp.text
     assert "https://www.merriam-webster.com/dictionary/finances" in resp.text
+    # Existing dictionary word gets "In dictionary" link, promoted word enables Clear promoted
+    assert f'href="/entry/{existing_id}">In dictionary</a>' in resp.text
+    assert "Clear promoted (1)" in resp.text
+    assert "Delete page" in resp.text
+    assert "inbox-edit-form" in resp.text
+    assert "inbox-scratchpad-input" in resp.text
+    assert add_fin.status_code == 201
+
+
+async def test_delete_page_note_and_clear_promoted_items(
+    client, isolated_db, configured_api_token
+):
+    headers = {"Authorization": f"Bearer {configured_api_token}"}
+
+    # Note 1: only promoted item, no notes_md -> should be deleted by clear-promoted
+    n1_item = (
+        await client.post(
+            "/api/v1/page-note/items",
+            json={"url": "https://example.com/one", "title": "One", "word": "alpha"},
+            headers=headers,
+        )
+    ).json()["item"]["id"]
+
+    # Note 2: one promoted + one unpromoted -> note stays with only unpromoted item
+    n2_prom = (
+        await client.post(
+            "/api/v1/page-note/items",
+            json={"url": "https://example.com/two", "title": "Two", "word": "beta"},
+            headers=headers,
+        )
+    ).json()["item"]["id"]
+    n2_keep = (
+        await client.post(
+            "/api/v1/page-note/items",
+            json={"url": "https://example.com/two", "title": "Two", "word": "gamma"},
+            headers=headers,
+        )
+    ).json()["item"]["id"]
+
+    # Note 3: only promoted item, HAS notes_md -> note stays with 0 items
+    await client.put(
+        "/api/v1/page-note",
+        json={"url": "https://example.com/three", "title": "Three", "notes_md": "keep me"},
+        headers=headers,
+    )
+    n3_prom = (
+        await client.post(
+            "/api/v1/page-note/items",
+            json={"url": "https://example.com/three", "title": "Three", "word": "delta"},
+            headers=headers,
+        )
+    ).json()["item"]["id"]
+
+    await client.post(
+        "/api/v1/page-note/promote",
+        json={"item_ids": [n1_item, n2_prom, n3_prom]},
+        headers=headers,
+    )
+
+    r_clear = await client.post(
+        "/api/v1/page-note/clear-promoted", json={}, headers=headers
+    )
+    assert r_clear.status_code == 200
+    assert r_clear.json() == {"deleted": 3}
+
+    remaining = {n.url: n for n in database.db_list_page_notes()}
+    assert "https://example.com/one" not in remaining
+    assert [i.id for i in remaining["https://example.com/two"].items] == [n2_keep]
+    assert remaining["https://example.com/three"].items == []
+    assert remaining["https://example.com/three"].notes_md == "keep me"
+
+    # Deleting a page note removes it and its items; deleting again returns 404
+    two_id = remaining["https://example.com/two"].id
+    r_del = await client.delete(f"/api/v1/page-note/{two_id}", headers=headers)
+    assert r_del.status_code == 200
+    assert r_del.json() == {"message": "deleted"}
+    r_del_again = await client.delete(f"/api/v1/page-note/{two_id}", headers=headers)
+    assert r_del_again.status_code == 404
+    assert "https://example.com/two" not in {
+        n.url for n in database.db_list_page_notes()
+    }

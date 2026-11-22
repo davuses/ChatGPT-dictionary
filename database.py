@@ -734,6 +734,47 @@ def db_delete_capture_item(item_id: int) -> bool:
         return True
 
 
+def db_delete_page_note(note_id: int) -> bool:
+    with Session(engine) as session:
+        note = session.get(PageNote, note_id)
+        if not note:
+            return False
+        session.delete(note)
+        session.commit()
+        return True
+
+
+def db_clear_promoted_items(note_id: int | None = None) -> int:
+    now = int(time.time())
+    with Session(engine) as session:
+        query = session.query(PageCaptureItem).filter(
+            PageCaptureItem.promoted_entry_id.is_not(None)
+        )
+        if note_id is not None:
+            query = query.filter(PageCaptureItem.page_note_id == note_id)
+        items = query.all()
+        if not items:
+            return 0
+        affected_note_ids = {item.page_note_id for item in items}
+        for item in items:
+            session.delete(item)
+        session.flush()
+        for affected_id in affected_note_ids:
+            note = (
+                session.query(PageNote)
+                .options(joinedload(PageNote.items))
+                .filter(PageNote.id == affected_id)
+                .first()
+            )
+            if note:
+                if not note.notes_md.strip() and not note.items:
+                    session.delete(note)
+                else:
+                    note.updated_at = now
+        session.commit()
+        return len(items)
+
+
 def db_promote_capture_items(
     item_ids: list[int], validate_fn
 ) -> list[dict[str, object]]:
