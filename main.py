@@ -1,7 +1,10 @@
+import hashlib
 import logging
 import time
 import urllib.parse
 from dataclasses import replace
+from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 
 import markdown2
@@ -91,11 +94,25 @@ app.add_middleware(
 )
 
 
-app.mount("/static", StaticFiles(directory="./static"), name="static")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@lru_cache(maxsize=64)
+def static_url(filename: str) -> str:
+    clean_name = filename.lstrip("/")
+    file_path = (STATIC_DIR / clean_name).resolve()
+    if file_path.is_relative_to(STATIC_DIR) and file_path.is_file():
+        digest = hashlib.sha256(file_path.read_bytes()).hexdigest()[:12]
+        return f"/static/{clean_name}?v={digest}"
+    return f"/static/{clean_name}"
+
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 templates = Jinja2Templates(
     directory="templates", context_processors=[auth_template_context]
 )
+templates.env.globals["static_url"] = static_url
 
 protected_router = APIRouter(dependencies=[Depends(require_admin)])
 

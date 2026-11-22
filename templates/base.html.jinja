@@ -7,25 +7,25 @@
         content="width=device-width, initial-scale=1.0">
     {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}">{% endif %}
     <link rel="stylesheet"
-        href="/static/style.css" />
-    <script src="/static/script.js" defer></script>
+        href="{{ static_url('style.css') }}" />
+    <script src="{{ static_url('script.js') }}" defer></script>
     <link rel="icon"
         type="image/x-icon"
-        href="/static/favicon.ico">
+        href="{{ static_url('favicon.ico') }}">
     {% if needs_editor or needs_markdown_css %}
     <link rel="stylesheet"
-        href="/static/markdown-pc.css"
+        href="{{ static_url('markdown-pc.css') }}"
         media="screen and (min-width: 600px)" />
     <link rel="stylesheet"
-        href="/static/markdown-mobile.css"
+        href="{{ static_url('markdown-mobile.css') }}"
         media="screen and (max-width: 599px)" />
     {% endif %}
     {% if needs_editor %}
     <link rel="stylesheet"
-        href="/static/font-awesome.min.css">
+        href="{{ static_url('font-awesome.min.css') }}">
     <link rel="stylesheet"
-        href="/static/md-editor.min.css">
-    <script src="/static/md-editor.min.js"></script>
+        href="{{ static_url('md-editor.min.css') }}">
+    <script src="{{ static_url('md-editor.min.js') }}"></script>
     {% endif %}
     {% block head %}{% endblock head %}
 </head>

@@ -303,3 +303,18 @@ async def test_synonyms_handles_sim_list_stems_and_phrases(
     caching.temporary_dict_synonyms.clear()
 
 
+async def test_static_assets_include_content_hash_for_cache_busting(client):
+    style_url = main.static_url("style.css")
+    script_url = main.static_url("script.js")
+    assert style_url.startswith("/static/style.css?v=")
+    assert len(style_url.split("?v=")[1]) == 12
+    assert script_url.startswith("/static/script.js?v=")
+    assert main.static_url("nonexistent.css") == "/static/nonexistent.css"
+
+    login_page = await client.get("/login")
+    assert login_page.status_code == 200
+    assert f'href="{style_url}"' in login_page.text
+    assert f'src="{script_url}"' in login_page.text
+
+
+
