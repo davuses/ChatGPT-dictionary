@@ -135,6 +135,10 @@ a:hover {
   resize: vertical;
 }
 
+.sp-context-input {
+  margin-bottom: 8px;
+}
+
 .sp-row {
   align-items: center;
   display: flex;

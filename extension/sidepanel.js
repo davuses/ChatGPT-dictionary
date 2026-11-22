@@ -597,6 +597,16 @@ function applyCapturedPayload(captured) {
   if (captured.word) els.jotWord.value = captured.word;
   if (captured.context) els.jotContext.value = captured.context;
   setPendingTimestamp(captured.timestampSeconds);
+  if (captured.source === "transcript") {
+    setStatus(els.jotStatus, "Full sentence grabbed from transcript");
+  } else if (captured.source === "captions") {
+    setStatus(els.jotStatus, "Full sentence grabbed from captions");
+  } else if (captured.source === "overlay") {
+    setStatus(
+      els.jotStatus,
+      "Partial caption only — open YouTube Transcript for full sentences"
+    );
+  }
   if (!els.jotWord.value) {
     els.jotWord.focus();
   } else {
@@ -620,18 +630,22 @@ els.saveSettingsBtn.addEventListener("click", saveSettings);
 els.clearTsBtn.addEventListener("click", () => setPendingTimestamp(null));
 
 els.grabPageBtn.addEventListener("click", () => {
-  setStatus(els.jotStatus, "");
-  chrome.runtime.sendMessage({ type: "grabFromActiveTab" }, (resp) => {
-    if (chrome.runtime.lastError || !resp || !resp.ok) {
-      setStatus(
-        els.jotStatus,
-        (resp && resp.error) || "Could not grab from page.",
-        true
-      );
-      return;
+  setStatus(els.jotStatus, "Grabbing…");
+  chrome.runtime.sendMessage(
+    { type: "grabFromActiveTab", hintWord: els.jotWord.value.trim() },
+    (resp) => {
+      if (chrome.runtime.lastError || !resp || !resp.ok) {
+        setStatus(
+          els.jotStatus,
+          (resp && resp.error) || "Could not grab from page.",
+          true
+        );
+        return;
+      }
+      setStatus(els.jotStatus, "");
+      applyCapturedPayload(resp.data);
     }
-    applyCapturedPayload(resp.data);
-  });
+  );
 });
 
 els.jotForm.addEventListener("submit", async (event) => {
