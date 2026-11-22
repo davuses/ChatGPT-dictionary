@@ -975,6 +975,28 @@ input[type="submit"]:hover {
   margin: 4px 0 0;
 }
 
+.inbox-dict-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.inbox-dict-link {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 7px;
+}
+
+.inbox-dict-link:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
 .inbox-item-actions {
   display: flex;
   flex-shrink: 0;

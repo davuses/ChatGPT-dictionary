@@ -65,6 +65,48 @@ function isYouTubeUrl(url) {
   }
 }
 
+const DICTIONARY_LINKS = [
+  {
+    label: "Google",
+    title: 'Search "define <word>" on Google',
+    url: (w) => `https://www.google.com/search?q=${encodeURIComponent("define " + w)}`,
+  },
+  {
+    label: "Oxford",
+    title: "Search on Oxford Learner's Dictionaries",
+    url: (w) =>
+      `https://www.oxfordlearnersdictionaries.com/search/english/?q=${encodeURIComponent(w)}`,
+  },
+  {
+    label: "Longman",
+    title: "Search on Longman Dictionary",
+    url: (w) =>
+      `https://www.ldoceonline.com/search/english/direct/?q=${encodeURIComponent(w)}`,
+  },
+  {
+    label: "MW",
+    title: "Search on Merriam-Webster",
+    url: (w) =>
+      `https://www.merriam-webster.com/dictionary/${encodeURIComponent(w)}`,
+  },
+];
+
+function createDictionaryLinksRow(word) {
+  const row = document.createElement("div");
+  row.className = "sp-dict-links";
+  DICTIONARY_LINKS.forEach((site) => {
+    const a = document.createElement("a");
+    a.className = "sp-dict-link";
+    a.href = site.url(word);
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.title = site.title;
+    a.textContent = site.label;
+    row.appendChild(a);
+  });
+  return row;
+}
+
 function setStatus(el, text, isError = false) {
   el.textContent = text;
   el.classList.toggle("is-error", isError);
@@ -306,6 +348,8 @@ function renderItems() {
       def.textContent = item.definition_text;
       li.appendChild(def);
     }
+
+    li.appendChild(createDictionaryLinksRow(item.word));
 
     const actions = document.createElement("div");
     actions.className = "sp-item-actions";

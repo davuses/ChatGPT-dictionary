@@ -398,3 +398,7 @@ async def test_inbox_page_renders_captured_notes(
     assert "Podcast Episode" in resp.text
     assert "finances" in resp.text
     assert "41:00" in resp.text
+    assert "https://www.google.com/search?q=define%20finances" in resp.text
+    assert "https://www.oxfordlearnersdictionaries.com/search/english/?q=finances" in resp.text
+    assert "https://www.ldoceonline.com/search/english/direct/?q=finances" in resp.text
+    assert "https://www.merriam-webster.com/dictionary/finances" in resp.text

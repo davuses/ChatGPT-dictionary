@@ -60,6 +60,12 @@
                     {% if item.definition_text %}
                     <p class="inbox-item-def">{{ item.definition_text }}</p>
                     {% endif %}
+                    <div class="inbox-dict-links">
+                        <a class="inbox-dict-link" href="https://www.google.com/search?q={{ ('define ' ~ item.word) | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search &quot;define {{ item.word }}&quot; on Google">Google</a>
+                        <a class="inbox-dict-link" href="https://www.oxfordlearnersdictionaries.com/search/english/?q={{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Oxford Learner's Dictionaries">Oxford</a>
+                        <a class="inbox-dict-link" href="https://www.ldoceonline.com/search/english/direct/?q={{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Longman Dictionary">Longman</a>
+                        <a class="inbox-dict-link" href="https://www.merriam-webster.com/dictionary/{{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Merriam-Webster">MW</a>
+                    </div>
                 </div>
                 <div class="inbox-item-actions">
                     {% if not item.promoted_entry_id %}
