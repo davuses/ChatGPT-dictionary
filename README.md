@@ -115,3 +115,12 @@ Requires Python 3.12+.
 ## Notes
 
 - Data is stored locally in `dictionary.db` (SQLite) and is not tracked in git.
+
+## Chrome Side Panel extension (optional)
+
+An unpacked Manifest V3 Chrome extension lives in [`extension/`](extension/) for taking per-page Markdown scratchpad notes and batch-capturing words/phrases (with YouTube playback timestamps + captions or article sentence selection) directly into your dictionary:
+
+1. Generate a personal API token (at least 32 characters) and add `api_token = "..."` under `[auth]` in `config.toml` (or set `DICTIONARY_API_TOKEN`).
+2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the `extension/` folder.
+3. Click the extension icon to open the Side Panel, click **Settings**, enter your server URL (e.g. `http://localhost:8001`) and API token, and click **Save & test**.
+4. You can also review and batch-promote captured items from any device at `/inbox`.

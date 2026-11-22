@@ -47,6 +47,11 @@ def test_all_non_login_routes_require_authentication():
         for method in route.methods:
             if (method, route.path) in public_routes:
                 assert auth.require_admin not in dep_calls
+                assert auth.require_api_auth not in dep_calls
+            elif route.path.startswith("/api/v1/"):
+                assert auth.require_api_auth in dep_calls, (
+                    f"API route {method} {route.path} is missing require_api_auth"
+                )
             else:
                 assert auth.require_admin in dep_calls, (
                     f"Route {method} {route.path} is missing require_admin"

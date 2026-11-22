@@ -43,11 +43,96 @@ def parse_entry_text(text: str) -> tuple[str, str]:
 
 def format_entry_text(word: str, context: str = "") -> str:
     """Combine word and optional context into the stored entry text format."""
-    clean_word = word.strip()
-    clean_context = context.strip()
+    clean_word = " ".join(word.split())
+    clean_context = " ".join(context.split())
     if clean_context:
         return f"{clean_context}{ENTRY_TEXT_SEPARATOR}{clean_word}"
     return clean_word
+
+
+def validate_entry_fields(word: str, context: str = "") -> tuple[str | None, str | None]:
+    """Validate and assemble word + optional context into single-line entry text."""
+    clean_word = " ".join(word.split())
+    if not clean_word:
+        return None, "Word cannot be empty."
+    if ENTRY_TEXT_SEPARATOR in clean_word:
+        return None, 'Word cannot contain " - " (reserved as the context separator).'
+    return format_entry_text(clean_word, context), None
+
+
+_YOUTUBE_HOSTS = frozenset(
+    {
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "music.youtube.com",
+        "youtu.be",
+    }
+)
+_YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{6,}$")
+_TRACKING_QUERY_PARAMS = frozenset(
+    {
+        "fbclid",
+        "gclid",
+        "igshid",
+        "mc_cid",
+        "mc_eid",
+        "ref",
+        "ref_src",
+        "si",
+    }
+)
+
+
+def normalize_page_url(raw_url: str) -> str:
+    """Normalize an HTTP(S) page URL for per-page note lookup/storage.
+
+    Canonicalizes YouTube video URLs (watch, youtu.be, shorts, live, embed,
+    m., music.) to https://www.youtube.com/watch?v=<id> while leaving non-video
+    YouTube pages intact. Strips fragments and common tracking parameters.
+    """
+    cleaned = raw_url.strip()
+    parsed = urllib.parse.urlsplit(cleaned)
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("Only http and https URLs are supported")
+
+    host = parsed.hostname.lower()
+    query_pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=False)
+
+    if host in _YOUTUBE_HOSTS:
+        video_id = ""
+        path_parts = [p for p in parsed.path.split("/") if p]
+        if host == "youtu.be" and path_parts:
+            video_id = path_parts[0]
+        elif parsed.path == "/watch":
+            for k, v in query_pairs:
+                if k == "v" and v:
+                    video_id = v
+                    break
+        elif len(path_parts) >= 2 and path_parts[0] in {"shorts", "live", "embed"}:
+            video_id = path_parts[1]
+
+        if video_id and _YOUTUBE_VIDEO_ID_RE.match(video_id):
+            return f"https://www.youtube.com/watch?v={video_id}"
+
+    netloc = host
+    if parsed.port is not None:
+        default_port = 80 if scheme == "http" else 443
+        if parsed.port != default_port:
+            netloc = f"{host}:{parsed.port}"
+
+    path = parsed.path or "/"
+    if path != "/":
+        path = path.rstrip("/") or "/"
+
+    kept_params = sorted(
+        (k, v)
+        for k, v in query_pairs
+        if not k.lower().startswith("utm_") and k.lower() not in _TRACKING_QUERY_PARAMS
+    )
+    query = urllib.parse.urlencode(kept_params, doseq=True)
+    return urllib.parse.urlunsplit((scheme, netloc, path, query, ""))
 
 
 def normalize_pronoun_casing(text: str) -> str:
@@ -530,6 +615,24 @@ def get_synonyms(word):
 
 def format_meaning_html(md_text: str) -> str:
     return markdown2.markdown(md_text.strip())
+
+
+@lru_cache(maxsize=512)
+def get_thesaurus_senses_plain(word: str) -> tuple[dict[str, object], ...]:
+    """Cached plain-text thesaurus senses for JSON API consumers (no raw HTML)."""
+    synonyms_data = get_synonyms(word)
+    if not synonyms_data:
+        return ()
+    senses = []
+    for _, pos, meaning_md, synonyms in synonyms_data:
+        senses.append(
+            {
+                "part_of_speech": pos,
+                "meaning": meaning_md.strip(),
+                "synonyms": list(synonyms),
+            }
+        )
+    return tuple(senses)
 
 
 def get_thesaurus_senses(

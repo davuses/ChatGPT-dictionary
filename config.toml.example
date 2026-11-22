@@ -6,3 +6,5 @@ admin_username = "admin"
 admin_password_hash = "$argon2id$..."
 session_secret = "replace-with-a-random-secret-at-least-32-characters"
 https_only = true
+# Optional personal API token (at least 32 chars) for the Chrome Side Panel extension
+# api_token = "replace-with-a-random-token-at-least-32-characters"

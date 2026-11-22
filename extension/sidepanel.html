@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Dictionary</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="sp-header">
+    <div class="sp-brand-row">
+      <h1 class="sp-brand">My Dictionary</h1>
+      <div class="sp-header-actions">
+        <a id="open-inbox-link" class="sp-btn sp-btn-ghost" href="#" target="_blank" rel="noopener noreferrer" hidden>Inbox</a>
+        <button id="toggle-settings-btn" class="sp-btn sp-btn-ghost" type="button">Settings</button>
+      </div>
+    </div>
+    <div id="page-banner" class="sp-page-banner">
+      <div id="page-title" class="sp-page-title">Loading tab&hellip;</div>
+      <div id="page-url" class="sp-page-url"></div>
+    </div>
+  </header>
+
+  <section id="settings-panel" class="sp-card sp-settings" hidden>
+    <h2>Connection settings</h2>
+    <label class="sp-label" for="server-url-input">Server URL</label>
+    <input id="server-url-input" class="sp-input" type="url" placeholder="http://localhost:8001">
+    <label class="sp-label" for="api-token-input">API Token <span class="sp-hint">(stored locally only)</span></label>
+    <input id="api-token-input" class="sp-input" type="password" placeholder="Paste auth.api_token from config.toml">
+    <div class="sp-row">
+      <button id="save-settings-btn" class="sp-btn sp-btn-primary" type="button">Save &amp; test</button>
+      <span id="settings-status" class="sp-status"></span>
+    </div>
+  </section>
+
+  <div id="global-notice" class="sp-notice" hidden></div>
+
+  <main id="workspace" hidden>
+    <section class="sp-card">
+      <div class="sp-section-head">
+        <h2>Quick jot</h2>
+        <button id="grab-page-btn" class="sp-btn sp-btn-ghost" type="button">Grab from page</button>
+      </div>
+      <form id="jot-form">
+        <input id="jot-word" class="sp-input" type="text" placeholder="Word or phrase (e.g. finances)" autocomplete="off" required>
+        <input id="jot-context" class="sp-input" type="text" placeholder="Context sentence (optional)" autocomplete="off">
+        <div id="jot-ts-row" class="sp-ts-row" hidden>
+          <span id="jot-ts-label" class="sp-pill"></span>
+          <button id="clear-ts-btn" class="sp-link-btn" type="button">Clear timestamp</button>
+        </div>
+        <div class="sp-row">
+          <button class="sp-btn sp-btn-primary" type="submit">Jot word</button>
+          <span id="jot-status" class="sp-status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="sp-card">
+      <div class="sp-section-head">
+        <h2>Captured words <span id="items-count" class="sp-count"></span></h2>
+        <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden>Add selected</button>
+      </div>
+      <p id="items-empty" class="sp-empty">No words jotted for this page yet.</p>
+      <ul id="items-list" class="sp-items"></ul>
+      <div id="promote-status" class="sp-status"></div>
+    </section>
+
+    <section class="sp-card">
+      <div class="sp-section-head">
+        <h2>Page scratchpad</h2>
+        <span id="notes-status" class="sp-status"></span>
+      </div>
+      <textarea id="notes-textarea" class="sp-textarea" rows="6" placeholder="Freeform Markdown notes for this video or article&hellip;"></textarea>
+    </section>
+  </main>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

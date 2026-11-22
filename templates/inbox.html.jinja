@@ -1,0 +1,128 @@
+{% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header with context %}
+{% block title %}Capture Inbox{% endblock title %}
+{% block body_class %}page-narrow{% endblock body_class %}
+
+{% macro format_ts(sec) -%}
+{%- set h = sec // 3600 -%}
+{%- set m = (sec % 3600) // 60 -%}
+{%- set s = sec % 60 -%}
+{%- if h > 0 %}{{ h }}:{{ "%02d"|format(m) }}:{{ "%02d"|format(s) }}{% else %}{{ m }}:{{ "%02d"|format(s) }}{% endif -%}
+{%- endmacro %}
+
+{% block body %}
+{{ page_header(subtitle="Per-page notes and words captured from Chrome", active="inbox", show_add=True) }}
+
+<main class="inbox-page">
+    {% if not page_notes %}
+    <section class="card">
+        <h2>Inbox is empty</h2>
+        <p>Notes and words you jot down with the Chrome Side Panel extension will show up here for batch review and promotion into your dictionary.</p>
+    </section>
+    {% else %}
+    {% for note in page_notes %}
+    <section class="card inbox-note-card" data-note-id="{{ note.id }}">
+        <div class="inbox-note-header">
+            <div>
+                <h2 class="inbox-note-title">
+                    <a href="{{ note.url }}" target="_blank" rel="noopener noreferrer">{{ note.title or note.url }}</a>
+                </h2>
+                <p class="inbox-note-url">{{ note.url }}</p>
+            </div>
+            {% set unpromoted = note.items | selectattr("promoted_entry_id", "none") | list %}
+            {% if unpromoted %}
+            <button type="button"
+                class="button button-primary inbox-promote-all"
+                data-item-ids="{{ unpromoted | map(attribute='id') | join(',') }}">
+                Add all ({{ unpromoted | length }})
+            </button>
+            {% endif %}
+        </div>
+
+        {% if note.items %}
+        <ul class="inbox-item-list">
+            {% for item in note.items %}
+            <li class="inbox-item{% if item.promoted_entry_id %} is-promoted{% endif %}" data-item-id="{{ item.id }}">
+                <div class="inbox-item-main">
+                    <div class="inbox-item-head">
+                        <strong class="inbox-item-word">{{ item.word }}</strong>
+                        {% if item.timestamp_seconds is not none %}
+                        {% set ts_url = note.url ~ ("&t=" if "?" in note.url else "?t=") ~ item.timestamp_seconds %}
+                        <a class="inbox-ts-badge" href="{{ ts_url }}" target="_blank" rel="noopener noreferrer">{{ format_ts(item.timestamp_seconds) }}</a>
+                        {% endif %}
+                        {% if item.promoted_entry_id %}
+                        <a class="inbox-promoted-badge" href="/entry/{{ item.promoted_entry_id }}">Added &rarr;</a>
+                        {% endif %}
+                    </div>
+                    {% if item.context %}
+                    <p class="inbox-item-context">{{ item.context }}</p>
+                    {% endif %}
+                    {% if item.definition_text %}
+                    <p class="inbox-item-def">{{ item.definition_text }}</p>
+                    {% endif %}
+                </div>
+                <div class="inbox-item-actions">
+                    {% if not item.promoted_entry_id %}
+                    <button type="button" class="button button-ghost inbox-promote-one" data-item-id="{{ item.id }}">Add</button>
+                    {% endif %}
+                    <button type="button" class="button button-danger inbox-delete-one" data-item-id="{{ item.id }}">Delete</button>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if note.notes_md %}
+        <details class="inbox-scratchpad" open>
+            <summary>Page scratchpad</summary>
+            <pre class="inbox-scratchpad-body">{{ note.notes_md }}</pre>
+        </details>
+        {% endif %}
+    </section>
+    {% endfor %}
+    {% endif %}
+</main>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    function promoteIds(itemIds) {
+        fetchJson("/api/v1/page-note/promote", {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
+            body: JSON.stringify({ item_ids: itemIds }),
+        })
+            .then(() => location.reload())
+            .catch((err) => {
+                console.error(err);
+                alert("Failed to promote item(s).");
+            });
+    }
+
+    document.querySelectorAll(".inbox-promote-one").forEach((btn) => {
+        btn.addEventListener("click", () => promoteIds([Number(btn.dataset.itemId)]));
+    });
+
+    document.querySelectorAll(".inbox-promote-all").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const ids = btn.dataset.itemIds.split(",").map(Number).filter(Boolean);
+            if (ids.length) promoteIds(ids);
+        });
+    });
+
+    document.querySelectorAll(".inbox-delete-one").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            if (!confirm("Remove this captured item?")) return;
+            fetch("/api/v1/page-note/items/" + encodeURIComponent(btn.dataset.itemId), {
+                method: "DELETE",
+                headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
+            })
+                .then(handleProtectedResponse)
+                .then((resp) => {
+                    if (resp.ok) location.reload();
+                })
+                .catch((err) => console.error(err));
+        });
+    });
+});
+</script>
+{% endblock body %}

@@ -910,3 +910,96 @@ input[type="submit"]:hover {
 .form-error {
     color: #a40000;
 }
+
+/* Capture inbox (/inbox) */
+.inbox-note-header {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.inbox-note-title {
+  font-size: 19px;
+  margin: 0 0 2px;
+}
+
+.inbox-note-url {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+  word-break: break-all;
+}
+
+.inbox-item-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.inbox-item {
+  align-items: flex-start;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.inbox-item.is-promoted {
+  opacity: 0.72;
+}
+
+.inbox-item-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inbox-ts-badge,
+.inbox-promoted-badge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.inbox-item-context,
+.inbox-item-def {
+  color: var(--muted);
+  font-size: 15px;
+  margin: 4px 0 0;
+}
+
+.inbox-item-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.inbox-scratchpad {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.inbox-scratchpad summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.inbox-scratchpad-body {
+  background: var(--surface);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 15px;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+}

@@ -24,6 +24,7 @@ class AuthSettings:
     password_hash: str
     session_secret: str
     https_only: bool
+    api_token: str = ""
 
 
 def load_auth_config() -> dict[str, object]:
@@ -62,6 +63,9 @@ def get_auth_settings() -> AuthSettings:
     session_secret = os.environ.get(
         "DICTIONARY_SESSION_SECRET", _auth_text(auth_config, "session_secret")
     )
+    api_token = os.environ.get(
+        "DICTIONARY_API_TOKEN", _auth_text(auth_config, "api_token")
+    ).strip()
 
     config_https_only = auth_config.get("https_only", True)
     if not isinstance(config_https_only, bool):
@@ -86,6 +90,8 @@ def get_auth_settings() -> AuthSettings:
         )
     if len(session_secret) < 32:
         raise RuntimeError("The session secret must be at least 32 characters")
+    if api_token and len(api_token) < 32:
+        raise RuntimeError("The API token must be at least 32 characters")
     if https_only_value not in {"true", "false"}:
         raise RuntimeError("DICTIONARY_HTTPS_ONLY must be 'true' or 'false'")
 
@@ -94,6 +100,7 @@ def get_auth_settings() -> AuthSettings:
         admin_password_hash,
         session_secret,
         https_only=https_only_value == "true",
+        api_token=api_token,
     )
 
 
@@ -179,6 +186,38 @@ async def require_admin_with_header_csrf(
     request: Request, _: None = Depends(require_admin)
 ) -> None:
     verify_csrf_value(request, request.headers.get("X-CSRF-Token"))
+
+
+async def require_api_auth(request: Request) -> None:
+    """Authenticate /api/v1/* via Bearer token (Chrome extension) or existing
+    browser session + X-CSRF-Token on state-changing methods.
+
+    Fail-closed: if an Authorization header is present, never fall back to
+    session cookies and never accept an empty/unconfigured api_token.
+    """
+    auth_header = request.headers.get("authorization")
+    if auth_header is not None:
+        scheme, sep, raw_token = auth_header.partition(" ")
+        token = raw_token.strip()
+        configured = get_auth_settings().api_token
+        if (
+            scheme.lower() != "bearer"
+            or not sep
+            or not token
+            or not configured
+            or not secrets.compare_digest(token, configured)
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid API token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return
+
+    if not is_admin(request):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        verify_csrf_value(request, request.headers.get("X-CSRF-Token"))
 
 
 def auth_template_context(request: Request) -> dict[str, object]:

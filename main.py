@@ -2,6 +2,7 @@ import hashlib
 import logging
 import time
 import urllib.parse
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
@@ -40,6 +41,7 @@ from auth import (
 
 from database import (
     ENTRIES_PAGE_SIZE,
+    create_tables,
     db_add_definition,
     db_add_entry,
     db_count_entries,
@@ -51,6 +53,7 @@ from database import (
     db_get_entry_by_id,
     db_get_entry_by_text,
     db_get_entry_page_number,
+    db_list_page_notes,
     db_clear_review_bookmark,
     db_record_entry_visit,
     db_set_review_bookmark,
@@ -60,10 +63,8 @@ from database import (
     get_review_bookmark,
 )
 from utils import (
-    ENTRY_TEXT_SEPARATOR,
     EntryDisplay,
     build_directory_tree_markdown,
-    format_entry_text,
     get_all_words,
     get_how_long_ago,
     get_IPA,
@@ -78,12 +79,25 @@ from utils import (
     pick_random_question,
     QuizQuestion,
     safe_path_note,
+    validate_entry_fields,
 )
 
 logger = logging.getLogger(__name__)
 auth_settings = get_auth_settings()
 
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    create_tables()
+    yield
+
+
+app = FastAPI(
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+    lifespan=lifespan,
+)
 app.add_middleware(
     SessionMiddleware,
     secret_key=auth_settings.session_secret,
@@ -187,15 +201,6 @@ class AddEntryForm(CsrfForm):
         )
 
 
-def _validate_entry_fields(word: str, context: str) -> tuple[str | None, str | None]:
-    clean_word = word.strip()
-    if not clean_word:
-        return None, "Word cannot be empty."
-    if ENTRY_TEXT_SEPARATOR in clean_word:
-        return None, 'Word cannot contain " - " (reserved as the context separator).'
-    return format_entry_text(clean_word, context), None
-
-
 class AddDefinitionForm(CsrfForm):
     definition_text: str
     entry_id: int
@@ -280,6 +285,8 @@ async def logout(request: Request, _: None = Depends(verify_form_csrf)):
 
 
 def _wants_json_error(request: Request) -> bool:
+    if request.url.path.startswith("/api/"):
+        return True
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return True
     sec_fetch_mode = request.headers.get("Sec-Fetch-Mode")
@@ -312,9 +319,17 @@ async def custom_http_exception_handler(
                 url=f"/login?next={urllib.parse.quote(next_path, safe='')}",
                 status_code=303,
             )
-        return JSONResponse({"detail": exc.detail}, status_code=401)
+        return JSONResponse(
+            {"detail": exc.detail},
+            status_code=401,
+            headers=exc.headers,
+        )
     if _wants_json_error(request):
-        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        return JSONResponse(
+            {"detail": exc.detail},
+            status_code=exc.status_code,
+            headers=exc.headers,
+        )
     if exc.status_code == 404:
         return templates.TemplateResponse(
             request=request,
@@ -611,7 +626,7 @@ def edit_entry(
     form_data: EditEntryForm = Depends(EditEntryForm.as_form),
 ):
     verify_csrf_value(request, form_data.csrf_token)
-    updated_text, error = _validate_entry_fields(form_data.word, form_data.context)
+    updated_text, error = validate_entry_fields(form_data.word, form_data.context)
     if error or not updated_text:
         return templates.TemplateResponse(
             request=request,
@@ -701,7 +716,7 @@ def add_entry(
     form_data: AddEntryForm = Depends(AddEntryForm.as_form),
 ):
     verify_csrf_value(request, form_data.csrf_token)
-    updated_text, error = _validate_entry_fields(form_data.word, form_data.context)
+    updated_text, error = validate_entry_fields(form_data.word, form_data.context)
     if error or not updated_text:
         return templates.TemplateResponse(
             request=request,
@@ -906,4 +921,18 @@ def edit_note(
         raise HTTPException(status_code=500, detail="Unable to save the note")
 
 
+@protected_router.get("/inbox", response_class=HTMLResponse)
+def inbox_page(request: Request):
+    page_notes = db_list_page_notes()
+    context = {
+        "page_notes": page_notes,
+    }
+    return templates.TemplateResponse(
+        request=request, name="inbox.html.jinja", context=context
+    )
+
+
+from capture import api_router as capture_api_router  # noqa: E402
+
 app.include_router(protected_router)
+app.include_router(capture_api_router)
