@@ -415,43 +415,6 @@ def db_record_entry_visit(entry_id: int, now: int | None = None) -> bool | None:
         return False
 
 
-def db_entry_last_visit_old_enough(entry_id: int):
-    with Session(engine) as session:
-        entry = (
-            session.query(Entry)
-            .options(noload(Entry.definitions))
-            .filter(Entry.id == entry_id)
-            .first()
-        )
-        if entry:
-            last_visit = entry.last_visit
-            if not last_visit:
-                entry.last_visit = int(time.time())
-                session.commit()
-                return True
-            now = int(time.time())
-            # last visit more than 12h ago
-            if now - last_visit >= VISIT_COOLDOWN_SECONDS:
-                entry.last_visit = now
-                session.commit()
-                return True
-            return False
-
-
-def db_entry_increment_visit_count(entry_id: int):
-    with Session(engine) as session:
-        entry = (
-            session.query(Entry)
-            .options(noload(Entry.definitions))
-            .filter(Entry.id == entry_id)
-            .first()
-        )
-        if entry:
-            entry.visit_count = (entry.visit_count or 0) + 1
-            session.commit()
-            return True
-
-
 def db_get_definition_by_id(definition_id: int):
     with Session(engine) as session:
         return (
@@ -855,23 +818,24 @@ def db_promote_capture_items(
 
 
 def main():
-    parser = ArgumentParser(description="Your program's description")
+    parser = ArgumentParser(description="Database utility for My Dictionary")
 
     subparsers = parser.add_subparsers(dest="mode", help="Mode selection")
     subparsers.add_parser("create-table")
     entry_parser = subparsers.add_parser("entry")
     entry_parser.add_argument(
-        "--entry", required=True, help="Specify the entry"
+        "--entry", required=True, help="Specify the entry text to look up"
     )
 
     args = parser.parse_args()
 
-    print("Mode:", args.mode)
     if args.mode == "entry":
-        print("Entry:", args.entry)
-        db_get_entry_by_text(args.entry)
-    if args.mode == "create-table":
+        entry = db_get_entry_by_text(args.entry)
+        print(entry if entry else "Entry not found")
+    elif args.mode == "create-table":
         create_tables()
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":

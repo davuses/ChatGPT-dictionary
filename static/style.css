@@ -609,11 +609,6 @@ tr.selected {
   font-size: 15px;
 }
 
-.entry-button {
-  margin: 5px;
-}
-
-.entry-button:hover,
 button:hover,
 .button:hover {
   border-color: var(--accent);
@@ -698,11 +693,6 @@ caption {
   font-family: "BBC Reith Serif", serif;
   font-weight: bold;
   font-size: 1.2em;
-}
-
-.flex-center {
-  display: flex;
-  align-items: center;
 }
 
 /* Word detail page */

@@ -63,8 +63,6 @@ My Dictionary
         if (!results) return;
 
         results.addEventListener("click", function (event) {
-            if (event.target.closest(".dynamic-delete-button")) return;
-
             const row = event.target.closest("tr[id]");
             if (!row) return;
 

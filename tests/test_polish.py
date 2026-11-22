@@ -215,7 +215,7 @@ async def test_entry_page_ui_polish_and_offline_audio(
     monkeypatch.setattr(main, "get_IPA", lambda w: "ˈkændər")
 
     # Newly created entry has visit_count=0 -> simulate 1 visit
-    database.db_entry_increment_visit_count(eid)
+    database.db_record_entry_visit(eid, now=int(2_000_000_000))
     resp = await client.get(f"/entry/{eid}")
     assert resp.status_code == 200
     assert "fonts.googleapis.com" not in resp.text
@@ -233,8 +233,11 @@ async def test_dashboard_quick_search_and_entries_visit_tiers(
     await _login(client)
     e0 = database.db_add_entry("ctx zero - zero")
     e5 = database.db_add_entry("ctx five - five")
-    for _ in range(5):
-        database.db_entry_increment_visit_count(e5)
+    base_ts = 2_000_000_000
+    for step in range(5):
+        database.db_record_entry_visit(
+            e5, now=base_ts + step * (database.VISIT_COOLDOWN_SECONDS + 1)
+        )
 
     dash = await client.get("/")
     assert dash.status_code == 200

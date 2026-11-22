@@ -177,7 +177,7 @@ async function apiRequest(path, options = {}) {
 
 async function loadSettings() {
   const stored = await chrome.storage.local.get(["serverUrl", "apiToken"]);
-  state.serverUrl = cleanServerUrl(stored.serverUrl || "http://localhost:8001");
+  state.serverUrl = cleanServerUrl(stored.serverUrl || "http://localhost:8000");
   state.apiToken = (stored.apiToken || "").trim();
   els.serverUrlInput.value = state.serverUrl;
   els.apiTokenInput.value = state.apiToken;

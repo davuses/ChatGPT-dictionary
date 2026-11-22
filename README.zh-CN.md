@@ -18,7 +18,7 @@
 - **访问记录** — 每个词条自动记录访问次数和最近访问时间
 - **多种视图** — 支持查看全部词条、仅词条列表、或带例句的词条列表
 - **学习笔记** — 浏览并编辑个人英语学习 Markdown 笔记文件夹，自动生成目录
-- **Markdown 编辑** — 词条、释义、例句和笔记均使用 [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) 进行编辑
+- **Markdown 编辑** — 释义、例句和学习笔记使用 [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) 进行编辑，词条本身使用简洁的纯文本单词与语境输入框
 
 ## 技术栈
 
@@ -88,14 +88,33 @@
 
    然后在浏览器中打开 `http://localhost:8000`。
 
+   如需在同一受信任局域网内的其他设备上测试：
+
+   ```bash
+   export DICTIONARY_HTTPS_ONLY=false
+   uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+
+   打开 `http://<电脑局域网IP>:8000`。部署到生产环境时请恢复 `DICTIONARY_HTTPS_ONLY=true`（或移除该环境变量）。
+
 ## 访问控制
 
-- 整个应用默认私有：所有词条页面、测验、同义词、书签、笔记和修改接口均需在 `/login` 登录后访问。
+- 整个应用默认私有：所有词条页面、测验、同义词、书签、笔记、`/inbox` 和修改接口均需在 `/login` 登录后访问。
 - 仅 `/login` 和 `/static/*` 静态资源在未登录时可访问。
 - 会话使用 `HttpOnly`、`SameSite=Lax` Cookie（开启 `https_only` 时附带 `Secure`），有效期 30 天。
-- 所有状态修改请求均需携带有效的 CSRF Token。
+- 所有浏览器端的状态修改请求均需携带有效的 CSRF Token。
+- `/api/v1/*` 采集接口支持已登录的浏览器会话（修改请求需带 `X-CSRF-Token`），或与 `auth.api_token` / `DICTIONARY_API_TOKEN` 匹配的 `Bearer` Token（未配置或无效时默认拒绝）。
 - 已禁用 FastAPI 的 `/docs`、`/redoc` 和 `/openapi.json` 接口。
 
 ## 说明
 
 - 数据保存在本地的 `dictionary.db`（SQLite）文件中，未被 git 追踪。
+
+## Chrome 侧边栏扩展（可选）
+
+[`extension/`](extension/) 目录包含一个可本地加载的 Manifest V3 Chrome 扩展，用于在任意网页记录按页面归档的 Markdown 随手笔记，并批量记录生词/短语（支持自动提取 YouTube 播放时间戳与完整字幕句，或抓取文章选中句子），统一导入个人词典：
+
+1. 生成一个个人 API Token（至少 32 个字符），在 `config.toml` 的 `[auth]` 下添加 `api_token = "..."`（或设置环境变量 `DICTIONARY_API_TOKEN`）。
+2. 打开 `chrome://extensions`，开启**开发者模式**，点击**加载已解压的扩展程序**，选择 `extension/` 目录。
+3. 点击扩展图标打开侧边栏，进入 **Settings**，填写服务地址（如 `http://localhost:8000`）和 API Token，点击 **Save & test**。
+4. 你也可以随时在任意设备上访问 `/inbox` 查看、编辑并批量导入已记录的词条。

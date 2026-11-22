@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import Depends, Form, HTTPException, Request
+from fastapi import Form, HTTPException, Request
 from pwdlib import PasswordHash
 
 
@@ -171,20 +171,6 @@ async def verify_form_csrf(
 
 
 async def verify_header_csrf(request: Request) -> None:
-    verify_csrf_value(request, request.headers.get("X-CSRF-Token"))
-
-
-async def require_admin_with_form_csrf(
-    request: Request,
-    _: None = Depends(require_admin),
-    csrf_token: str | None = Form(None),
-) -> None:
-    verify_csrf_value(request, csrf_token)
-
-
-async def require_admin_with_header_csrf(
-    request: Request, _: None = Depends(require_admin)
-) -> None:
     verify_csrf_value(request, request.headers.get("X-CSRF-Token"))
 
 
