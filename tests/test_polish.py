@@ -192,3 +192,58 @@ async def test_edit_note_oserror_returns_500_page(
     )
     assert resp.status_code == 500
     assert "Unable to save the note" in resp.text
+
+
+def test_get_how_long_ago_formatting():
+    now = 1_750_000_000
+    assert utils.get_how_long_ago(None, now=now) == "never"
+    assert utils.get_how_long_ago(now - 20, now=now) == "just now"
+    assert utils.get_how_long_ago(now - 300, now=now) == "5 min ago"
+    assert utils.get_how_long_ago(now - 3600, now=now) == "1 hour ago"
+    assert utils.get_how_long_ago(now - 5 * 3600, now=now) == "5 hours ago"
+    assert utils.get_how_long_ago(now - 86400, now=now) == "1 day ago"
+    assert utils.get_how_long_ago(now - 45 * 86400, now=now) == "1 month 15 days ago"
+    assert utils.get_how_long_ago(now - 430 * 86400, now=now) == "1 year 2 months ago"
+
+
+async def test_entry_page_ui_polish_and_offline_audio(
+    client, isolated_db, monkeypatch
+):
+    await _login(client)
+    eid = database.db_add_entry("She spoke with candor - candor")
+    monkeypatch.setattr(main, "get_IPA", lambda w: "ˈkændər")
+
+    # Newly created entry has visit_count=0 -> simulate 1 visit
+    database.db_entry_increment_visit_count(eid)
+    resp = await client.get(f"/entry/{eid}")
+    assert resp.status_code == 200
+    assert "fonts.googleapis.com" not in resp.text
+    assert 'class="audio-btn"' in resp.text
+    assert "1 visit</span>" in resp.text
+    assert "<h2>Context</h2>" in resp.text
+    assert "She spoke with candor" in resp.text
+    assert 'data-entry-text="She spoke with candor - candor"' in resp.text
+    assert 'class="page-narrow"' in resp.text
+
+
+async def test_dashboard_quick_search_and_entries_visit_tiers(
+    client, isolated_db
+):
+    await _login(client)
+    e0 = database.db_add_entry("ctx zero - zero")
+    e5 = database.db_add_entry("ctx five - five")
+    for _ in range(5):
+        database.db_entry_increment_visit_count(e5)
+
+    dash = await client.get("/")
+    assert dash.status_code == 200
+    assert 'class="page-narrow"' in dash.text
+    assert 'action="/entries"' in dash.text
+
+    entries = await client.get("/entries")
+    assert entries.status_code == 200
+    assert "visit-0" in entries.text
+    assert "visit-high" in entries.text
+    assert 'class="back-to-top"' in entries.text
+    assert "unselectable" not in entries.text
+

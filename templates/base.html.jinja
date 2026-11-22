@@ -30,7 +30,8 @@
     {% block head %}{% endblock head %}
 </head>
 
-<body>
+{% set _body_class %}{% block body_class %}{% endblock body_class %}{% endset %}
+<body{% if _body_class.strip() %} class="{{ _body_class.strip() }}"{% endif %}>
     {% block body%}
 
     {% endblock body %}

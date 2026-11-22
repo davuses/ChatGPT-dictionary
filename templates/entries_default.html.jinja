@@ -1,15 +1,23 @@
-<tr>
-    <th class="entry-col">Entry</th>
-    <th class="context-col">Context</th>
-    <th class="visit-col">Visit</th>
-</tr>
+<colgroup>
+    <col class="entry-col">
+    <col class="context-col">
+    <col class="visit-col">
+</colgroup>
+<thead>
+    <tr>
+        <th class="entry-col">Entry</th>
+        <th class="context-col">Context</th>
+        <th class="visit-col">Visits</th>
+    </tr>
+</thead>
+<tbody>
 {% for display in entry_displays %}
+{% set vc = display.entry.visit_count %}
+{% set visit_tier = "visit-0" if vc == 0 else ("visit-low" if vc <= 2 else ("visit-mid" if vc <= 4 else "visit-high")) %}
 <tr id="{{ display.entry.id }}">
-    <td class="entry-col"><label class="unselectable">-<span data-content=" "></span></label><a
-            href="entry/{{ display.entry.id }}">{{ display.text }}</a></td>
-    <td class="context-col">
-        {{ display.context }}
-    </td>
-    <td class="visit-{{ display.entry.visit_count }}">{{ display.entry.visit_count }}</td>
+    <td class="entry-col"><a href="/entry/{{ display.entry.id }}">{{ display.text }}</a></td>
+    <td class="context-col">{{ display.context }}</td>
+    <td class="visit-col {{ visit_tier }}">{{ vc }}</td>
 </tr>
 {% endfor %}
+</tbody>

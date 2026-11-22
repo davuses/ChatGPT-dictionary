@@ -1,12 +1,14 @@
 @font-face {
   font-family: "BBC Reith Serif";
-  src: url("BBCReithSerif_W_Rg.woff2") format("woff");
+  src: url("BBCReithSerif_W_Rg.woff2") format("woff2");
+  font-display: swap;
 }
 
 @font-face {
   font-family: "BBC Reith Serif";
-  src: url("BBCReithSerif_W_Bd.woff2") format("woff");
+  src: url("BBCReithSerif_W_Bd.woff2") format("woff2");
   font-weight: bold;
+  font-display: swap;
 }
 
 @font-face {
@@ -14,23 +16,27 @@
   src: url("BBCReithSerif_W_BdIt.woff") format("woff");
   font-weight: bold;
   font-style: italic;
+  font-display: swap;
 }
 
 @font-face {
   font-family: "BBC Reith Serif";
-  src: url("BBCReithSerif_W_It.woff2") format("woff");
+  src: url("BBCReithSerif_W_It.woff2") format("woff2");
   font-style: italic;
+  font-display: swap;
 }
 
 @font-face {
   font-family: "BBC Reith Sans";
-  src: url("BBCReithSans_W_Rg.woff2") format("woff");
+  src: url("BBCReithSans_W_Rg.woff2") format("woff2");
+  font-display: swap;
 }
 
 @font-face {
   font-family: "BBC Reith Sans";
-  src: url("BBCReithSans_W_Bd.woff2") format("woff");
+  src: url("BBCReithSans_W_Bd.woff2") format("woff2");
   font-weight: bold;
+  font-display: swap;
 }
 
 @font-face {
@@ -38,54 +44,79 @@
   src: url("BBCReithSans_W_BdIt.woff") format("woff");
   font-weight: bold;
   font-style: italic;
+  font-display: swap;
 }
 
 @font-face {
   font-family: "BBC Reith Sans";
-  src: url("BBCReithSans_W_It.woff2") format("woff");
+  src: url("BBCReithSans_W_It.woff2") format("woff2");
   font-style: italic;
+  font-display: swap;
 }
 
 @font-face {
   font-family: "Lucida Sans Unicode";
   src: url("lucidasansunicode.ttf") format("truetype");
+  font-display: swap;
 }
 
 body {
   --accent: #1f6f8b;
   --accent-dark: #164f64;
   --border: #c8d1d6;
+  --border-subtle: #e2eaef;
+  --ink: #1d2f38;
   --link: #1f6f8b;
   --muted: #4f6670;
   --selected: #c0d6e1;
   --surface: #f4f8fa;
-  font-size: 19px;
-  font-family: sans-serif;
+  color: var(--ink);
+  font-size: 17px;
+  font-family: "BBC Reith Sans", system-ui, -apple-system, sans-serif;
+  line-height: 1.55;
   margin: 0 auto;
   max-width: 1200px;
-  padding: 12px 16px;
+  padding: 16px 20px 40px;
 }
 
-button {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #fff;
-  color: #20333d;
-  font-size: 15px;
-  min-height: 30px;
-  padding: 4px 10px;
+body.page-narrow {
+  max-width: 820px;
 }
 
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+button,
 .button {
   align-items: center;
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: 6px;
-  color: #20333d;
+  box-sizing: border-box;
+  color: var(--ink);
+  cursor: pointer;
   display: inline-flex;
-  font-size: 16px;
+  font-family: inherit;
+  font-size: 15px;
+  justify-content: center;
   line-height: 1;
-  min-height: 34px;
+  min-height: 36px;
   padding: 0 12px;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
 
 .button-primary {
@@ -114,21 +145,12 @@ audio {
   height: 38px;
 }
 
-audio.svelte-eemfgq {
-  padding: 3px;
-  width: 100%;
-}
-
 textarea {
   height: 18em;
   width: 100%;
   max-width: 70em;
   font-size: 16px;
-  font-family: sans-serif;
-}
-
-tr:hover {
-  background-color: #d1d1d157;
+  font-family: inherit;
 }
 
 .entries-table {
@@ -136,16 +158,12 @@ tr:hover {
    * separate (not collapse) borders: border-collapse resolves shared borders
    * across the whole table, which is costly for thousands of rows and fights
    * with per-row content-visibility containment. With separate borders each
-   * cell owns its borders, so skipped rows need no table-wide reconciliation.
-   * The single-line grid is reproduced via table top/left + per-cell
-   * right/bottom borders below.
+   * cell owns its bottom border, so skipped rows need no table-wide reconciliation.
    */
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
   width: 100%;
-  border-top: 1px solid var(--border);
-  border-left: 1px solid var(--border);
 }
 
 .data-table,
@@ -156,37 +174,51 @@ tr:hover {
 }
 
 .entries-table th,
-.entries-table td,
-.data-table th,
-.data-table td,
-.synonyms-table th,
-.synonyms-table td {
-  padding: 4px 6px;
+.entries-table td {
+  padding: 10px 12px;
   vertical-align: top;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
-/* collapse-border tables: full border on every cell */
 .data-table th,
 .data-table td,
 .synonyms-table th,
 .synonyms-table td {
+  padding: 8px 10px;
+  vertical-align: top;
+  overflow-wrap: break-word;
   border: 1px solid var(--border);
 }
 
-/* separate-border table: each cell draws its right/bottom; table draws top/left */
-.entries-table th,
-.entries-table td {
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+.entries-table th {
+  background: #fff;
+  border-bottom: 2px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  position: sticky;
+  text-align: left;
+  text-transform: uppercase;
+  top: 0;
+  z-index: 2;
 }
 
-.entries-table th,
+.entries-table td {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.entries-table tbody tr:hover {
+  background-color: var(--surface);
+}
+
 .data-table th,
 .synonyms-table th {
-  background: #fff;
+  background: var(--surface);
   color: var(--accent-dark);
   position: sticky;
+  text-align: left;
   top: 0;
   z-index: 2;
 }
@@ -196,16 +228,13 @@ tr:hover {
 }
 
 /*
- * The dictionary renders every entry (thousands of rows) in one table so
- * Ctrl+F can search the whole list. content-visibility lets the browser skip
- * layout/paint for off-screen rows, which avoids a multi-hundred-ms freeze
- * when the tab regains focus. Only data rows (which carry an id) are skipped;
- * the sticky header row has no id and stays rendered. Ctrl+F and #id anchor
- * jumps still work because the browser renders matched/targeted subtrees.
+ * content-visibility lets the browser skip layout/paint for off-screen rows,
+ * avoiding a multi-hundred-ms freeze when the tab regains focus. Only data
+ * rows (which carry an id) are skipped; the sticky header stays rendered.
  */
 .entries-table tr[id] {
   content-visibility: auto;
-  contain-intrinsic-size: auto 50px;
+  contain-intrinsic-size: auto 48px;
 }
 
 .entries-table tr.resume-target-flash td {
@@ -219,7 +248,7 @@ tr:hover {
 .entries-table mark {
   background: #fff3a3;
   color: inherit;
-  padding: 0 1px;
+  padding: 0 2px;
   border-radius: 2px;
 }
 
@@ -250,21 +279,38 @@ tr:hover {
   }
 }
 
-.entries-table .entry-col {
-  width: 20%;
+.entries-table--default col.entry-col {
+  width: 26%;
 }
 
-.entries-table .context-col {
-  width: 40%;
+.entries-table--default col.context-col {
+  width: auto;
 }
 
-.entries-table .example-col {
-  width: 40%;
+.entries-table--default col.visit-col {
+  width: 4.75rem;
+}
+
+.entries-table--examples col.entry-col {
+  width: 22%;
+}
+
+.entries-table--examples col.context-col {
+  width: 36%;
+}
+
+.entries-table--examples col.example-col {
+  width: 42%;
+}
+
+.entries-table .entry-col a {
+  font-weight: 600;
 }
 
 .entries-table .visit-col {
-  text-align: center;
-  width: 5%;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .entries-table th:only-child,
@@ -288,35 +334,31 @@ tr:hover {
   width: 48%;
 }
 
-.float {
+.back-to-top {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  bottom: 28px;
+  box-shadow: 0 2px 10px rgba(22, 43, 52, 0.12);
+  color: var(--accent-dark);
+  font-size: 18px;
+  font-weight: bold;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
   position: fixed;
-  display: flex;
-  justify-content: center;
-  width: 60px;
-  height: 60px;
-  bottom: 40px;
-  right: 40px;
-  background-color: #0c9;
-  color: #fff;
-  border-radius: 50px;
-  text-align: center;
-  box-shadow: 2px 2px 3px #999;
-}
-.my-float {
-  font-size: 20px;
-  display: flex;
-  justify-content: center;
-  text-align: center;
-  align-items: center;
+  right: 28px;
+  width: 44px;
+  z-index: 20;
 }
 
-.unselectable {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  -khtml-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
+.back-to-top[hidden] {
+  display: none;
+}
+
+.back-to-top:hover {
+  background: var(--surface);
+  border-color: var(--accent);
 }
 
 a,
@@ -334,7 +376,7 @@ a:focus {
 
 .button,
 .button:visited {
-  color: #20333d;
+  color: var(--ink);
 }
 
 .button-primary,
@@ -349,10 +391,6 @@ a:focus {
 
 tr.selected {
   background-color: var(--selected) !important;
-}
-
-.unselectable [data-content]:before {
-  content: attr(data-content);
 }
 
 /* Shared by every page (see templates/_page_header.html.jinja). The site
@@ -423,23 +461,29 @@ tr.selected {
   margin: 4px 0 0;
 }
 
+.dashboard-search {
+  margin: 16px 0 18px;
+}
+
 .dashboard-secondary-action {
   color: var(--muted);
   font-size: 15px;
   margin: 14px 0 0;
-  max-width: 68ch;
 }
 
 .card {
+  background: #fff;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(22, 43, 52, 0.04);
   margin: 16px 0;
-  max-width: 68ch;
-  padding: 16px;
+  padding: 20px 22px;
 }
 
 .card h2 {
-  margin: 0 0 6px;
+  font-family: "BBC Reith Serif", serif;
+  font-size: 21px;
+  margin: 0 0 10px;
 }
 
 .card p {
@@ -580,38 +624,73 @@ button:hover,
 .IPA-player {
   display: flex;
   align-items: center;
-  justify-content: start;
-  font-family: "Lucida Sans Unicode";
+  justify-content: flex-start;
+  font-family: "Lucida Sans Unicode", sans-serif;
 }
+
 .ipa {
-  font-family: "Lucida Sans Unicode";
+  font-family: "Lucida Sans Unicode", sans-serif;
 }
+
+.ipa-text {
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.audio-btn {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--accent);
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  width: 36px;
+}
+
+.audio-btn[hidden] {
+  display: none;
+}
+
+.audio-btn:hover {
+  background: var(--surface);
+  border-color: transparent;
+  color: var(--accent-dark);
+}
+
+.audio-btn .icon-pause {
+  display: none;
+}
+
+.audio-btn.is-playing .icon-play {
+  display: none;
+}
+
+.audio-btn.is-playing .icon-pause {
+  display: block;
+}
+
+/* Visit count tiers: all meet WCAG AA contrast on white and --surface */
 .visit-0 {
-  color: #eff3f5;
+  color: #566c78;
 }
-.visit-1 {
-  color: #d0dbe1;
+
+.visit-low {
+  color: #3a5a6a;
 }
-.visit-2 {
-  color: #c1cfd7;
+
+.visit-mid {
+  color: var(--accent);
+  font-weight: 600;
 }
-.visit-3 {
-  color: #a2b8c3;
+
+.visit-high {
+  color: var(--accent-dark);
+  font-weight: 700;
 }
-.visit-4 {
-  color: #7394a5;
-}
-.visit-5 {
-  color: #5a7a8c;
-}
-.visit-6 {
-  color: #50687c;
-}
-.visit-7 {
-  color: #3c4e5d;
-}
+
 caption {
-  font-family: "BBC Reith Serif";
+  font-family: "BBC Reith Serif", serif;
   font-weight: bold;
   font-size: 1.2em;
 }
@@ -623,38 +702,75 @@ caption {
 
 /* Word detail page */
 .word-title {
-  font-size: 31px;
-  text-align: center;
+  font-family: "BBC Reith Serif", serif;
+  font-size: 34px;
+  line-height: 1.15;
 }
 
-.word-meta {
+.word-hero {
+  margin: 18px 0 8px;
+}
+
+.word-hero-top {
+  align-items: baseline;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
-  color: var(--muted);
-  font-size: medium;
-  font-family: monospace;
+}
+
+.word-hero .word-title {
   margin: 0;
-}
-
-.word-meta button {
-  margin-left: 10px;
-}
-
-.entry-value {
-  /* font-size: 20px; */
-  margin: 0 0 10px;
+  text-align: left;
 }
 
 .pronunciation-row {
   align-items: center;
-  border-top: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-  padding-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.word-meta {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 14px;
+  gap: 10px 16px;
+  justify-content: space-between;
+  margin: 14px 0 6px;
+}
+
+.word-meta-stats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.word-meta-bookmark {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.bookmark-badge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+.entry-context {
+  color: var(--ink);
+  font-family: "BBC Reith Serif", serif;
+  font-size: 18px;
+  line-height: 1.55;
+  margin: 0;
 }
 
 .form-page {
@@ -739,9 +855,8 @@ input[type="submit"]:hover {
 
 @media only screen and (max-width: 600px) {
   body {
-    padding: 8px;
-    font-size: 17px;
-    font-family: sans-serif;
+    padding: 10px 12px 32px;
+    font-size: 16px;
   }
 
   .page-header {
@@ -750,7 +865,40 @@ input[type="submit"]:hover {
 
   .entries-table th,
   .entries-table td {
-    padding: 4px;
+    padding: 8px 6px;
+    font-size: 15px;
+  }
+
+  .entries-table--default col.entry-col {
+    width: 34%;
+  }
+
+  .entries-table--default col.visit-col {
+    width: 3.75rem;
+  }
+
+  .entries-table--examples col.entry-col {
+    width: 28%;
+  }
+
+  .entries-table--examples col.context-col {
+    width: 34%;
+  }
+
+  .entries-table--examples col.example-col {
+    width: 38%;
+  }
+
+  .back-to-top {
+    bottom: 16px;
+    right: 16px;
+    height: 40px;
+    min-height: 40px;
+    width: 40px;
+  }
+
+  .word-title {
+    font-size: 28px;
   }
 }
 /* Small state-changing forms used in the global navigation. */

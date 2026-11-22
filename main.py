@@ -476,7 +476,7 @@ def entry_page(entry_id: int, request: Request):
         d = entry.definitions[0]
         definition_html = markdown2.markdown(d.text, extras=["strike"])
         definition_id = d.id
-    _, word = parse_entry_text(entry.text)
+    context_text, word = parse_entry_text(entry.text)
     IPA_transcript = get_IPA(word)
     oxford_audio_slug = urllib.parse.quote(word.lower(), safe="")
     tts_audio_query = urllib.parse.quote_plus(word)
@@ -494,6 +494,7 @@ def entry_page(entry_id: int, request: Request):
         "last_visit_elapsed": get_how_long_ago(entry.last_visit),
         "is_review_bookmark": entry_id == review_bookmark_entry_id,
         "entry_text": normalize_pronoun_casing(entry.text),
+        "context_text": normalize_pronoun_casing(context_text),
         "entry_id": entry_id,
         "IPA_transcript": IPA_transcript,
         "word": word,

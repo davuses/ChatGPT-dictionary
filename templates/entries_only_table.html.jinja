@@ -1,9 +1,12 @@
-<tr>
-    <th class="entry-col">Entry</th>
-</tr>
+<thead>
+    <tr>
+        <th class="entry-col">Entry</th>
+    </tr>
+</thead>
+<tbody>
 {% for display in entry_displays %}
 <tr id="{{ display.entry.id }}">
-    <td class="entry-col"><label class="unselectable">-<span data-content=" "></span></label><a
-            href="entry/{{ display.entry.id }}">{{ display.text }}</a></td>
+    <td class="entry-col"><a href="/entry/{{ display.entry.id }}">{{ display.text }}</a></td>
 </tr>
 {% endfor %}
+</tbody>

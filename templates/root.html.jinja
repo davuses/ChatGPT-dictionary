@@ -2,10 +2,19 @@
 {% from "_quiz_card.html.jinja" import quiz_card %}
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}My Dictionary{% endblock title %}
+{% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
 
 {{ page_header(subtitle=entries_count ~ " entries · " ~ visited_last_7_days ~ " visited in the last 7 days", brand_as_h1=True, show_notes=True, show_add=True) }}
+
+<form class="search-form dashboard-search" role="search" action="/entries" method="get">
+    <input type="search"
+        name="q"
+        placeholder="Jump to a word, context, or example&hellip;"
+        aria-label="Search entries">
+    <button class="button button-primary" type="submit">Search</button>
+</form>
 
 {% block dashboard_widgets %}
 <section class="card">

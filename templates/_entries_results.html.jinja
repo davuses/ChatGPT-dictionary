@@ -8,15 +8,16 @@
 #}
 {% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
 
-<table class="entries-table">
+{% set table_variant = "only" if entries_only else ("examples" if show_example else "default") %}
+<table class="entries-table entries-table--{{ table_variant }}">
     {% if entries_only %}
-    <caption>Entries Only</caption>
+    <caption class="sr-only">Entries Only</caption>
     {% include "entries_only_table.html.jinja" %}
     {% elif show_example %}
-    <caption>Entries with Examples</caption>
+    <caption class="sr-only">Entries with Examples</caption>
     {% include "entries_with_examples.html.jinja" %}
     {% else %}
-    <caption>My Entries</caption>
+    <caption class="sr-only">My Entries</caption>
     {% include "entries_default.html.jinja" %}
     {% endif %}
 

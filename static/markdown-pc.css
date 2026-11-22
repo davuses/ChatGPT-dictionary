@@ -18,7 +18,7 @@
 }
 
 .markdown-body a {
-  color: #4183c4;
+  color: var(--link, #1f6f8b);
 }
 .markdown-body a.absent {
   color: #cc0000;
@@ -35,7 +35,7 @@
 }
 
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
-  margin: 20px -8px 10px;
+  margin: 20px 0 10px;
   padding: 0;
   font-weight: bold;
   -webkit-font-smoothing: antialiased;
@@ -221,14 +221,12 @@
   white-space: nowrap; /* Prevents wrapping */
   overflow: hidden; /* Hide overflow text */
   text-overflow: ellipsis; /* Add ellipsis (…) when text overflows */
-  font-size: 17px;
+  font-size: 16px;
   font-style: italic;
-  font-family: "Segoe UI", "BBC Reith Serif", Palatino, sans-serif;
 }
 .markdown-body table tr td.col-2 {
   max-width: 45rem;
-  font-size: 16px;
-  font-family: Helvetica, sans-serif;
+  font-size: 15px;
 }
 .markdown-body table tr th :first-child, .markdown-body table tr td :first-child {
   margin-top: 0;

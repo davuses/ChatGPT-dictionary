@@ -1,17 +1,23 @@
-<tr>
-    <th class="entry-col">Entry</th>
-    <th class="context-col">Context</th>
-    <th class="example-col">Examples</th>
-</tr>
+<colgroup>
+    <col class="entry-col">
+    <col class="context-col">
+    <col class="example-col">
+</colgroup>
+<thead>
+    <tr>
+        <th class="entry-col">Entry</th>
+        <th class="context-col">Context</th>
+        <th class="example-col">Examples</th>
+    </tr>
+</thead>
+<tbody>
 {% for display in entry_displays %}
 <tr id="{{ display.entry.id }}">
-    <td class="entry-col"><label class="unselectable">-<span data-content=" "></span></label><a
-            href="entry/{{ display.entry.id }}">{{ display.text }}</a></td>
-    <td class="context-col">
-        {{ display.context }}
-    </td>
+    <td class="entry-col"><a href="/entry/{{ display.entry.id }}">{{ display.text }}</a></td>
+    <td class="context-col">{{ display.context }}</td>
     {% if show_example %}
-    <td class="example-col"> {{ display.entry.example }} </td>
+    <td class="example-col">{{ display.entry.example or "" }}</td>
     {% endif %}
 </tr>
 {% endfor %}
+</tbody>

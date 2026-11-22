@@ -45,13 +45,7 @@ My Dictionary
     {% include "_entries_results.html.jinja" %}
 </div>
 
-<div id="bottom">
-</div>
-<a href="#"
-    class="float">
-    <i class="my-float"
-        style="font-size:20px">top</i>
-</a>
+<button type="button" class="back-to-top" id="back-to-top" aria-label="Back to top" hidden>&uarr;</button>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         document.addEventListener("keydown", (event) => {
@@ -85,9 +79,30 @@ My Dictionary
         });
 
         initLiveSearch(results);
+        initBackToTop();
         refreshReviewBookmarkLink();
         flashIncomingHashTarget();
     });
+
+    function initBackToTop() {
+        const button = document.getElementById("back-to-top");
+        const sentinel = document.getElementById("top");
+        if (!button || !sentinel) return;
+
+        button.addEventListener("click", function () {
+            const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+        });
+
+        if ("IntersectionObserver" in window) {
+            const observer = new IntersectionObserver((entries) => {
+                button.hidden = entries[0].isIntersecting;
+            });
+            observer.observe(sentinel);
+        } else {
+            button.hidden = false;
+        }
+    }
 
     // Search-as-you-type: debounce keystrokes, fetch the same /entries
     // route with a header that asks for a JSON fragment instead of the

@@ -13,6 +13,7 @@ os.environ.setdefault(
 os.environ.setdefault(
     "DICTIONARY_SESSION_SECRET", "test-session-secret-at-least-32-characters"
 )
+os.environ.setdefault("DICTIONARY_HTTPS_ONLY", "true")
 
 from main import app  # noqa: E402
 

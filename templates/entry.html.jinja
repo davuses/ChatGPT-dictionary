@@ -1,314 +1,297 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ word }}{% endblock title %}
+{% block body_class %}page-narrow{% endblock body_class %}
 
-{% block head %}
-<link rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
-<style>
-    .material-symbols-outlined {
-        font-size: 32px;
-        font-variation-settings:
-            'FILL' 0,
-            'wght' 400,
-            'GRAD' 0,
-            'opsz' 24
-    }
-
-    .audio-icon {
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .audio-icon:hover {
-        color: var(--accent-dark);
-    }
-</style>
-{% endblock head %}
+{% macro audio_button(btn_id, audio_id, label) %}
+<button type="button"
+    class="audio-btn"
+    id="{{ btn_id }}"
+    data-audio-id="{{ audio_id }}"
+    aria-label="{{ label }}"
+    hidden>
+    <svg class="icon-play" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <polygon points="10,8 16.5,12 10,16" fill="currentColor" />
+    </svg>
+    <svg class="icon-pause" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <rect x="9" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
+        <rect x="12.6" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
+    </svg>
+</button>
+{% endmacro %}
 
 {% block body %}
     {% set synonyms_link %}<a class="button button-ghost" href="/show_synonyms/{{ entry_id }}">Synonyms</a>{% endset %}
     {{ page_header(extra_nav=synonyms_link) }}
-    <article class="entry-page">
-        <h1 class="word-title"> {{ word }} </h1>
-        <p class="word-meta">
-            <span>{{ visit_count }} visits</span>
-            <span>Last visit: {{ last_visit_elapsed }}</span>
-            <span class="flex-center">
-                {% if is_review_bookmark %}
-                <span>Resume point</span>
-                <button class="button-danger" id="clear-review-bookmark" onclick="handleClearReviewBookmark()">Clear</button>
-                {% else %}
-                <button id="set-review-bookmark" onclick="handleSetReviewBookmark()">Mark here</button>
-                {% endif %}
-            </span>
-        </p>
-        <div class="pronunciation-row IPA-player">
-            /{{ IPA_transcript }}/
-
-            <audio id="1-ipa-audio"
-                controls
-                style="display: none;"
-                class="ipa-audio"
-                oncanplay="myOnCanPlayFunction(this)">
-                <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_1.mp3"
-                    type="audio/mp3">
-                <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ oxford_audio_slug }}--_us_1.mp3"
-                    type="audio/mp3">
-            </audio>
-            <span class="material-symbols-outlined audio-icon"
-                id="audio-icon-1"
-                style="display: none; margin-left: 10px;"
-                onclick="toggleAudio(this)">
-                play_circle
-            </span>
-
-            <audio id="2-ipa-audio"
-                controls
-                style="display: none;"
-                class="ipa-audio"
-                oncanplay="myOnCanPlayFunction(this)">
-                <source id="2nd-ipa-source"
-                    src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_2.mp3"
-                    type="audio/mp3">
-            </audio>
-            <span class="material-symbols-outlined audio-icon"
-                id="audio-icon-2"
-                style="display: none; margin-left: 10px;"
-                onclick="toggleAudio(this)">
-                play_circle
-            </span>
-
-            <audio id="google-translate-audio"
-                controls
-                style="display: none;"
-                oncanplay="check_IPA_audio()">
-                <source
-                    src="https://www.google.com/speech-api/v1/synthesize?text={{ tts_audio_query }}&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1"
-                    type="audio/mp3">
-            </audio>
-            <span class="material-symbols-outlined audio-icon"
-                style="display: none; margin-left: 10px;"
-                id="google-translate-audio-icon"
-                onclick="toggleGoogleTranslateAudio(this)">
-                play_circle
-            </span>
-
-            <script>
-                function toggleAudio(icon) {
-                    const audioId = icon.id[icon.id.length - 1]
-                    const audio = document.getElementById(audioId + "-ipa-audio");
-                    if (audio.paused) {
-                        audio.play();
-                        icon.innerHTML = 'pause_circle'; // Change to pause icon
-
-                    } else {
-                        audio.pause();
-                        icon.innerHTML = 'play_circle'; // Change to play icon
-
-                    }
-                }
-                function toggleGoogleTranslateAudio(icon) {
-                    const audio = document.getElementById("google-translate-audio");
-                    if (audio.paused) {
-                        audio.play();
-                        icon.innerHTML = 'pause_circle'; // Change to pause icon
-
-                    } else {
-                        audio.pause();
-                        icon.innerHTML = 'play_circle'; // Change to play icon
-
-                    }
-                }
-                const audioElements = document.querySelectorAll('audio');
-                audioElements.forEach((audio, index) => {
-                    let icon
-                    if (audio.id == "google-translate-audio") {
-                        icon = document.getElementById("google-translate-audio-icon")
-                    } else {
-                        const audioId = audio.id[0];
-                        icon = document.getElementById("audio-icon-" + audioId);
-                    }
-                    audio.addEventListener('ended', () => {
-                        icon.innerHTML = 'play_circle';
-                    });
-                })
-                function myOnCanPlayFunction(audio) {
-                    const audioId = audio.id[0];
-                    if (audio) {
-                        if (audio.readyState) {
-                            const icon = document.getElementById("audio-icon-" + audioId);
-                            icon.style.display = "inline";
-                        }
-                    }
-                }
-                function check_IPA_audio() {
-                    const audioIPAElements = document.querySelectorAll('.ipa-audio');
-                    if (!audioElements[0].readyState && !audioElements[1].readyState) {
-                        const icon = document.getElementById("google-translate-audio-icon")
-                        icon.style.display = "inline";
-                    }
-                }
-                document.addEventListener("DOMContentLoaded", () => {
-                    document.addEventListener("keydown", (event) => {
-                        if (event.altKey && event.key === "v") {
-                            if (shouldIgnoreShortcut(event, { allowAlt: true })) return;
-                            event.preventDefault();
-                            const definitionDiv = document.getElementById("definition-div");
-                            if (!definitionDiv) {
-                                navigator.clipboard
-                                    .readText()
-                                    .then((text) => {
-                                        const definitionForm = document.createElement("form");
-                                        definitionForm.method = "post";
-                                        definitionForm.action = "/add_definition";
-                                        let formData = { entry_id: entryId, definition_text: text, csrf_token: "{{ csrf_token or '' }}" };
-                                        for (const key in formData) {
-                                            const hiddenField = document.createElement("input");
-                                            hiddenField.type = "hidden";
-                                            hiddenField.name = key;
-                                            hiddenField.value = formData[key];
-                                            definitionForm.appendChild(hiddenField);
-                                        }
-                                        document.body.appendChild(definitionForm);
-                                        definitionForm.submit();
-                                    })
-                                    .catch((error) => {
-                                        console.error("Failed to read clipboard: ", error);
-                                    });
-                            }
-                            return;
-                        }
-                        if (shouldIgnoreShortcut(event)) return;
-                        if (event.key === "p") {
-                            let audioElems;
-                            const ipaAudios = document.querySelectorAll('.ipa-audio');
-                            if (!ipaAudios[0].readyState && !ipaAudios[1].readyState) {
-                                audioElems = [document.getElementById("google-translate-audio")];
-                            } else {
-                                audioElems = ipaAudios;
-                            }
-                            let preAudio;
-                            audioElems.forEach((audio) => {
-                                let duration = 0;
-                                if (typeof preAudio !== 'undefined') {
-                                    duration = preAudio.duration;
-                                }
-                                setTimeout(function () {
-                                    audio.play();
-                                }, duration * 1000);
-                                preAudio = audio;
-                            });
-                        } else if (event.key === "b") {
-                            let length = history.length;
-                            for (let step = length - 1; step > 0; step--) {
-                                history.back(step);
-                            }
-                        } else if (event.key === "e") {
-                            const editBtn = document.getElementById("edit-example");
-                            if (editBtn) editBtn.click();
-                        } else if (event.key === "D") {
-                            const delBtn = document.getElementById("dbt");
-                            if (delBtn) delBtn.click();
-                        } else if (event.key === "a") {
-                            window.open("/add_entry", "_blank").focus();
-                        } else if (event.key === "Q") {
-                            const textToCopy = document.getElementById('entry').innerText;
-                            navigator.clipboard.writeText(textToCopy).then(() => {
-                                console.log('Text copied to clipboard!');
-                            }).catch(err => {
-                                console.error('Failed to copy text: ', err);
-                            });
-                        } else if (event.key === "A") {
-                            window.location.href = "/add_entry";
-                        }
-                    });
-                });
-                function deleteDefinition(button, definitionId) {
-                    if (confirm("Are you sure you want to delete this definition?")) {
-                        fetch("/delete_definition/" + definitionId, {
-                            method: "DELETE",
-                            headers: csrfHeaders()
-                        }).then(handleProtectedResponse).then((Response) => {
-                            if (Response.ok) {
-                                location.reload();
-                            }
-                        });
-                    }
-                }
-
-                function handleSetReviewBookmark() {
-                    fetch('/entry/{{ entry_id }}/set_review_bookmark', {
-                        method: 'POST', headers: csrfHeaders()
-                    }).then(handleProtectedResponse)
-                        .then(response => {
-                            if (response.ok) location.reload();
-                            else alert('Failed to set resume point.');
-                        });
-                }
-
-                function handleClearReviewBookmark() {
-                    fetch('/entry/{{ entry_id }}/clear_review_bookmark', {
-                        method: 'POST', headers: csrfHeaders()
-                    }).then(handleProtectedResponse)
-                        .then(response => {
-                            if (response.ok) location.reload();
-                            else alert('Failed to clear resume point.');
-                        });
-                }
-                var entryId = "{{ entry_id }}"
-            </script>
-        </div>
-        <section class="content-section">
-            <div class="section-header">
-                <h2>Entry</h2>
+    <article class="entry-page" id="entry-article" data-entry-text="{{ entry_text }}">
+        <header class="word-hero">
+            <div class="word-hero-top">
+                <h1 class="word-title">{{ word }}</h1>
                 <div class="section-actions">
-                    <button class="entry-button"
+                    <button class="button button-ghost"
                         onclick="location.href='/edit_entry/{{ entry_id }}'"
                         type="button">Edit</button>
-                    <button class="entry-button button-danger"
+                    <button class="button button-danger"
                         onclick="deleteEntry({{ entry_id }})"
                         type="button"
                         id="dbt">Delete</button>
                 </div>
             </div>
-            <p class="entry-value" id="entry">{{ entry_text }}</p>
+
+            <div class="pronunciation-row IPA-player">
+                <span class="ipa-text">/{{ IPA_transcript }}/</span>
+
+                <audio id="1-ipa-audio"
+                    class="ipa-audio"
+                    preload="metadata"
+                    hidden>
+                    <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_1.mp3"
+                        type="audio/mp3">
+                    <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ oxford_audio_slug }}--_us_1.mp3"
+                        type="audio/mp3">
+                </audio>
+                {{ audio_button("audio-icon-1", "1-ipa-audio", "Play pronunciation 1") }}
+
+                <audio id="2-ipa-audio"
+                    class="ipa-audio"
+                    preload="metadata"
+                    hidden>
+                    <source id="2nd-ipa-source"
+                        src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_2.mp3"
+                        type="audio/mp3">
+                </audio>
+                {{ audio_button("audio-icon-2", "2-ipa-audio", "Play pronunciation 2") }}
+
+                <audio id="google-translate-audio"
+                    preload="metadata"
+                    hidden>
+                    <source
+                        src="https://www.google.com/speech-api/v1/synthesize?text={{ tts_audio_query }}&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1"
+                        type="audio/mp3">
+                </audio>
+                {{ audio_button("google-translate-audio-icon", "google-translate-audio", "Play pronunciation") }}
+            </div>
+
+            <div class="word-meta">
+                <div class="word-meta-stats">
+                    <span>{{ visit_count }} {{ "visit" if visit_count == 1 else "visits" }}</span>
+                    <span aria-hidden="true">&middot;</span>
+                    <span>Last visit: {{ last_visit_elapsed }}</span>
+                </div>
+                <span class="word-meta-bookmark">
+                    {% if is_review_bookmark %}
+                    <span class="bookmark-badge">Resume point</span>
+                    <button class="button button-danger" id="clear-review-bookmark" onclick="handleClearReviewBookmark()" type="button">Clear</button>
+                    {% else %}
+                    <button class="button button-ghost" id="set-review-bookmark" onclick="handleSetReviewBookmark()" type="button">Mark here</button>
+                    {% endif %}
+                </span>
+            </div>
+        </header>
+
+        {% if context_text %}
+        <section class="content-section">
+            <div class="section-header">
+                <h2>Context</h2>
+            </div>
+            <p class="entry-context">{{ context_text }}</p>
         </section>
+        {% endif %}
+
         <section class="content-section">
             <div class="section-header">
                 <h2>Definition</h2>
                 {% if definition_exists %}
                 <div class="section-actions">
-                    <button class="entry-button"
+                    <button class="button button-ghost"
                         onclick="location.href='/edit_definition/{{ definition_id }}'"
                         type="button">Edit</button>
-                    <button class="entry-button button-danger"
-                        onclick="deleteDefinition(this,{{ definition_id }})">Delete</button>
+                    <button class="button button-danger"
+                        onclick="deleteDefinition(this, {{ definition_id }})"
+                        type="button">Delete</button>
                 </div>
                 {% endif %}
             </div>
-        {% if not definition_exists %}
-        <button class="entry-button"
-            onclick="location.href='/add_definition?entry_id={{ entry_id }}'"
-            type="button">Add definition</button>
-        {% endif %}
-        {% if definition_exists %}
-        <div id="definition-div" class="markdown-body">
-            {{ definition_html | safe }}
-        </div>
-        {% endif %}
+            {% if not definition_exists %}
+            <button class="button button-ghost"
+                onclick="location.href='/add_definition?entry_id={{ entry_id }}'"
+                type="button">Add definition</button>
+            {% else %}
+            <div id="definition-div" class="markdown-body">
+                {{ definition_html | safe }}
+            </div>
+            {% endif %}
         </section>
+
         <section class="content-section">
             <div class="section-header">
                 <h2>Example</h2>
-                <button class="entry-button"
+                <button class="button button-ghost"
                     onclick="location.href='/edit_example/{{ entry_id }}'"
                     type="button"
-                    id="edit-example">
-                    Edit</button>
+                    id="edit-example">Edit</button>
             </div>
             <div class="markdown-body">{{ example_html | safe }}</div>
         </section>
     </article>
+
+    <script>
+        var entryId = "{{ entry_id }}";
+
+        function deleteDefinition(button, definitionId) {
+            if (confirm("Are you sure you want to delete this definition?")) {
+                fetch("/delete_definition/" + definitionId, {
+                    method: "DELETE",
+                    headers: csrfHeaders()
+                }).then(handleProtectedResponse).then((Response) => {
+                    if (Response.ok) {
+                        location.reload();
+                    }
+                });
+            }
+        }
+
+        function handleSetReviewBookmark() {
+            fetch('/entry/{{ entry_id }}/set_review_bookmark', {
+                method: 'POST', headers: csrfHeaders()
+            }).then(handleProtectedResponse)
+                .then(response => {
+                    if (response.ok) location.reload();
+                    else alert('Failed to set resume point.');
+                });
+        }
+
+        function handleClearReviewBookmark() {
+            fetch('/entry/{{ entry_id }}/clear_review_bookmark', {
+                method: 'POST', headers: csrfHeaders()
+            }).then(handleProtectedResponse)
+                .then(response => {
+                    if (response.ok) location.reload();
+                    else alert('Failed to clear resume point.');
+                });
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const buttons = document.querySelectorAll(".audio-btn");
+            const ipaAudios = [
+                document.getElementById("1-ipa-audio"),
+                document.getElementById("2-ipa-audio"),
+            ];
+            const ttsAudio = document.getElementById("google-translate-audio");
+            const ttsBtn = document.getElementById("google-translate-audio-icon");
+
+            function syncAudioFallback() {
+                if (!ttsBtn || !ttsAudio) return;
+                const hasIpa = ipaAudios.some((a) => a && a.readyState > 0);
+                if (!hasIpa && ttsAudio.readyState > 0) {
+                    ttsBtn.hidden = false;
+                } else if (hasIpa) {
+                    ttsBtn.hidden = true;
+                }
+            }
+
+            buttons.forEach((btn) => {
+                const audio = document.getElementById(btn.dataset.audioId);
+                if (!audio) return;
+
+                btn.addEventListener("click", () => {
+                    if (audio.paused) {
+                        audio.play();
+                    } else {
+                        audio.pause();
+                    }
+                });
+
+                audio.addEventListener("play", () => btn.classList.add("is-playing"));
+                audio.addEventListener("pause", () => btn.classList.remove("is-playing"));
+                audio.addEventListener("ended", () => btn.classList.remove("is-playing"));
+                audio.addEventListener("canplay", () => {
+                    if (audio === ttsAudio) {
+                        syncAudioFallback();
+                    } else {
+                        btn.hidden = false;
+                        syncAudioFallback();
+                    }
+                });
+
+                if (audio.readyState > 0) {
+                    if (audio === ttsAudio) {
+                        syncAudioFallback();
+                    } else {
+                        btn.hidden = false;
+                        syncAudioFallback();
+                    }
+                }
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (event.altKey && event.key === "v") {
+                    if (shouldIgnoreShortcut(event, { allowAlt: true })) return;
+                    event.preventDefault();
+                    const definitionDiv = document.getElementById("definition-div");
+                    if (!definitionDiv) {
+                        navigator.clipboard
+                            .readText()
+                            .then((text) => {
+                                const definitionForm = document.createElement("form");
+                                definitionForm.method = "post";
+                                definitionForm.action = "/add_definition";
+                                let formData = { entry_id: entryId, definition_text: text, csrf_token: "{{ csrf_token or '' }}" };
+                                for (const key in formData) {
+                                    const hiddenField = document.createElement("input");
+                                    hiddenField.type = "hidden";
+                                    hiddenField.name = key;
+                                    hiddenField.value = formData[key];
+                                    definitionForm.appendChild(hiddenField);
+                                }
+                                document.body.appendChild(definitionForm);
+                                definitionForm.submit();
+                            })
+                            .catch((error) => {
+                                console.error("Failed to read clipboard: ", error);
+                            });
+                    }
+                    return;
+                }
+                if (shouldIgnoreShortcut(event)) return;
+                if (event.key === "p") {
+                    const readyIpa = ipaAudios.filter((a) => a && a.readyState > 0);
+                    const audioElems = readyIpa.length ? readyIpa : (ttsAudio ? [ttsAudio] : []);
+                    let delayMs = 0;
+                    audioElems.forEach((audio) => {
+                        setTimeout(() => audio.play(), delayMs);
+                        if (Number.isFinite(audio.duration)) {
+                            delayMs += audio.duration * 1000;
+                        }
+                    });
+                } else if (event.key === "b") {
+                    let length = history.length;
+                    for (let step = length - 1; step > 0; step--) {
+                        history.back(step);
+                    }
+                } else if (event.key === "e") {
+                    const editBtn = document.getElementById("edit-example");
+                    if (editBtn) editBtn.click();
+                } else if (event.key === "D") {
+                    const delBtn = document.getElementById("dbt");
+                    if (delBtn) delBtn.click();
+                } else if (event.key === "a") {
+                    window.open("/add_entry", "_blank").focus();
+                } else if (event.key === "Q") {
+                    const article = document.getElementById("entry-article");
+                    const textToCopy = article ? article.dataset.entryText || "" : "";
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        console.log("Text copied to clipboard!");
+                    }).catch((err) => {
+                        console.error("Failed to copy text: ", err);
+                    });
+                } else if (event.key === "A") {
+                    window.location.href = "/add_entry";
+                }
+            });
+        });
+    </script>
 
 {% endblock body %}

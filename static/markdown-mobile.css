@@ -11,28 +11,22 @@ html {
  * to set a *sans* stack while markdown-pc.css set a *serif* one, so the
  * same content changed typeface at 600px.) */
 .markdown-body {
-  color: #444;
-  line-height: 1.5em;
+  line-height: 1.6;
 }
 
 .markdown-body a {
-  color: #0645ad;
+  color: var(--link, #1f6f8b);
   text-decoration: none;
 }
 .markdown-body a:visited {
-  color: #0b0080;
+  color: var(--link, #1f6f8b);
 }
 .markdown-body a:hover {
-  color: #06e;
+  color: var(--accent-dark, #164f64);
+  text-decoration: underline;
 }
 .markdown-body a:active {
-  color: #faa700;
-}
-.markdown-body a:focus {
-  outline: thin dotted;
-}
-.markdown-body a:hover, .markdown-body a:active {
-  outline: 0;
+  color: var(--accent-dark, #164f64);
 }
 
 .markdown-body ::-moz-selection {

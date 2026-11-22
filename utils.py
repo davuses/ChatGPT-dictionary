@@ -374,14 +374,20 @@ def pick_random_question(
     return _question_from_candidate(candidate, random)
 
 
-def get_how_long_ago(timestamp: int | None) -> str:
+def get_how_long_ago(timestamp: int | None, now: int | None = None) -> str:
     if not timestamp:
         return "never"
-    now = int(time.time())
-    time_delta = now - timestamp
+    current_time = int(time.time()) if now is None else now
+    time_delta = max(0, current_time - timestamp)
 
+    if time_delta < 60:
+        return "just now"
+    if time_delta < 3600:
+        minutes = time_delta // 60
+        return f"{minutes} min ago"
     if time_delta < 86400:
-        return "<= a day "
+        hours = time_delta // 3600
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
 
     days = time_delta // 86400
     years = days // 365
@@ -393,7 +399,7 @@ def get_how_long_ago(timestamp: int | None) -> str:
         parts.append(f"{years} year{'s' if years != 1 else ''}")
     if months > 0:
         parts.append(f"{months} month{'s' if months != 1 else ''}")
-    if remaining_days > 0 or not parts:
+    if years == 0 and (remaining_days > 0 or not parts):
         parts.append(
             f"{remaining_days} day{'s' if remaining_days != 1 else ''}"
         )
