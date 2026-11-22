@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 import auth
 import capture
 import database
+import thesaurus
 import utils
 
 
@@ -47,13 +48,13 @@ def isolated_db(monkeypatch, tmp_path):
     monkeypatch.setattr(database, "engine", test_engine)
     utils.invalidate_words_cache()
     utils.invalidate_quiz_pool_cache()
-    utils.get_thesaurus_senses_plain.cache_clear()
+    thesaurus.fetch_thesaurus_senses.cache_clear()
     try:
         yield test_engine
     finally:
         utils.invalidate_words_cache()
         utils.invalidate_quiz_pool_cache()
-        utils.get_thesaurus_senses_plain.cache_clear()
+        thesaurus.fetch_thesaurus_senses.cache_clear()
         test_engine.dispose()
 
 

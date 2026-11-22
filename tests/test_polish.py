@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 
 import database
 import main
+import thesaurus
 import utils
 
 
@@ -248,13 +249,10 @@ async def test_dashboard_quick_search_and_entries_visit_tiers(
     assert "unselectable" not in entries.text
 
 
-async def test_synonyms_handles_sim_list_stems_and_phrases(
+async def test_synonyms_handles_sim_list_stems_phrases_and_escaping(
     client, isolated_db, monkeypatch
 ):
-    from wordhoard import Synonyms
-    from wordhoard.utilities import caching
-
-    caching.temporary_dict_synonyms.clear()
+    thesaurus.fetch_thesaurus_senses.cache_clear()
     await _login(client)
     e_phrase = database.db_add_entry("ctx - zero in on")
     e_linked = database.db_add_entry("ctx - Focus")
@@ -276,7 +274,12 @@ async def test_synonyms_handles_sim_list_stems_and_phrases(
                             [
                                 "sense",
                                 {
-                                    "dt": [["text", "to direct one's attention to"]],
+                                    "dt": [
+                                        [
+                                            "text",
+                                            "to direct <script>alert(1)</script> attention to",
+                                        ]
+                                    ],
                                     "sim_list": [[{"wd": "focus"}, {"wd": "concentrate"}]],
                                 },
                             ]
@@ -287,20 +290,80 @@ async def test_synonyms_handles_sim_list_stems_and_phrases(
         }
     ]
 
+    calls = []
+
     class FakeResp:
         status_code = 200
 
         def json(self):
             return mw_payload
 
-    monkeypatch.setattr("wordhoard.synonyms.requests.get", lambda url, timeout: FakeResp())
+    def fake_get(url, timeout):
+        calls.append(url)
+        return FakeResp()
+
+    monkeypatch.setattr(thesaurus.requests, "get", fake_get)
     monkeypatch.setattr(utils, "get_mw_thesaurus_api_key", lambda: "fake-key")
 
-    resp = await client.get(f"/show_synonyms/{e_phrase}")
-    assert resp.status_code == 200
-    assert "concentrate" in resp.text
-    assert f'/entry/{e_linked}">focus</a>' in resp.text
-    caching.temporary_dict_synonyms.clear()
+    try:
+        resp = await client.get(f"/show_synonyms/{e_phrase}")
+        assert resp.status_code == 200
+        assert "concentrate" in resp.text
+        assert f'/entry/{e_linked}">focus</a>' in resp.text
+        # Meaning from MW must be autoescaped, never rendered | safe
+        assert "<script>alert(1)</script>" not in resp.text
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in resp.text
+
+        # Case-insensitive cache hit: "Zero In On" reuses cached "zero in on"
+        senses_again = utils.get_thesaurus_senses("  Zero   In On ")
+        assert len(senses_again) == 1
+        assert len(calls) == 1
+    finally:
+        thesaurus.fetch_thesaurus_senses.cache_clear()
+
+
+def test_thesaurus_errors_raise_and_do_not_poison_cache(monkeypatch):
+    thesaurus.fetch_thesaurus_senses.cache_clear()
+    attempts = {"n": 0}
+
+    class FakeOkResp:
+        status_code = 200
+
+        def json(self):
+            return [
+                {
+                    "meta": {"id": "candid", "stems": ["candid"], "syns": [["frank"]]},
+                    "hwi": {"hw": "candid"},
+                    "fl": "adjective",
+                    "shortdef": ["honest and direct"],
+                    "def": [],
+                }
+            ]
+
+    def flaky_get(url, timeout):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise thesaurus.requests.Timeout("timed out")
+        if attempts["n"] == 2:
+            resp = FakeOkResp()
+            resp.status_code = 503
+            return resp
+        return FakeOkResp()
+
+    monkeypatch.setattr(thesaurus.requests, "get", flaky_get)
+    try:
+        with pytest.raises(thesaurus.ThesaurusError):
+            thesaurus.lookup_thesaurus("candid", "secret-key")
+        with pytest.raises(thesaurus.ThesaurusError):
+            thesaurus.lookup_thesaurus("candid", "secret-key")
+
+        # Subsequent call succeeds because failures were not cached
+        senses = thesaurus.lookup_thesaurus("Candid", "secret-key")
+        assert len(senses) == 1
+        assert senses[0].synonyms == ("frank",)
+        assert attempts["n"] == 3
+    finally:
+        thesaurus.fetch_thesaurus_senses.cache_clear()
 
 
 def test_highlight_ipa_preserves_escaped_html_and_wraps_ipa():

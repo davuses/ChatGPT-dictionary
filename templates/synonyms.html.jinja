@@ -21,7 +21,7 @@
         {% for sense in senses %}
         <tr>
             <td>{{ sense.part_of_speech }}</td>
-            <td>{{ sense.meaning_html | safe }}</td>
+            <td>{{ sense.meaning }}</td>
             <td>
                 {% for syn in sense.synonyms %}
                 {% set syn_key = syn.lower() %}

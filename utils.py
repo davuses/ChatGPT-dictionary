@@ -5,15 +5,12 @@ import re
 import threading
 import time
 import tomllib
-import urllib
 import urllib.parse
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import cast
 
-import markdown2
 from bs4 import BeautifulSoup, NavigableString
 from fastapi import HTTPException
 from markupsafe import Markup, escape
@@ -26,7 +23,7 @@ from database import (
     db_get_entry_visit_stats,
     db_get_quiz_source_entries,
 )
-from wordhoard import Synonyms
+from thesaurus import ThesaurusSense, fetch_thesaurus_senses, lookup_thesaurus
 
 
 ENTRY_TEXT_SEPARATOR = " - "
@@ -593,70 +590,31 @@ def safe_path_note(subpath: str) -> Path:
 
 
 @dataclass
-class ThesaurusSense:
-    part_of_speech: str
-    meaning_html: str
-    synonyms: list[str]
-
-
-@dataclass
 class EntryDisplay:
     entry: Entry | EntrySummary
     text: str
     context: str
 
 
-def get_synonyms(word):
-    synonym = Synonyms(
-        search_string=word,
-        api_key=get_mw_thesaurus_api_key(),
-    )
-    synonyms = cast(
-        list[tuple[str, str, str, list[str]]], synonym.find_synonyms()
-    )
-    return synonyms
+def clear_thesaurus_cache() -> None:
+    fetch_thesaurus_senses.cache_clear()
 
 
-def format_meaning_html(md_text: str) -> str:
-    return markdown2.markdown(md_text.strip())
+def get_thesaurus_senses(word: str) -> list[ThesaurusSense]:
+    return list(lookup_thesaurus(word, get_mw_thesaurus_api_key()))
 
 
-@lru_cache(maxsize=512)
 def get_thesaurus_senses_plain(word: str) -> tuple[dict[str, object], ...]:
-    """Cached plain-text thesaurus senses for JSON API consumers (no raw HTML)."""
-    synonyms_data = get_synonyms(word)
-    if not synonyms_data:
-        return ()
-    senses = []
-    for _, pos, meaning_md, synonyms in synonyms_data:
-        senses.append(
-            {
-                "part_of_speech": pos,
-                "meaning": meaning_md.strip(),
-                "synonyms": list(synonyms),
-            }
-        )
-    return tuple(senses)
-
-
-def get_thesaurus_senses(
-    word: str,
-) -> list[ThesaurusSense]:
-    synonyms_data = get_synonyms(word)
-    if not synonyms_data:
-        return []
-    senses = render_thesaurus_senses(synonyms_data)
-    return senses
-
-
-def render_thesaurus_senses(
-    synonyms_data: list[tuple[str, str, str, list[str]]],
-) -> list[ThesaurusSense]:
-    senses = []
-    for _, pos, meaning_md, synonyms in synonyms_data:
-        meaning_html = format_meaning_html(meaning_md)
-        senses.append(ThesaurusSense(pos, meaning_html, synonyms))
-    return senses
+    """Plain-text thesaurus senses for JSON API consumers (backed by thesaurus cache)."""
+    senses = lookup_thesaurus(word, get_mw_thesaurus_api_key())
+    return tuple(
+        {
+            "part_of_speech": sense.part_of_speech,
+            "meaning": sense.meaning,
+            "synonyms": list(sense.synonyms),
+        }
+        for sense in senses
+    )
 
 
 def highlight_ipa(html: str) -> str:
