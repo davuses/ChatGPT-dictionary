@@ -1,20 +1,20 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Edit Note{% endblock title %}
+{% block title %}{{ t('form.edit_note_title') }}{% endblock title %}
 
 {% block body %}
-{% set note_link %}<a class="button button-ghost" href="/view_note/{{ note_url_path }}">Note</a>{% endset %}
+{% set note_link %}<a class="button button-ghost" href="/view_note/{{ note_url_path }}">{{ t('nav.note') }}</a>{% endset %}
 {{ page_header(extra_nav=note_link) }}
 <main class="form-page">
-<h1>Edit Note</h1>
+<h1>{{ t('form.edit_note_title') }}</h1>
 <form method="post"
     action="/edit_note/{{ note_url_path }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <textarea class="markdown-editor" name="note_text">{{ note_text }}</textarea><br>
     <div class="form-actions">
         <input type="submit"
-            value="Submit">
-        <a class="button button-ghost" href="/view_note/{{ note_url_path }}">Cancel</a>
+            value="{{ t('form.submit') }}">
+        <a class="button button-ghost" href="/view_note/{{ note_url_path }}">{{ t('form.cancel') }}</a>
     </div>
 </form>
 </main>

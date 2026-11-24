@@ -1,40 +1,40 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Add Entry{% endblock title %}
+{% block title %}{{ t('form.add_entry_title') }}{% endblock title %}
 
 {% block body %}
 {{ page_header() }}
 <main class="form-page">
-<h1>Add Entry</h1>
+<h1>{{ t('form.add_entry_title') }}</h1>
 {% if error %}
 <p class="form-error" role="alert">
     {{ error }}
     {% if existing_entry_id %}
-    <a href="/entry/{{ existing_entry_id }}">View existing entry</a>
+    <a href="/entry/{{ existing_entry_id }}">{{ t('form.view_existing') }}</a>
     {% endif %}
 </p>
 {% endif %}
 <form method="post" action="/add_entry">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-field">
-        <label for="word">Word or phrase</label>
+        <label for="word">{{ t('form.word_label') }}</label>
         <input id="word" name="word" type="text" value="{{ word }}" required autofocus>
     </div>
     <div class="form-field">
-        <label for="context">Context <span class="field-hint">(optional — sentence or phrase where you saw it)</span></label>
+        <label for="context">{{ t('form.context_label') }} <span class="field-hint">{{ t('form.context_hint') }}</span></label>
         <input id="context" name="context" type="text" value="{{ context }}">
     </div>
     <div class="form-field">
-        <label for="definition_text">Definition <span class="field-hint">(optional, Markdown supported)</span></label>
+        <label for="definition_text">{{ t('form.def_label') }} <span class="field-hint">{{ t('form.md_hint') }}</span></label>
         <textarea id="definition_text" name="definition_text" rows="4">{{ definition_text }}</textarea>
     </div>
     <div class="form-field">
-        <label for="example_text">Example <span class="field-hint">(optional, Markdown supported)</span></label>
+        <label for="example_text">{{ t('form.example_label') }} <span class="field-hint">{{ t('form.md_hint') }}</span></label>
         <textarea id="example_text" name="example_text" rows="4">{{ example_text }}</textarea>
     </div>
     <div class="form-actions">
-        <input type="submit" value="Save entry">
-        <a class="button button-ghost" href="/entries">Cancel</a>
+        <input type="submit" value="{{ t('form.save_entry') }}">
+        <a class="button button-ghost" href="/entries">{{ t('form.cancel') }}</a>
     </div>
 </form>
 </main>

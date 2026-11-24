@@ -1,20 +1,20 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Synonyms of {{ word }}{% endblock title %}
+{% block title %}{{ t('syn.title', word=word) }}{% endblock title %}
 
 {% block body %}
-{% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">Entry</a>{% endset %}
+{% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">{{ t('nav.entry') }}</a>{% endset %}
 {{ page_header(extra_nav=entry_link) }}
 
-<h1 class="word-title">Synonyms of <a href="/entry/{{ entry_id }}">{{ word }}</a></h1>
+<h1 class="word-title">{{ t('syn.heading') }} <a href="/entry/{{ entry_id }}">{{ word }}</a></h1>
 
 {% if senses %}
 <table class="synonyms-table data-table">
     <thead>
         <tr>
-            <th>Part of Speech</th>
-            <th>Meaning</th>
-            <th>Synonyms</th>
+            <th>{{ t('syn.col_pos') }}</th>
+            <th>{{ t('syn.col_meaning') }}</th>
+            <th>{{ t('syn.col_synonyms') }}</th>
         </tr>
     </thead>
     <tbody>
@@ -36,7 +36,7 @@
     </tbody>
 </table>
 {% else %}
-<p class="content-section">No synonyms found for this word.</p>
+<p class="content-section">{{ t('syn.empty') }}</p>
 {% endif %}
 
 

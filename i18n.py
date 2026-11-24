@@ -1,0 +1,809 @@
+"""Lightweight English / Simplified Chinese i18n catalog for Glossbook."""
+
+from typing import Any
+from fastapi import Request
+
+from auth import safe_next_path
+
+LANG_COOKIE_NAME = "glossbook_lang"
+LANG_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
+DEFAULT_LANG = "en"
+SUPPORTED_LANGS = ("en", "zh-CN")
+
+
+def normalize_lang(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    cleaned = raw.strip().replace("_", "-").lower()
+    if cleaned == "en" or cleaned.startswith("en-"):
+        return "en"
+    if cleaned == "zh" or cleaned.startswith("zh-"):
+        return "zh-CN"
+    return None
+
+
+def parse_accept_language(header_value: str | None) -> str:
+    """Resolve best supported locale from an HTTP Accept-Language header."""
+    if not header_value:
+        return DEFAULT_LANG
+    ranked: list[tuple[float, int, str]] = []
+    for index, raw_part in enumerate(header_value.split(",")):
+        part = raw_part.strip()
+        if not part:
+            continue
+        pieces = [p.strip() for p in part.split(";")]
+        lang = normalize_lang(pieces[0])
+        if lang is None:
+            continue
+        q = 1.0
+        valid_q = True
+        for param in pieces[1:]:
+            if param.lower().startswith("q="):
+                try:
+                    q = float(param[2:].strip())
+                except ValueError:
+                    valid_q = False
+                    break
+        if not valid_q or q <= 0.0:
+            continue
+        ranked.append((min(q, 1.0), -index, lang))
+
+    if not ranked:
+        return DEFAULT_LANG
+    ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return ranked[0][2]
+
+
+def get_request_lang(request: Request) -> str:
+    cached = getattr(request.state, "_lang", None)
+    if isinstance(cached, str):
+        return cached
+    cookie_lang = normalize_lang(request.cookies.get(LANG_COOKIE_NAME))
+    lang = (
+        cookie_lang
+        if cookie_lang in SUPPORTED_LANGS
+        else parse_accept_language(request.headers.get("accept-language"))
+    )
+    request.state._lang = lang
+    return lang
+
+
+TRANSLATIONS: dict[str, dict[str, str]] = {
+    "en": {
+        # Navigation & header
+        "nav.main_aria": "Main navigation",
+        "nav.words": "Words",
+        "nav.inbox": "Inbox",
+        "nav.notes": "Notes",
+        "nav.add": "+ Add",
+        "nav.account_menu_aria": "Account menu",
+        "nav.account": "Account",
+        "nav.admin": "Admin",
+        "nav.logout": "Log out",
+        "nav.switch_lang_label": "中文",
+        "nav.switch_lang_aria": "Switch language to Chinese",
+        "nav.entry": "Entry",
+        "nav.note": "Note",
+        "nav.synonyms": "Synonyms",
+        "nav.edit": "Edit",
+        # Dashboard
+        "dash.entries_one": "{n} entry",
+        "dash.entries_many": "{n} entries",
+        "dash.visited_7d": "{n} visited in the last 7 days",
+        "dash.search_placeholder": "Jump to a word, context, or example…",
+        "dash.search_aria": "Search entries",
+        "dash.search_btn": "Search",
+        "dash.quiz_title": "Fill in the blank",
+        "dash.review_session": "Review session",
+        "dash.resume_prefix": "Pick up where you left off",
+        "dash.resume_link": "Resume from last mark",
+        "dash.ext_title": "Capture words with the Chrome Side Panel",
+        "dash.ext_desc": "Jot down vocabulary from articles and YouTube transcripts right alongside what you're reading or watching, then batch-add them to Glossbook.",
+        "dash.ext_download": "Download extension (.zip)",
+        "dash.ext_setup": "Get API token & install guide",
+        # Quiz card
+        "quiz.show_answer": "Show answer",
+        "quiz.hide_answer": "Hide answer",
+        "quiz.try_another": "Try another",
+        "quiz.view_entry": "View full entry",
+        "quiz.empty": "No quizzable entries yet — add some examples first.",
+        # Entries list
+        "entries.title_only": "Words Only",
+        "entries.title_examples": "Examples",
+        "entries.title_needs_def": "Needs Definition",
+        "entries.count_plain": "{n} entries",
+        "entries.count_matching": "{n} matching entries",
+        "entries.search_placeholder": "Search words, context, or examples…",
+        "entries.clear": "Clear",
+        "entries.views_aria": "Entry views",
+        "entries.tab_all": "All",
+        "entries.tab_only": "Words Only",
+        "entries.tab_examples": "Examples",
+        "entries.tab_needs_def": "Needs Definition",
+        "entries.col_entry": "Word",
+        "entries.col_context": "Context",
+        "entries.col_visits": "Visits",
+        "entries.col_examples": "Examples",
+        "entries.caption_all": "My Words",
+        "entries.caption_only": "Words Only",
+        "entries.caption_examples": "Entries with Examples",
+        "entries.caption_needs_def": "Entries Needing Definitions",
+        "entries.empty_search": "No matching entries for “{q}”.",
+        "entries.empty_needs_def": "All entries have definitions.",
+        "entries.empty_all": "No entries yet.",
+        "entries.page_first": "First",
+        "entries.page_prev": "Prev",
+        "entries.page_next": "Next",
+        "entries.page_last": "Last",
+        "entries.page_status": "Page {page} of {total}",
+        "entries.back_to_top": "Back to top",
+        # Entry detail
+        "entry.edit": "Edit",
+        "entry.delete": "Delete",
+        "entry.play_1": "Play pronunciation 1",
+        "entry.play_2": "Play pronunciation 2",
+        "entry.play": "Play pronunciation",
+        "entry.visit_one": "{n} visit",
+        "entry.visit_many": "{n} visits",
+        "entry.last_visit": "Last visit: {elapsed}",
+        "entry.resume_point": "Resume point",
+        "entry.clear": "Clear",
+        "entry.mark_here": "Mark here",
+        "entry.context": "Context",
+        "entry.definition": "Definition",
+        "entry.add_definition": "Add definition",
+        "entry.example": "Example",
+        # Review session
+        "review.title": "Review Session",
+        "review.subtitle_one": "{n} quizzable entry",
+        "review.subtitle_many": "{n} quizzable entries",
+        "review.card_counter": "Card {i} of {n}",
+        "review.complete_counter": "Complete",
+        "review.empty_prefix": "No quizzable entries yet — add context sentences or usage examples to",
+        "review.empty_entries": "your words",
+        "review.empty_or": "or",
+        "review.empty_add": "add a new entry",
+        "review.empty_suffix": "first.",
+        "review.skip": "Skip",
+        "review.open_entry": "Open entry ↗",
+        "review.no_def": "No definition saved yet",
+        "review.add_def_link": "Add definition ↗",
+        "review.next_card": "Next card",
+        "review.finish_round": "Finish round",
+        "review.shortcuts_reveal": "reveal / next",
+        "review.shortcuts_or": "or",
+        "review.shortcuts_skip": "skip",
+        "review.shortcuts_open": "open entry",
+        "review.round_complete": "Round complete",
+        "review.another_round": "Another round",
+        "review.back_dashboard": "Back to dashboard",
+        # Inbox
+        "inbox.title": "Capture Inbox",
+        "inbox.subtitle": "Per-page notes and words captured from Chrome",
+        "inbox.clear_promoted": "Clear promoted ({n})",
+        "inbox.empty_title": "Inbox is empty",
+        "inbox.empty_desc": "Notes and words you jot down with the Chrome Side Panel extension will show up here for batch review and promotion into your dictionary.",
+        "inbox.install_ext": "Install Chrome extension",
+        "inbox.download_zip": "Download .zip",
+        "inbox.add_all": "Add all ({n})",
+        "inbox.delete_page": "Delete page",
+        "inbox.added_badge": "Added →",
+        "inbox.in_dict_badge": "In dictionary",
+        "inbox.play_aria": "Play pronunciation for {word}",
+        "inbox.play_title": "Play pronunciation",
+        "inbox.word_label": "Word",
+        "inbox.context_label": "Context",
+        "inbox.def_label": "Definition",
+        "inbox.def_placeholder": "Optional definition",
+        "inbox.save": "Save",
+        "inbox.cancel": "Cancel",
+        "inbox.add_one": "Add",
+        "inbox.scratchpad_title": "Page scratchpad",
+        "inbox.scratchpad_placeholder": "Freeform Markdown notes for this page…",
+        "inbox.save_notes": "Save notes",
+        # Add / Edit forms
+        "form.add_entry_title": "Add Entry",
+        "form.edit_entry_title": "Edit Entry",
+        "form.add_def_title": "Add Definition",
+        "form.edit_def_title": "Edit Definition",
+        "form.edit_example_title": "Edit Example",
+        "form.edit_note_title": "Edit Note",
+        "form.view_existing": "View existing entry",
+        "form.word_label": "Word or phrase",
+        "form.context_label": "Context",
+        "form.context_hint": "(optional — sentence or phrase where you saw it)",
+        "form.optional_hint": "(optional)",
+        "form.def_label": "Definition",
+        "form.example_label": "Example",
+        "form.md_hint": "(optional, Markdown supported)",
+        "form.save_entry": "Save entry",
+        "form.save_changes": "Save changes",
+        "form.submit": "Submit",
+        "form.cancel": "Cancel",
+        # Synonyms
+        "syn.title": "Synonyms of {word}",
+        "syn.heading": "Synonyms of",
+        "syn.col_pos": "Part of Speech",
+        "syn.col_meaning": "Meaning",
+        "syn.col_synonyms": "Synonyms",
+        "syn.empty": "No synonyms found for this word.",
+        # Notes
+        "notes.title": "Study Notes",
+        # Auth pages
+        "auth.login_title": "Log in",
+        "auth.username": "Username",
+        "auth.password": "Password",
+        "auth.password_bounds": "Password (10–128 characters)",
+        "auth.confirm_password": "Confirm password",
+        "auth.login_btn": "Log in",
+        "auth.register_title": "Create Account",
+        "auth.register_heading": "Create account",
+        "auth.register_btn": "Create account",
+        "auth.back_to_login": "Back to log in",
+        "auth.reset_title": "Reset Password",
+        "auth.reset_heading": "Reset password",
+        "auth.reset_for_user": "Setting a new password for",
+        "auth.new_password": "New password (10–128 characters)",
+        "auth.confirm_new_password": "Confirm new password",
+        "auth.save_password": "Save new password",
+        "auth.notice_pw_updated": "Password updated. You can log in now.",
+        "auth.err_rate_login": "Too many login attempts. Please wait a few minutes.",
+        "auth.err_invalid_creds": "Invalid username or password",
+        "auth.err_invite_invalid": "This invite link is invalid, expired, or has already been used.",
+        "auth.err_invite_only": "Registration is invite-only. Ask the admin for an invite link.",
+        "auth.err_rate_register": "Too many registration attempts. Please wait a few minutes.",
+        "auth.err_invite_required": "An invite code is required.",
+        "auth.err_pw_mismatch": "Passwords do not match.",
+        "auth.err_username_taken": "That username is already taken.",
+        "auth.err_register_failed": "Unable to complete registration.",
+        "auth.err_reset_invalid": "This password reset link is invalid, expired, or has already been used.",
+        "auth.err_rate_reset": "Too many password reset attempts. Please wait a few minutes.",
+        # Account page
+        "account.title": "Account",
+        "account.subtitle_user": "Signed in as {username}",
+        "account.subtitle_admin": "Signed in as {username} (admin)",
+        "account.export_import_title": "Export & Import Dictionary",
+        "account.export_desc_one": "Download an offline copy of your {n} entry (JSON includes /inbox page notes and visit stats; Markdown formats a clean study notebook).",
+        "account.export_desc_many": "Download an offline copy of your {n} entries (JSON includes /inbox page notes and visit stats; Markdown formats a clean study notebook).",
+        "account.download_json": "Download JSON",
+        "account.download_md": "Download Markdown",
+        "account.import_title": "Import Glossbook JSON",
+        "account.import_desc": "Merge a Glossbook .json export into your account. Existing entries and page notes are kept untouched and duplicates are skipped.",
+        "account.import_include_inbox": "Also import /inbox page notes",
+        "account.import_btn": "Import JSON",
+        "account.tokens_title": "Chrome Side Panel API Tokens",
+        "account.tokens_desc": "Generate a separate token per device (e.g. Laptop Chrome, Desktop Chrome). Tokens are only shown once when created.",
+        "account.ext_guide_summary": "How to install the Chrome extension (v{version})",
+        "account.ext_step1_link": "Download glossbook-extension-v{version}.zip",
+        "account.ext_step1_after": "and unzip it.",
+        "account.ext_step2_before": "Open",
+        "account.ext_step2_mid": "in Chrome and enable",
+        "account.ext_step2_bold": "Developer mode",
+        "account.ext_step2_after": "(top right).",
+        "account.ext_step3_before": "Click",
+        "account.ext_step3_bold": "Load unpacked",
+        "account.ext_step3_after": "and select the extracted folder (the one containing",
+        "account.ext_step3_end": ").",
+        "account.ext_step4_before": "Generate a token below, click the Glossbook icon to open the Side Panel, open",
+        "account.ext_step4_settings": "Settings",
+        "account.ext_step4_mid": ", enter server URL",
+        "account.ext_step4_and": "and your token, then click",
+        "account.ext_step4_save": "Save & test",
+        "account.ext_step4_end": ".",
+        "account.new_token_title": "New token created",
+        "account.new_token_hint": "— copy it now; it won't be shown again:",
+        "account.copy": "Copy",
+        "account.token_label_placeholder": "Device label (e.g. Laptop Chrome)",
+        "account.generate_token": "Generate token",
+        "account.col_label": "Label",
+        "account.col_created": "Created",
+        "account.col_last_used": "Last used",
+        "account.col_action": "Action",
+        "account.revoke": "Revoke",
+        "account.no_tokens": "No API tokens yet.",
+        "account.pw_title": "Change Password",
+        "account.current_pw": "Current password",
+        "account.update_pw": "Update password",
+        "account.err_current_pw": "Current password is incorrect.",
+        "account.err_new_pw_mismatch": "New passwords do not match.",
+        "account.notice_pw_changed": "Password updated. Other sessions have been signed out.",
+        "account.err_import_too_large": "Import file is too large (max 20 MB).",
+        "account.err_import_missing": "Choose a Glossbook .json file to import.",
+        "account.err_import_empty": "The selected file is empty.",
+        # Admin page
+        "admin.title": "Admin",
+        "admin.subtitle": "Manage invite links and user accounts",
+        "admin.invite_created": "One-time invite link created",
+        "admin.invite_for": " for {note}",
+        "admin.invite_valid_hint": "(valid for 7 days — copy it now):",
+        "admin.reset_created": "One-time password reset link created for {username}",
+        "admin.reset_valid_hint": "(valid for 24 hours — copy it now):",
+        "admin.invites_title": "Invite Links",
+        "admin.invites_desc": "Each invite link can be used once to register a new private account.",
+        "admin.invite_note_placeholder": "Optional note (e.g. Alice)",
+        "admin.create_invite": "Create invite link",
+        "admin.col_note": "Note",
+        "admin.col_status": "Status",
+        "admin.col_created": "Created",
+        "admin.col_action": "Action",
+        "admin.status_used": "Used",
+        "admin.status_used_by": " by {username}",
+        "admin.status_expired": "Expired",
+        "admin.status_pending": "Pending",
+        "admin.no_invites": "No invite links generated yet.",
+        "admin.users_title": "Users ({n})",
+        "admin.col_username": "Username",
+        "admin.col_role": "Role",
+        "admin.col_entries": "Entries",
+        "admin.col_actions": "Actions",
+        "admin.you_tag": " (you)",
+        "admin.role_admin": "Admin",
+        "admin.role_member": "Member",
+        "admin.status_active": "Active",
+        "admin.status_disabled": "Disabled",
+        "admin.reset_link": "Reset link",
+        "admin.disable": "Disable",
+        "admin.enable": "Enable",
+        "admin.err_self_disable": "You cannot disable your own account.",
+        "admin.err_last_admin": "Cannot disable the last active admin account.",
+        "admin.err_reset_disabled": "Cannot issue a reset link for a disabled account.",
+        # Error pages
+        "err.403_title": "Forbidden",
+        "err.403_heading": "Access Denied",
+        "err.403_default": "You do not have permission to view this page.",
+        "err.404_title": "Not Found",
+        "err.404_heading": "Not Found",
+        "err.500_title": "Internal Error",
+        "err.500_heading": "Internal Error",
+        # Validation errors
+        "val.word_empty": "Word cannot be empty.",
+        "val.word_separator": 'Word cannot contain " - " (reserved as the context separator).',
+        "val.entry_exists": "An entry with that text already exists.",
+        "val.username_rules": "Username must be 2–32 characters using letters, numbers, '.', '_', or '-'.",
+        "val.pw_short": "Password must be at least 10 characters.",
+        "val.pw_long": "Password must be at most 128 characters.",
+    },
+    "zh-CN": {
+        # Navigation & header
+        "nav.main_aria": "主导航",
+        "nav.words": "词库",
+        "nav.inbox": "收件箱",
+        "nav.notes": "笔记",
+        "nav.add": "+ 添加",
+        "nav.account_menu_aria": "账户菜单",
+        "nav.account": "账户",
+        "nav.admin": "管理",
+        "nav.logout": "退出登录",
+        "nav.switch_lang_label": "English",
+        "nav.switch_lang_aria": "Switch language to English",
+        "nav.entry": "返回词条",
+        "nav.note": "返回笔记",
+        "nav.synonyms": "同义词",
+        "nav.edit": "编辑",
+        # Dashboard
+        "dash.entries_one": "{n} 个词条",
+        "dash.entries_many": "{n} 个词条",
+        "dash.visited_7d": "近 7 天复习 {n} 个",
+        "dash.search_placeholder": "搜索词条、语境或例句…",
+        "dash.search_aria": "搜索词条",
+        "dash.search_btn": "搜索",
+        "dash.quiz_title": "语境填空",
+        "dash.review_session": "开始复习",
+        "dash.resume_prefix": "接着上次看",
+        "dash.resume_link": "回到上次标记",
+        "dash.ext_title": "用 Chrome 侧边栏随时收集生词",
+        "dash.ext_desc": "阅读网页或看 YouTube 时随手记下生词与原句，再批量整理入库到 Glossbook。",
+        "dash.ext_download": "下载扩展 (.zip)",
+        "dash.ext_setup": "获取 API 令牌与安装指南",
+        # Quiz card
+        "quiz.show_answer": "查看答案",
+        "quiz.hide_answer": "隐藏答案",
+        "quiz.try_another": "换一题",
+        "quiz.view_entry": "查看完整词条",
+        "quiz.empty": "还没有可用于测验的词条——先添加几条带语境或例句的词汇吧。",
+        # Entries list
+        "entries.title_only": "仅词条",
+        "entries.title_examples": "含例句",
+        "entries.title_needs_def": "待补释义",
+        "entries.count_plain": "{n} 个词条",
+        "entries.count_matching": "{n} 个匹配词条",
+        "entries.search_placeholder": "搜索词条、语境或例句…",
+        "entries.clear": "清空",
+        "entries.views_aria": "词条视图",
+        "entries.tab_all": "全部",
+        "entries.tab_only": "仅词条",
+        "entries.tab_examples": "含例句",
+        "entries.tab_needs_def": "待补释义",
+        "entries.col_entry": "词条",
+        "entries.col_context": "语境",
+        "entries.col_visits": "访问",
+        "entries.col_examples": "例句",
+        "entries.caption_all": "全部词条",
+        "entries.caption_only": "仅词条",
+        "entries.caption_examples": "含例句词条",
+        "entries.caption_needs_def": "待补释义词条",
+        "entries.empty_search": "没有找到与“{q}”匹配的词条。",
+        "entries.empty_needs_def": "所有词条都已补充释义。",
+        "entries.empty_all": "还没有词条。",
+        "entries.page_first": "首页",
+        "entries.page_prev": "上一页",
+        "entries.page_next": "下一页",
+        "entries.page_last": "末页",
+        "entries.page_status": "第 {page} / {total} 页",
+        "entries.back_to_top": "回到顶部",
+        # Entry detail
+        "entry.edit": "编辑",
+        "entry.delete": "删除",
+        "entry.play_1": "播放发音 1",
+        "entry.play_2": "播放发音 2",
+        "entry.play": "播放发音",
+        "entry.visit_one": "访问 {n} 次",
+        "entry.visit_many": "访问 {n} 次",
+        "entry.last_visit": "上次访问：{elapsed}",
+        "entry.resume_point": "上次标记",
+        "entry.clear": "清除",
+        "entry.mark_here": "标记此处",
+        "entry.context": "语境",
+        "entry.definition": "释义",
+        "entry.add_definition": "添加释义",
+        "entry.example": "例句",
+        # Review session
+        "review.title": "专注复习",
+        "review.subtitle_one": "共 {n} 个可测验词条",
+        "review.subtitle_many": "共 {n} 个可测验词条",
+        "review.card_counter": "第 {i} / {n} 张",
+        "review.complete_counter": "已完成",
+        "review.empty_prefix": "还没有可用于测验的词条——请先在",
+        "review.empty_entries": "词库",
+        "review.empty_or": "中补充语境或例句，或者",
+        "review.empty_add": "添加新词条",
+        "review.empty_suffix": "。",
+        "review.skip": "跳过",
+        "review.open_entry": "查看词条 ↗",
+        "review.no_def": "暂未填写释义",
+        "review.add_def_link": "去添加释义 ↗",
+        "review.next_card": "下一张",
+        "review.finish_round": "完成本轮",
+        "review.shortcuts_reveal": "查看答案 / 下一张",
+        "review.shortcuts_or": "或",
+        "review.shortcuts_skip": "跳过",
+        "review.shortcuts_open": "打开词条",
+        "review.round_complete": "本轮复习完成",
+        "review.another_round": "再来一轮",
+        "review.back_dashboard": "返回首页",
+        # Inbox
+        "inbox.title": "收件箱",
+        "inbox.subtitle": "从 Chrome 侧边栏收集的网页笔记与生词",
+        "inbox.clear_promoted": "清理已入库 ({n})",
+        "inbox.empty_title": "收件箱为空",
+        "inbox.empty_desc": "在 Chrome 侧边栏随手记录的网页笔记与生词会汇总到这里，方便集中整理并一键加入词库。",
+        "inbox.install_ext": "安装 Chrome 扩展",
+        "inbox.download_zip": "下载 .zip",
+        "inbox.add_all": "全部入库 ({n})",
+        "inbox.delete_page": "删除此页",
+        "inbox.added_badge": "已入库 →",
+        "inbox.in_dict_badge": "词库已有",
+        "inbox.play_aria": "播放 {word} 的发音",
+        "inbox.play_title": "播放发音",
+        "inbox.word_label": "单词 / 短语",
+        "inbox.context_label": "语境",
+        "inbox.def_label": "释义",
+        "inbox.def_placeholder": "可选释义",
+        "inbox.save": "保存",
+        "inbox.cancel": "取消",
+        "inbox.add_one": "入库",
+        "inbox.scratchpad_title": "本页随手记",
+        "inbox.scratchpad_placeholder": "自由记录当前网页的 Markdown 笔记…",
+        "inbox.save_notes": "保存笔记",
+        # Add / Edit forms
+        "form.add_entry_title": "添加词条",
+        "form.edit_entry_title": "编辑词条",
+        "form.add_def_title": "添加释义",
+        "form.edit_def_title": "编辑释义",
+        "form.edit_example_title": "编辑例句",
+        "form.edit_note_title": "编辑笔记",
+        "form.view_existing": "查看已有词条",
+        "form.word_label": "单词或短语",
+        "form.context_label": "语境",
+        "form.context_hint": "（可选 — 遇到这个词的原句或短语）",
+        "form.optional_hint": "（可选）",
+        "form.def_label": "释义",
+        "form.example_label": "例句",
+        "form.md_hint": "（可选，支持 Markdown）",
+        "form.save_entry": "保存词条",
+        "form.save_changes": "保存修改",
+        "form.submit": "提交",
+        "form.cancel": "取消",
+        # Synonyms
+        "syn.title": "{word} 的同义词",
+        "syn.heading": "同义词：",
+        "syn.col_pos": "词性",
+        "syn.col_meaning": "含义",
+        "syn.col_synonyms": "同义词",
+        "syn.empty": "未找到该词的同义词。",
+        # Notes
+        "notes.title": "学习笔记",
+        # Auth pages
+        "auth.login_title": "登录",
+        "auth.username": "用户名",
+        "auth.password": "密码",
+        "auth.password_bounds": "密码（10–128 位）",
+        "auth.confirm_password": "确认密码",
+        "auth.login_btn": "登录",
+        "auth.register_title": "创建账户",
+        "auth.register_heading": "创建账户",
+        "auth.register_btn": "创建账户",
+        "auth.back_to_login": "返回登录",
+        "auth.reset_title": "重置密码",
+        "auth.reset_heading": "重置密码",
+        "auth.reset_for_user": "正在为以下账户设置新密码：",
+        "auth.new_password": "新密码（10–128 位）",
+        "auth.confirm_new_password": "确认新密码",
+        "auth.save_password": "保存新密码",
+        "auth.notice_pw_updated": "密码已更新，现在可以登录了。",
+        "auth.err_rate_login": "登录尝试过于频繁，请几分钟后再试。",
+        "auth.err_invalid_creds": "用户名或密码错误。",
+        "auth.err_invite_invalid": "该邀请链接无效、已过期或已被使用。",
+        "auth.err_invite_only": "本站仅限受邀注册，请联系管理员获取邀请链接。",
+        "auth.err_rate_register": "注册尝试过于频繁，请几分钟后再试。",
+        "auth.err_invite_required": "需要有效的邀请码。",
+        "auth.err_pw_mismatch": "两次输入的密码不一致。",
+        "auth.err_username_taken": "该用户名已被占用。",
+        "auth.err_register_failed": "无法完成注册，请重试。",
+        "auth.err_reset_invalid": "该密码重置链接无效、已过期或已被使用。",
+        "auth.err_rate_reset": "重置尝试过于频繁，请几分钟后再试。",
+        # Account page
+        "account.title": "账户",
+        "account.subtitle_user": "当前登录：{username}",
+        "account.subtitle_admin": "当前登录：{username}（管理员）",
+        "account.export_import_title": "导出与导入词库",
+        "account.export_desc_one": "下载当前 {n} 个词条的离线备份（JSON 含收件箱笔记与访问统计；Markdown 为整洁的学习笔记文档）。",
+        "account.export_desc_many": "下载当前 {n} 个词条的离线备份（JSON 含收件箱笔记与访问统计；Markdown 为整洁的学习笔记文档）。",
+        "account.download_json": "下载 JSON",
+        "account.download_md": "下载 Markdown",
+        "account.import_title": "导入 Glossbook JSON",
+        "account.import_desc": "将 Glossbook 导出的 .json 备份合并到当前账户。已有词条与笔记保持不变，重复项会自动跳过。",
+        "account.import_include_inbox": "同时导入收件箱网页笔记",
+        "account.import_btn": "导入 JSON",
+        "account.tokens_title": "Chrome 侧边栏 API 令牌",
+        "account.tokens_desc": "建议为每台设备单独生成一个令牌（如「笔记本 Chrome」）。令牌仅在创建时显示一次。",
+        "account.ext_guide_summary": "如何安装 Chrome 侧边栏扩展 (v{version})",
+        "account.ext_step1_link": "下载 glossbook-extension-v{version}.zip",
+        "account.ext_step1_after": "并解压到本地文件夹。",
+        "account.ext_step2_before": "在 Chrome 地址栏打开",
+        "account.ext_step2_mid": "并开启右上角的",
+        "account.ext_step2_bold": "开发者模式",
+        "account.ext_step2_after": "。",
+        "account.ext_step3_before": "点击",
+        "account.ext_step3_bold": "加载已解压的扩展程序",
+        "account.ext_step3_after": "，选择刚解压出的文件夹（包含",
+        "account.ext_step3_end": "的那一层）。",
+        "account.ext_step4_before": "在下方生成一个令牌，点击浏览器工具栏上的 Glossbook 图标打开侧边栏，进入",
+        "account.ext_step4_settings": "设置",
+        "account.ext_step4_mid": "，填入服务器地址",
+        "account.ext_step4_and": "与令牌，点击",
+        "account.ext_step4_save": "保存并测试",
+        "account.ext_step4_end": "即可。",
+        "account.new_token_title": "新令牌已生成",
+        "account.new_token_hint": "— 请立即复制，关闭后将不再显示：",
+        "account.copy": "复制",
+        "account.token_label_placeholder": "设备备注（如：笔记本 Chrome）",
+        "account.generate_token": "生成令牌",
+        "account.col_label": "设备备注",
+        "account.col_created": "创建时间",
+        "account.col_last_used": "最近使用",
+        "account.col_action": "操作",
+        "account.revoke": "吊销",
+        "account.no_tokens": "尚未生成 API 令牌。",
+        "account.pw_title": "修改密码",
+        "account.current_pw": "当前密码",
+        "account.update_pw": "更新密码",
+        "account.err_current_pw": "当前密码不正确。",
+        "account.err_new_pw_mismatch": "两次输入的新密码不一致。",
+        "account.notice_pw_changed": "密码已更新，其他设备的登录会话已自动退出。",
+        "account.err_import_too_large": "导入文件过大（最大 20 MB）。",
+        "account.err_import_missing": "请选择要导入的 Glossbook .json 文件。",
+        "account.err_import_empty": "所选文件为空。",
+        # Admin page
+        "admin.title": "管理",
+        "admin.subtitle": "管理邀请链接与用户账户",
+        "admin.invite_created": "一次性邀请链接已生成",
+        "admin.invite_for": "（备注：{note}）",
+        "admin.invite_valid_hint": "（7 天内有效，请立即复制）：",
+        "admin.reset_created": "已为 {username} 生成一次性密码重置链接",
+        "admin.reset_valid_hint": "（24 小时内有效，请立即复制）：",
+        "admin.invites_title": "邀请链接",
+        "admin.invites_desc": "每个邀请链接仅可使用一次，用于注册独立的个人账户。",
+        "admin.invite_note_placeholder": "可选备注（如：小明）",
+        "admin.create_invite": "生成邀请链接",
+        "admin.col_note": "备注",
+        "admin.col_status": "状态",
+        "admin.col_created": "创建时间",
+        "admin.col_action": "操作",
+        "admin.status_used": "已使用",
+        "admin.status_used_by": "（{username}）",
+        "admin.status_expired": "已过期",
+        "admin.status_pending": "待使用",
+        "admin.no_invites": "尚未生成邀请链接。",
+        "admin.users_title": "用户列表 ({n})",
+        "admin.col_username": "用户名",
+        "admin.col_role": "角色",
+        "admin.col_entries": "词条数",
+        "admin.col_actions": "操作",
+        "admin.you_tag": "（当前）",
+        "admin.role_admin": "管理员",
+        "admin.role_member": "成员",
+        "admin.status_active": "正常",
+        "admin.status_disabled": "已停用",
+        "admin.reset_link": "重置链接",
+        "admin.disable": "停用",
+        "admin.enable": "启用",
+        "admin.err_self_disable": "不能停用自己的账户。",
+        "admin.err_last_admin": "不能停用最后一个活跃的管理员账户。",
+        "admin.err_reset_disabled": "无法为已停用的账户生成重置链接。",
+        # Error pages
+        "err.403_title": "无权访问",
+        "err.403_heading": "无权访问",
+        "err.403_default": "你没有权限查看此页面。",
+        "err.404_title": "页面不存在",
+        "err.404_heading": "页面不存在",
+        "err.500_title": "服务器错误",
+        "err.500_heading": "服务器错误",
+        # Validation errors
+        "val.word_empty": "单词或短语不能为空。",
+        "val.word_separator": '单词中不能包含 " - "（该符号保留为语境分隔符）。',
+        "val.entry_exists": "已存在相同内容的词条。",
+        "val.username_rules": "用户名需为 2–32 位，仅支持字母、数字、'.'、'_' 或 '-'。",
+        "val.pw_short": "密码长度至少为 10 位。",
+        "val.pw_long": "密码长度不能超过 128 位。",
+    },
+}
+
+JS_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "en": {
+        "show_answer": "Show answer",
+        "hide_answer": "Hide answer",
+        "quiz_empty": "No quizzable entries yet — add some examples first.",
+        "confirm_delete_entry": "Are you sure you want to delete this entry?",
+        "confirm_delete_entry_detail": "Delete this entry?\n\nID: {id}\nEntry: {entry}",
+        "confirm_delete_def": "Are you sure you want to delete this definition?",
+        "confirm_revoke_token": "Revoke this API token? Any extension using it will stop syncing.",
+        "bookmark_set_failed": "Failed to set resume point.",
+        "bookmark_clear_failed": "Failed to clear resume point.",
+        "entries_count_plain": "{n} entries",
+        "entries_count_matching": "{n} matching entries",
+        "copy": "Copy",
+        "copied": "Copied",
+        "review_card_counter": "Card {i} of {n}",
+        "review_complete": "Complete",
+        "review_next": "Next card",
+        "review_finish": "Finish round",
+        "review_summary": "Reviewed {reviewed} of {total} {cards}{skip}.",
+        "review_card_one": "card",
+        "review_card_many": "cards",
+        "review_skip_suffix": " ({skipped} skipped)",
+        "inbox_added": "Added →",
+        "inbox_err_add": "Could not add this word.",
+        "inbox_err_missing": "Item no longer exists.",
+        "inbox_err_promote": "Failed to promote item.",
+        "inbox_err_word_empty": "Word cannot be empty.",
+        "inbox_err_update": "Failed to update item.",
+        "inbox_confirm_delete_item": "Remove this captured item?",
+        "inbox_confirm_delete_note": "Delete this page note and all of its captured items?",
+        "inbox_confirm_clear_promoted": "Remove all already-added items from the inbox?",
+        "inbox_saving": "Saving…",
+        "inbox_saved": "Saved",
+        "inbox_save_failed": "Save failed",
+    },
+    "zh-CN": {
+        "show_answer": "查看答案",
+        "hide_answer": "隐藏答案",
+        "quiz_empty": "还没有可用于测验的词条——先添加几条带语境或例句的词汇吧。",
+        "confirm_delete_entry": "确定要删除这个词条吗？",
+        "confirm_delete_entry_detail": "确定要删除这个词条吗？\n\nID：{id}\n词条：{entry}",
+        "confirm_delete_def": "确定要删除这条释义吗？",
+        "confirm_revoke_token": "确定要吊销此 API 令牌吗？使用该令牌的扩展将停止同步。",
+        "bookmark_set_failed": "设置标记失败。",
+        "bookmark_clear_failed": "清除标记失败。",
+        "entries_count_plain": "{n} 个词条",
+        "entries_count_matching": "{n} 个匹配词条",
+        "copy": "复制",
+        "copied": "已复制",
+        "review_card_counter": "第 {i} / {n} 张",
+        "review_complete": "已完成",
+        "review_next": "下一张",
+        "review_finish": "完成本轮",
+        "review_summary": "本轮已复习 {reviewed} / {total} 张卡片{skip}。",
+        "review_card_one": "",
+        "review_card_many": "",
+        "review_skip_suffix": "（跳过 {skipped} 张）",
+        "inbox_added": "已入库 →",
+        "inbox_err_add": "无法入库该词条。",
+        "inbox_err_missing": "该记录已不存在。",
+        "inbox_err_promote": "入库失败。",
+        "inbox_err_word_empty": "单词不能为空。",
+        "inbox_err_update": "更新失败。",
+        "inbox_confirm_delete_item": "确定移除这条收集记录吗？",
+        "inbox_confirm_delete_note": "确定删除此网页笔记及其下所有生词记录吗？",
+        "inbox_confirm_clear_promoted": "确定清理收件箱中所有已入库的记录吗？",
+        "inbox_saving": "正在保存…",
+        "inbox_saved": "已保存",
+        "inbox_save_failed": "保存失败",
+    },
+}
+
+
+def translate(lang: str, key: str, **kwargs: Any) -> str:
+    catalog = TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_LANG])
+    template = catalog.get(key)
+    if template is None:
+        template = TRANSLATIONS[DEFAULT_LANG].get(key, key)
+    if kwargs:
+        try:
+            return template.format(**kwargs)
+        except (KeyError, ValueError):
+            return template
+    return template
+
+
+def format_import_summary(
+    lang: str,
+    *,
+    entries_added: int,
+    entries_skipped: int,
+    include_inbox: bool,
+    notes_added: int,
+    notes_skipped: int,
+) -> str:
+    if lang == "zh-CN":
+        parts = [f"已导入 {entries_added} 个词条"]
+        if entries_skipped > 0:
+            parts.append(f"跳过 {entries_skipped} 个重复词条")
+        if include_inbox and (notes_added > 0 or notes_skipped > 0):
+            note_bits = []
+            if notes_added > 0:
+                note_bits.append(f"新增 {notes_added} 页收件箱笔记")
+            if notes_skipped > 0:
+                note_bits.append(f"跳过 {notes_skipped} 页已有笔记")
+            parts.append("，".join(note_bits))
+        return "；".join(parts) + "。"
+
+    parts = [
+        f"Imported {entries_added} {'entry' if entries_added == 1 else 'entries'}"
+    ]
+    if entries_skipped > 0:
+        parts.append(
+            f"{entries_skipped} duplicate {'entry' if entries_skipped == 1 else 'entries'} skipped"
+        )
+    if include_inbox and (notes_added > 0 or notes_skipped > 0):
+        note_bits = []
+        if notes_added > 0:
+            note_bits.append(
+                f"{notes_added} inbox {'page' if notes_added == 1 else 'pages'} added"
+            )
+        if notes_skipped > 0:
+            note_bits.append(
+                f"{notes_skipped} existing {'page' if notes_skipped == 1 else 'pages'} skipped"
+            )
+        parts.append(", ".join(note_bits))
+    return "; ".join(parts) + "."
+
+
+def i18n_template_context(request: Request) -> dict[str, object]:
+    from utils import get_how_long_ago
+
+    lang = get_request_lang(request)
+    if request.method in {"GET", "HEAD"}:
+        raw_next = request.url.path + (
+            f"?{request.url.query}" if request.url.query else ""
+        )
+    else:
+        raw_next = request.url.path
+    return {
+        "lang": lang,
+        "t": lambda key, **kw: translate(lang, key, **kw),
+        "how_long_ago": lambda ts: get_how_long_ago(ts, lang=lang),
+        "js_i18n": JS_TRANSLATIONS.get(lang, JS_TRANSLATIONS[DEFAULT_LANG]),
+        "current_next_path": safe_next_path(raw_next, "/"),
+        "other_lang": "zh-CN" if lang == "en" else "en",
+    }

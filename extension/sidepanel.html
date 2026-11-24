@@ -11,24 +11,30 @@
     <div class="sp-brand-row">
       <h1 class="sp-brand">Glossbook</h1>
       <div class="sp-header-actions">
-        <a id="open-inbox-link" class="sp-btn sp-btn-ghost" href="#" target="_blank" rel="noopener noreferrer" hidden>Inbox</a>
-        <button id="toggle-settings-btn" class="sp-btn sp-btn-ghost" type="button">Settings</button>
+        <a id="open-inbox-link" class="sp-btn sp-btn-ghost" href="#" target="_blank" rel="noopener noreferrer" hidden data-i18n="inbox">Inbox</a>
+        <button id="toggle-settings-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="settings">Settings</button>
       </div>
     </div>
     <div id="page-banner" class="sp-page-banner">
-      <div id="page-title" class="sp-page-title">Loading tab&hellip;</div>
+      <div id="page-title" class="sp-page-title" data-i18n="loading_tab">Loading tab&hellip;</div>
       <div id="page-url" class="sp-page-url"></div>
     </div>
   </header>
 
   <section id="settings-panel" class="sp-card sp-settings" hidden>
-    <h2>Connection settings</h2>
-    <label class="sp-label" for="server-url-input">Server URL</label>
+    <h2 data-i18n="settings_title">Connection settings</h2>
+    <label class="sp-label" for="server-url-input" data-i18n="settings_server_url">Server URL</label>
     <input id="server-url-input" class="sp-input" type="url" placeholder="http://localhost:8000">
-    <label class="sp-label" for="api-token-input">API Token <span class="sp-hint">(stored locally only)</span></label>
-    <input id="api-token-input" class="sp-input" type="password" placeholder="Paste auth.api_token from config.toml">
+    <label class="sp-label" for="api-token-input"><span data-i18n="settings_api_token">API Token</span> <span class="sp-hint" data-i18n="settings_token_hint">(stored locally only)</span></label>
+    <input id="api-token-input" class="sp-input" type="password" placeholder="Paste your API token from /account" data-i18n-placeholder="settings_token_placeholder">
+    <label class="sp-label" for="lang-select" data-i18n="settings_lang_label">Language</label>
+    <select id="lang-select" class="sp-input">
+      <option value="auto" data-i18n="lang_auto">Auto (Browser)</option>
+      <option value="en">English</option>
+      <option value="zh-CN">简体中文</option>
+    </select>
     <div class="sp-row">
-      <button id="save-settings-btn" class="sp-btn sp-btn-primary" type="button">Save &amp; test</button>
+      <button id="save-settings-btn" class="sp-btn sp-btn-primary" type="button" data-i18n="save_test">Save &amp; test</button>
       <span id="settings-status" class="sp-status"></span>
     </div>
   </section>
@@ -38,19 +44,19 @@
   <main id="workspace" hidden>
     <section class="sp-card">
       <div class="sp-section-head">
-        <h2>Quick jot</h2>
-        <button id="grab-page-btn" class="sp-btn sp-btn-ghost" type="button">Grab from page</button>
+        <h2 data-i18n="quick_jot">Quick jot</h2>
+        <button id="grab-page-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="grab_from_page">Grab from page</button>
       </div>
       <form id="jot-form">
-        <input id="jot-word" class="sp-input" type="text" placeholder="Word or phrase (e.g. finances)" autocomplete="off" required>
-        <textarea id="jot-context" class="sp-textarea sp-context-input" rows="3" placeholder="Context sentence (optional — Ctrl+Enter to save)"></textarea>
+        <input id="jot-word" class="sp-input" type="text" placeholder="Word or phrase (e.g. finances)" data-i18n-placeholder="jot_word_placeholder" autocomplete="off" required>
+        <textarea id="jot-context" class="sp-textarea sp-context-input" rows="3" placeholder="Context sentence (optional — Ctrl+Enter to save)" data-i18n-placeholder="jot_context_placeholder"></textarea>
         <div id="jot-ts-row" class="sp-ts-row" hidden>
           <span id="jot-ts-label" class="sp-pill"></span>
-          <button id="clear-ts-btn" class="sp-link-btn" type="button">Clear timestamp</button>
+          <button id="clear-ts-btn" class="sp-link-btn" type="button" data-i18n="clear_ts">Clear timestamp</button>
         </div>
         <div class="sp-row">
-          <button id="jot-submit-btn" class="sp-btn sp-btn-primary" type="submit">Jot word</button>
-          <button id="jot-lookup-btn" class="sp-btn sp-btn-ghost" type="button">Lookup</button>
+          <button id="jot-submit-btn" class="sp-btn sp-btn-primary" type="submit" data-i18n="jot_word">Jot word</button>
+          <button id="jot-lookup-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="lookup">Lookup</button>
           <span id="jot-status" class="sp-status"></span>
         </div>
         <div id="jot-lookup-box" class="sp-lookup-box sp-jot-lookup" hidden></div>
@@ -59,23 +65,23 @@
 
     <section class="sp-card">
       <div class="sp-section-head">
-        <h2>Captured words <span id="items-count" class="sp-count"></span></h2>
+        <h2><span data-i18n="captured_words">Captured words</span> <span id="items-count" class="sp-count"></span></h2>
         <div class="sp-row">
-          <button id="toggle-select-all-btn" class="sp-link-btn" type="button" hidden>Select all</button>
-          <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden>Add selected</button>
+          <button id="toggle-select-all-btn" class="sp-link-btn" type="button" hidden data-i18n="select_all">Select all</button>
+          <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden data-i18n="add_selected">Add selected</button>
         </div>
       </div>
-      <p id="items-empty" class="sp-empty">No words jotted for this page yet.</p>
+      <p id="items-empty" class="sp-empty" data-i18n="items_empty">No words jotted for this page yet.</p>
       <ul id="items-list" class="sp-items"></ul>
       <div id="promote-status" class="sp-status"></div>
     </section>
 
     <section class="sp-card">
       <div class="sp-section-head">
-        <h2>Page scratchpad</h2>
+        <h2 data-i18n="scratchpad">Page scratchpad</h2>
         <span id="notes-status" class="sp-status"></span>
       </div>
-      <textarea id="notes-textarea" class="sp-textarea" rows="6" placeholder="Freeform Markdown notes for this video or article&hellip;"></textarea>
+      <textarea id="notes-textarea" class="sp-textarea" rows="6" placeholder="Freeform Markdown notes for this video or article&hellip;" data-i18n-placeholder="scratchpad_placeholder"></textarea>
     </section>
   </main>
 

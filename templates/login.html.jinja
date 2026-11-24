@@ -1,22 +1,22 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Log in{% endblock title %}
+{% block title %}{{ t('auth.login_title') }}{% endblock title %}
 
 {% block body %}
 {{ page_header() }}
 <main class="form-page">
-    <h1>Log in</h1>
+    <h1>{{ t('auth.login_title') }}</h1>
     {% if notice %}<p class="form-notice" role="status">{{ notice }}</p>{% endif %}
     {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
     <form class="login-form" method="post" action="/login">
         <input type="hidden" name="csrf_token" value="{{ login_csrf_token }}">
         <input type="hidden" name="next_path" value="{{ next_path }}">
-        <label for="username">Username</label>
+        <label for="username">{{ t('auth.username') }}</label>
         <input id="username" name="username" type="text" autocomplete="username" required autofocus>
-        <label for="password">Password</label>
+        <label for="password">{{ t('auth.password') }}</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required>
         <div class="form-actions">
-            <button class="button button-primary" type="submit">Log in</button>
+            <button class="button button-primary" type="submit">{{ t('auth.login_btn') }}</button>
         </div>
     </form>
 </main>

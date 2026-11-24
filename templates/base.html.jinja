@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang | default('en') }}">
 
 <head>
     <title>{% block title %}{% endblock title %}</title>
@@ -40,6 +40,7 @@
 
 {% set _body_class %}{% block body_class %}{% endblock body_class %}{% endset %}
 <body{% if _body_class.strip() %} class="{{ _body_class.strip() }}"{% endif %}>
+    <script type="application/json" id="i18n-data">{{ js_i18n | default({}) | tojson }}</script>
     {% block body%}
 
     {% endblock body %}

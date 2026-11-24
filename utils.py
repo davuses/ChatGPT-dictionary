@@ -641,20 +641,27 @@ def pick_review_session(
     return cards, active_count
 
 
-def get_how_long_ago(timestamp: int | None, now: int | None = None) -> str:
+def get_how_long_ago(
+    timestamp: int | None, now: int | None = None, *, lang: str = "en"
+) -> str:
+    is_zh = lang == "zh-CN"
     if not timestamp:
-        return "never"
+        return "从未" if is_zh else "never"
     current_time = int(time.time()) if now is None else now
     time_delta = max(0, current_time - timestamp)
 
     if time_delta < 60:
-        return "just now"
+        return "刚刚" if is_zh else "just now"
     if time_delta < 3600:
         minutes = time_delta // 60
-        return f"{minutes} min ago"
+        return f"{minutes} 分钟前" if is_zh else f"{minutes} min ago"
     if time_delta < 86400:
         hours = time_delta // 3600
-        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+        return (
+            f"{hours} 小时前"
+            if is_zh
+            else f"{hours} hour{'s' if hours != 1 else ''} ago"
+        )
 
     days = time_delta // 86400
     years = days // 365
@@ -662,6 +669,15 @@ def get_how_long_ago(timestamp: int | None, now: int | None = None) -> str:
     remaining_days = (days % 365) % 30
 
     parts = []
+    if is_zh:
+        if years > 0:
+            parts.append(f"{years} 年")
+        if months > 0:
+            parts.append(f"{months} 个月")
+        if years == 0 and (remaining_days > 0 or not parts):
+            parts.append(f"{remaining_days} 天")
+        return f"{' '.join(parts)}前"
+
     if years > 0:
         parts.append(f"{years} year{'s' if years != 1 else ''}")
     if months > 0:

@@ -1,11 +1,11 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Not Found{% endblock title %}
+{% block title %}{{ t('err.404_title') }}{% endblock title %}
 
 {% block body %}
 {{ page_header() }}
 <main class="error-page">
-<h1>Not Found</h1>
+<h1>{{ t('err.404_heading') }}</h1>
 
 <p>{{ detail }}</p>
 </main>

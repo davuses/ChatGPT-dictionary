@@ -144,7 +144,7 @@
     }
 </style>
 
-{% set edit_link %}{% if not is_dir %}<a class="button button-ghost" href="/edit_note/{{ note_url_path }}" id="edit-note">Edit</a>{% endif %}{% endset %}
+{% set edit_link %}{% if not is_dir %}<a class="button button-ghost" href="/edit_note/{{ note_url_path }}" id="edit-note">{{ t('nav.edit') }}</a>{% endif %}{% endset %}
 {{ page_header(active="notes", extra_nav=edit_link) }}
 
 <script>

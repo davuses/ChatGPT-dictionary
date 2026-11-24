@@ -1,22 +1,22 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Review Session{% endblock title %}
+{% block title %}{{ t('review.title') }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
-{{ page_header(subtitle=total_quizzable ~ " quizzable " ~ ("entry" if total_quizzable == 1 else "entries")) }}
+{{ page_header(subtitle=t('review.subtitle_one' if total_quizzable == 1 else 'review.subtitle_many', n=total_quizzable)) }}
 
 <main class="review-page">
     <div class="review-header-row">
-        <h1 class="review-title">Review Session</h1>
+        <h1 class="review-title">{{ t('review.title') }}</h1>
         {% if card_count > 0 %}
-        <span class="review-counter" id="review-counter">Card 1 of {{ card_count }}</span>
+        <span class="review-counter" id="review-counter">{{ t('review.card_counter', i=1, n=card_count) }}</span>
         {% endif %}
     </div>
 
     {% if card_count == 0 %}
     <section class="card">
-        <p class="quiz-empty">No quizzable entries yet &mdash; add context sentences or usage examples to <a href="/entries">your entries</a> or <a href="/add_entry">add a new entry</a> first.</p>
+        <p class="quiz-empty">{{ t('review.empty_prefix') }} <a href="/entries">{{ t('review.empty_entries') }}</a> {{ t('review.empty_or') }} <a href="/add_entry">{{ t('review.empty_add') }}</a> {{ t('review.empty_suffix') }}</p>
     </section>
     {% else %}
     <section class="card" id="review-card">
@@ -27,8 +27,8 @@
         <p class="quiz-sentence" id="review-sentence">{{ cards_json[0].blanked_sentence }}</p>
 
         <div class="quiz-actions" id="review-prompt-actions">
-            <button type="button" class="button button-primary" id="review-reveal-btn">Show answer</button>
-            <button type="button" class="button button-ghost" id="review-skip-btn">Skip</button>
+            <button type="button" class="button button-primary" id="review-reveal-btn">{{ t('quiz.show_answer') }}</button>
+            <button type="button" class="button button-ghost" id="review-skip-btn">{{ t('review.skip') }}</button>
         </div>
 
         <div class="review-answer-panel" id="review-answer-panel" hidden>
@@ -37,30 +37,30 @@
                     <strong class="review-headword" id="review-headword"></strong>
                     <span class="ipa-text" id="review-ipa"></span>
                 </div>
-                <a class="button button-ghost" id="review-open-entry" href="#" target="_blank" rel="noopener">Open entry &nearr;</a>
+                <a class="button button-ghost" id="review-open-entry" href="#" target="_blank" rel="noopener">{{ t('review.open_entry') }}</a>
             </div>
 
             <div class="markdown-body review-definition" id="review-definition" hidden></div>
             <p class="review-no-definition" id="review-no-definition" hidden>
-                No definition saved yet &mdash; <a id="review-add-definition" href="#" target="_blank" rel="noopener">Add definition &nearr;</a>
+                {{ t('review.no_def') }} &mdash; <a id="review-add-definition" href="#" target="_blank" rel="noopener">{{ t('review.add_def_link') }}</a>
             </p>
 
             <div class="quiz-actions">
-                <button type="button" class="button button-primary" id="review-next-btn">Next card</button>
+                <button type="button" class="button button-primary" id="review-next-btn">{{ t('review.next_card') }}</button>
             </div>
         </div>
 
         <p class="review-shortcuts">
-            <kbd>Space</kbd> reveal / next &middot; <kbd>s</kbd> or <kbd>&rarr;</kbd> skip &middot; <kbd>o</kbd> open entry
+            <kbd>Space</kbd> {{ t('review.shortcuts_reveal') }} &middot; <kbd>s</kbd> {{ t('review.shortcuts_or') }} <kbd>&rarr;</kbd> {{ t('review.shortcuts_skip') }} &middot; <kbd>o</kbd> {{ t('review.shortcuts_open') }}
         </p>
     </section>
 
     <section class="card" id="review-summary" hidden>
-        <h2>Round complete</h2>
+        <h2>{{ t('review.round_complete') }}</h2>
         <p id="review-summary-stats"></p>
         <div class="quiz-actions">
-            <a class="button button-primary" href="{{ another_round_url }}" id="review-another-btn">Another round</a>
-            <a class="button button-ghost" href="/">Back to dashboard</a>
+            <a class="button button-primary" href="{{ another_round_url }}" id="review-another-btn">{{ t('review.another_round') }}</a>
+            <a class="button button-ghost" href="/">{{ t('review.back_dashboard') }}</a>
         </div>
     </section>
 
@@ -118,7 +118,11 @@
             index = nextIndex;
             isRevealed = false;
             const card = deck[index];
-            counterEl.textContent = "Card " + (index + 1) + " of " + deck.length;
+            counterEl.textContent = uiText(
+                "review_card_counter",
+                { i: index + 1, n: deck.length },
+                "Card " + (index + 1) + " of " + deck.length
+            );
             progressFillEl.style.width = (((index + 1) / deck.length) * 100).toFixed(2) + "%";
             sentenceEl.textContent = card.blanked_sentence;
             promptActionsEl.hidden = false;
@@ -145,7 +149,10 @@
                 noDefinitionEl.hidden = false;
             }
 
-            nextBtn.textContent = index === deck.length - 1 ? "Finish round" : "Next card";
+            nextBtn.textContent =
+                index === deck.length - 1
+                    ? uiText("review_finish", null, "Finish round")
+                    : uiText("review_next", null, "Next card");
             promptActionsEl.hidden = true;
             answerPanelEl.hidden = false;
 
@@ -168,17 +175,30 @@
                 index = deck.length;
                 isRevealed = false;
                 cardSectionEl.hidden = true;
-                counterEl.textContent = "Complete";
-                const skipSuffix = skippedCount > 0 ? " (" + skippedCount + " skipped)" : "";
-                summaryStatsEl.textContent =
-                    "Reviewed " +
-                    reviewedCount +
-                    " of " +
-                    deck.length +
-                    " " +
-                    (deck.length === 1 ? "card" : "cards") +
-                    skipSuffix +
-                    ".";
+                counterEl.textContent = uiText("review_complete", null, "Complete");
+                const skipSuffix =
+                    skippedCount > 0
+                        ? uiText(
+                              "review_skip_suffix",
+                              { skipped: skippedCount },
+                              " (" + skippedCount + " skipped)"
+                          )
+                        : "";
+                const cardsWord = uiText(
+                    deck.length === 1 ? "review_card_one" : "review_card_many",
+                    null,
+                    deck.length === 1 ? "card" : "cards"
+                );
+                summaryStatsEl.textContent = uiText(
+                    "review_summary",
+                    {
+                        reviewed: reviewedCount,
+                        total: deck.length,
+                        cards: cardsWord,
+                        skip: skipSuffix,
+                    },
+                    "Reviewed " + reviewedCount + " of " + deck.length + " " + cardsWord + skipSuffix + "."
+                );
                 summarySectionEl.hidden = false;
             }
         }

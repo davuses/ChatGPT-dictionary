@@ -2,13 +2,13 @@
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title -%}
 {%- if entries_only -%}
-Entries Only
+{{ t('entries.title_only') }}
 {%- elif show_example -%}
-Show Example
+{{ t('entries.title_examples') }}
 {%- elif needs_definition -%}
-Needs Definition
+{{ t('entries.title_needs_def') }}
 {%- else -%}
-Glossbook
+{{ t('nav.words') }}
 {%- endif -%}
 {%- endblock title %}
 
@@ -16,8 +16,8 @@ Glossbook
 
 {% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
 
-{% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>Resume from last mark</a>{% endset %}
-{{ page_header(subtitle=(entries_count|string) ~ " " ~ ("matching " if search_query else "") ~ "entries", active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
+{% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>{{ t('dash.resume_link') }}</a>{% endset %}
+{{ page_header(subtitle=t('entries.count_matching' if search_query else 'entries.count_plain', n=entries_count), active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
 
 <form class="search-form" role="search" action="/entries" method="get">
     {% if entries_only %}<input type="hidden" name="entries_only" value="true">{% endif %}
@@ -26,32 +26,32 @@ Glossbook
     <input type="search"
         name="q"
         value="{{ search_query }}"
-        placeholder="Search words, context, or examples&hellip;"
-        aria-label="Search entries">
-    <button class="button button-primary" type="submit">Search</button>
-    <a class="button button-ghost" id="clear-search-link" href="/entries{% if entries_only %}?entries_only=true{% elif show_example %}?show_example=true{% elif needs_definition %}?needs_definition=true{% endif %}"{% if not search_query %} hidden{% endif %}>Clear</a>
+        placeholder="{{ t('entries.search_placeholder') }}"
+        aria-label="{{ t('dash.search_aria') }}">
+    <button class="button button-primary" type="submit">{{ t('dash.search_btn') }}</button>
+    <a class="button button-ghost" id="clear-search-link" href="/entries{% if entries_only %}?entries_only=true{% elif show_example %}?show_example=true{% elif needs_definition %}?needs_definition=true{% endif %}"{% if not search_query %} hidden{% endif %}>{{ t('entries.clear') }}</a>
 </form>
 
-<nav class="view-tabs" aria-label="Entry views">
+<nav class="view-tabs" aria-label="{{ t('entries.views_aria') }}">
     <a class="view-tab {% if not entries_only and not show_example and not needs_definition %}active{% endif %}"
         id="tab-all"
-        href="/entries{{ view_qs('?') }}">All</a>
+        href="/entries{{ view_qs('?') }}">{{ t('entries.tab_all') }}</a>
     <a class="view-tab {% if entries_only %}active{% endif %}"
         id="tab-entries-only"
-        href="/entries?entries_only=true{{ view_qs('&') }}">Entries Only</a>
+        href="/entries?entries_only=true{{ view_qs('&') }}">{{ t('entries.tab_only') }}</a>
     <a class="view-tab {% if show_example %}active{% endif %}"
         id="tab-examples"
-        href="/entries?show_example=true{{ view_qs('&') }}">Examples</a>
+        href="/entries?show_example=true{{ view_qs('&') }}">{{ t('entries.tab_examples') }}</a>
     <a class="view-tab {% if needs_definition %}active{% endif %}"
         id="tab-needs-definition"
-        href="/entries?needs_definition=true{{ view_qs('&') }}">Needs Definition{% if undefined_count > 0 %}<span id="undefined-count-badge" data-count="{{ undefined_count }}"{% if search_query %} hidden{% endif %}> ({{ undefined_count }})</span>{% endif %}</a>
+        href="/entries?needs_definition=true{{ view_qs('&') }}">{{ t('entries.tab_needs_def') }}{% if undefined_count > 0 %}<span id="undefined-count-badge" data-count="{{ undefined_count }}"{% if search_query %} hidden{% endif %}> ({{ undefined_count }})</span>{% endif %}</a>
 </nav>
 
 <div id="results">
     {% include "_entries_results.html.jinja" %}
 </div>
 
-<button type="button" class="back-to-top" id="back-to-top" aria-label="Back to top" hidden>&uarr;</button>
+<button type="button" class="back-to-top" id="back-to-top" aria-label="{{ t('entries.back_to_top') }}" hidden>&uarr;</button>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         document.addEventListener("keydown", (event) => {
@@ -162,8 +162,11 @@ Glossbook
         function applyResults(data, url) {
             results.innerHTML = data.results_html;
             if (countEl) {
-                countEl.textContent =
-                    data.count + (data.matching ? " matching entries" : " entries");
+                countEl.textContent = uiText(
+                    data.matching ? "entries_count_matching" : "entries_count_plain",
+                    { n: data.count },
+                    data.count + (data.matching ? " matching entries" : " entries")
+                );
             }
             if (clearLink) clearLink.hidden = !data.matching;
             if (undefinedBadge) undefinedBadge.hidden = data.matching;
@@ -236,7 +239,13 @@ Glossbook
         const selectedEntryId = selectedRow.id;
         const entryText = selectedRow.firstElementChild.textContent.trim();
         if (
-            confirm("Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText)
+            confirm(
+                uiText(
+                    "confirm_delete_entry_detail",
+                    { id: selectedEntryId, entry: entryText },
+                    "Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText
+                )
+            )
         ) {
             fetch("/delete_entry/" + selectedEntryId, {
                 method: "DELETE",
@@ -246,7 +255,7 @@ Glossbook
                     selectedRow.parentNode.removeChild(selectedRow);
                     const countEl = document.getElementById("results-count");
                     if (countEl) {
-                        const match = countEl.textContent.match(/^(\d+)(\s+.*)$/);
+                        const match = countEl.textContent.match(/^(\d+)(.*)$/);
                         if (match) {
                             countEl.textContent = Math.max(0, Number(match[1]) - 1) + match[2];
                         }

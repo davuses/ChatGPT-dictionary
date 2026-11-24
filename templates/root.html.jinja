@@ -1,44 +1,45 @@
 {% extends "base.html.jinja" %}
-{% from "_quiz_card.html.jinja" import quiz_card %}
+{% from "_quiz_card.html.jinja" import quiz_card with context %}
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}Glossbook{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
 
-{{ page_header(subtitle=entries_count ~ " entries · " ~ visited_last_7_days ~ " visited in the last 7 days", brand_as_h1=True, show_add=True) }}
+{% set dash_subtitle %}<a class="subtitle-link" href="/entries">{{ t('dash.entries_one' if entries_count == 1 else 'dash.entries_many', n=entries_count) }}</a> &middot; {{ t('dash.visited_7d', n=visited_last_7_days) }}{% endset %}
+{{ page_header(subtitle=dash_subtitle, brand_as_h1=True, show_add=True) }}
 
 <form class="search-form dashboard-search" role="search" action="/entries" method="get">
     <input type="search"
         name="q"
-        placeholder="Jump to a word, context, or example&hellip;"
-        aria-label="Search entries">
-    <button class="button button-primary" type="submit">Search</button>
+        placeholder="{{ t('dash.search_placeholder') }}"
+        aria-label="{{ t('dash.search_aria') }}">
+    <button class="button button-primary" type="submit">{{ t('dash.search_btn') }}</button>
 </form>
 
 {% block dashboard_widgets %}
 <section class="card">
     <div class="section-header">
-        <h2>Fill in the blank</h2>
-        <a class="button button-ghost" href="/review">Review session</a>
+        <h2>{{ t('dash.quiz_title') }}</h2>
+        <a class="button button-ghost" href="/review">{{ t('dash.review_session') }}</a>
     </div>
-    {{ quiz_card(question, action_exclude=next_exclude, action_label="Try another", action_id="quiz-next-btn") }}
+    {{ quiz_card(question, action_exclude=next_exclude, action_label=t('quiz.try_another'), action_id="quiz-next-btn") }}
 </section>
 {% endblock dashboard_widgets %}
 
 {% if not has_api_token %}
 <section class="card extension-promo-card">
-    <h2>Capture words with the Chrome Side Panel</h2>
-    <p>Jot down vocabulary from articles and YouTube transcripts right alongside what you're reading or watching, then batch-add them to Glossbook.</p>
+    <h2>{{ t('dash.ext_title') }}</h2>
+    <p>{{ t('dash.ext_desc') }}</p>
     <div class="quiz-actions">
-        <a class="button button-primary" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">Download extension (.zip)</a>
-        <a class="button button-ghost" href="/account#extension">Get API token &amp; install guide</a>
+        <a class="button button-primary" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('dash.ext_download') }}</a>
+        <a class="button button-ghost" href="/account#extension">{{ t('dash.ext_setup') }}</a>
     </div>
 </section>
 {% endif %}
 
 {% if review_bookmark_entry_id %}
-<p class="dashboard-secondary-action">Pick up where you left off &mdash; <a href="/resume_review">Resume from last mark</a></p>
+<p class="dashboard-secondary-action">{{ t('dash.resume_prefix') }} &mdash; <a href="/resume_review">{{ t('dash.resume_link') }}</a></p>
 {% endif %}
 
 {% endblock body %}

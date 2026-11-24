@@ -95,6 +95,16 @@ from database import (
     get_review_bookmark,
     hash_token,
 )
+from i18n import (
+    DEFAULT_LANG,
+    LANG_COOKIE_MAX_AGE,
+    LANG_COOKIE_NAME,
+    format_import_summary,
+    get_request_lang,
+    i18n_template_context,
+    normalize_lang,
+    translate,
+)
 from utils import (
     EntryDisplay,
     QuizQuestion,
@@ -126,7 +136,7 @@ auth_settings = get_auth_settings()
 
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 PASSWORD_RESET_TTL_SECONDS = 24 * 60 * 60
-EXTENSION_VERSION = "0.2.0"
+EXTENSION_VERSION = "0.3.0"
 EXTENSION_DOWNLOAD_URL = (
     f"https://github.com/davuses/glossbook/releases/download/"
     f"extension-v{EXTENSION_VERSION}/glossbook-extension-v{EXTENSION_VERSION}.zip"
@@ -181,12 +191,26 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(
-    directory=str(TEMPLATES_DIR), context_processors=[auth_template_context]
+    directory=str(TEMPLATES_DIR),
+    context_processors=[auth_template_context, i18n_template_context],
 )
 templates.env.globals["static_url"] = static_url
-templates.env.globals["how_long_ago"] = get_how_long_ago
 templates.env.globals["extension_version"] = EXTENSION_VERSION
 templates.env.globals["extension_download_url"] = EXTENSION_DOWNLOAD_URL
+
+
+def _localize_validation_error(lang: str, message: str | None) -> str | None:
+    if not message or lang == "en":
+        return message
+    mapping = {
+        "Word cannot be empty.": "val.word_empty",
+        'Word cannot contain " - " (reserved as the context separator).': "val.word_separator",
+        "Username must be 2–32 characters using letters, numbers, '.', '_', or '-'.": "val.username_rules",
+        "Password must be at least 10 characters.": "val.pw_short",
+        "Password must be at most 128 characters.": "val.pw_long",
+    }
+    key = mapping.get(message)
+    return translate(lang, key) if key else message
 
 protected_router = APIRouter(dependencies=[Depends(require_user)])
 admin_router = APIRouter(dependencies=[Depends(require_admin)])
@@ -396,6 +420,39 @@ class CreateInviteForm(CsrfForm):
 # ---------------------------------------------------------------------------
 
 
+@app.post("/language")
+def set_language(
+    request: Request,
+    lang: str = Form("en"),
+    next_path: str = Form("/"),
+):
+    if request.headers.get("Sec-Fetch-Site") == "cross-site":
+        raise HTTPException(status_code=403, detail="Cross-site request blocked")
+    origin = request.headers.get("origin")
+    if origin:
+        expected_origin = f"{request.url.scheme}://{request.url.netloc}"
+        if origin != expected_origin:
+            raise HTTPException(status_code=403, detail="Invalid origin")
+
+    chosen = normalize_lang(lang) or DEFAULT_LANG
+    destination = safe_next_path(next_path, "/")
+    response = RedirectResponse(
+        url=destination,
+        status_code=303,
+        headers=_SENSITIVE_TOKEN_HEADERS,
+    )
+    response.set_cookie(
+        key=LANG_COOKIE_NAME,
+        value=chosen,
+        max_age=LANG_COOKIE_MAX_AGE,
+        httponly=False,
+        samesite="lax",
+        secure=auth_settings.https_only,
+        path="/",
+    )
+    return response
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(
     request: Request,
@@ -405,14 +462,18 @@ async def login_page(
     destination = safe_next_path(next_path)
     if get_current_user(request) is not None:
         return RedirectResponse(url=destination, status_code=303)
+    lang = get_request_lang(request)
     context = {
         "next_path": destination,
         "login_csrf_token": get_csrf_token(request),
         "error": None,
-        "notice": "Password updated. You can log in now." if reset else None,
+        "notice": translate(lang, "auth.notice_pw_updated") if reset else None,
     }
     return templates.TemplateResponse(
-        request=request, name="login.html.jinja", context=context
+        request=request,
+        name="login.html.jinja",
+        context=context,
+        headers={"Vary": "Cookie, Accept-Language"},
     )
 
 
@@ -423,6 +484,7 @@ def login(
 ):
     verify_csrf_value(request, form_data.csrf_token)
     destination = safe_next_path(form_data.next_path)
+    lang = get_request_lang(request)
     if check_auth_rate_limit(request, "login", form_data.username):
         return templates.TemplateResponse(
             request=request,
@@ -430,7 +492,7 @@ def login(
             context={
                 "next_path": destination,
                 "login_csrf_token": get_csrf_token(request),
-                "error": "Too many login attempts. Please wait a few minutes.",
+                "error": translate(lang, "auth.err_rate_login"),
                 "notice": None,
             },
             status_code=429,
@@ -444,7 +506,7 @@ def login(
     context = {
         "next_path": destination,
         "login_csrf_token": get_csrf_token(request),
-        "error": "Invalid username or password",
+        "error": translate(lang, "auth.err_invalid_creds"),
         "notice": None,
     }
     return templates.TemplateResponse(
@@ -459,6 +521,7 @@ def login(
 async def register_page(request: Request, code: str = Query("")):
     clean_code = code.strip()
     invite = db_get_valid_invite_token(hash_token(clean_code)) if clean_code else None
+    lang = get_request_lang(request)
     context = {
         "code": clean_code,
         "invite_valid": invite is not None,
@@ -468,9 +531,9 @@ async def register_page(request: Request, code: str = Query("")):
             None
             if invite is not None
             else (
-                "This invite link is invalid, expired, or has already been used."
+                translate(lang, "auth.err_invite_invalid")
                 if clean_code
-                else "Registration is invite-only. Ask the admin for an invite link."
+                else translate(lang, "auth.err_invite_only")
             )
         ),
     }
@@ -489,6 +552,7 @@ def register(
 ):
     verify_csrf_value(request, form_data.csrf_token)
     clean_code = form_data.code.strip()
+    lang = get_request_lang(request)
 
     def _render_error(message: str, status_code: int = 400, invite_valid: bool = True):
         return templates.TemplateResponse(
@@ -507,30 +571,33 @@ def register(
 
     if check_auth_rate_limit(request, "register", form_data.username):
         return _render_error(
-            "Too many registration attempts. Please wait a few minutes.",
+            translate(lang, "auth.err_rate_register"),
             status_code=429,
         )
 
     if not clean_code:
         record_auth_failure(request, "register", form_data.username)
-        return _render_error("An invite code is required.", invite_valid=False)
+        return _render_error(translate(lang, "auth.err_invite_required"), invite_valid=False)
 
     clean_username, username_error = validate_username(form_data.username)
     if username_error or not clean_username:
-        return _render_error(username_error or "Invalid username.")
+        return _render_error(
+            _localize_validation_error(lang, username_error)
+            or translate(lang, "val.username_rules")
+        )
 
     if form_data.password != form_data.confirm_password:
-        return _render_error("Passwords do not match.")
+        return _render_error(translate(lang, "auth.err_pw_mismatch"))
 
     password_error = validate_password(form_data.password)
     if password_error:
-        return _render_error(password_error)
+        return _render_error(_localize_validation_error(lang, password_error) or password_error)
 
     token_digest = hash_token(clean_code)
     if db_get_valid_invite_token(token_digest) is None:
         record_auth_failure(request, "register", form_data.username)
         return _render_error(
-            "This invite link is invalid, expired, or has already been used.",
+            translate(lang, "auth.err_invite_invalid"),
             status_code=400,
             invite_valid=False,
         )
@@ -542,7 +609,9 @@ def register(
         record_auth_failure(request, "register", clean_username)
         is_taken = "already taken" in (err or "").lower()
         return _render_error(
-            err or "Unable to complete registration.",
+            translate(lang, "auth.err_username_taken")
+            if is_taken
+            else translate(lang, "auth.err_invite_invalid"),
             status_code=409 if is_taken else 400,
             invite_valid=is_taken,
         )
@@ -555,6 +624,7 @@ def register(
 @app.get("/reset-password", response_class=HTMLResponse, name="reset_password_page")
 async def reset_password_page(request: Request, token: str = Query("")):
     clean_token = token.strip()
+    lang = get_request_lang(request)
     valid = (
         db_get_valid_password_reset_token(hash_token(clean_token))
         if clean_token
@@ -568,7 +638,7 @@ async def reset_password_page(request: Request, token: str = Query("")):
         "error": (
             None
             if valid is not None
-            else "This password reset link is invalid, expired, or has already been used."
+            else translate(lang, "auth.err_reset_invalid")
         ),
     }
     return templates.TemplateResponse(
@@ -586,6 +656,7 @@ def reset_password(
 ):
     verify_csrf_value(request, form_data.csrf_token)
     clean_token = form_data.token.strip()
+    lang = get_request_lang(request)
 
     def _render_error(
         message: str,
@@ -609,7 +680,7 @@ def reset_password(
 
     if check_auth_rate_limit(request, "reset"):
         return _render_error(
-            "Too many password reset attempts. Please wait a few minutes.",
+            translate(lang, "auth.err_rate_reset"),
             status_code=429,
         )
 
@@ -621,19 +692,22 @@ def reset_password(
     if valid is None:
         record_auth_failure(request, "reset")
         return _render_error(
-            "This password reset link is invalid, expired, or has already been used.",
+            translate(lang, "auth.err_reset_invalid"),
             token_valid=False,
         )
     _, target_username = valid
 
     if form_data.password != form_data.confirm_password:
         return _render_error(
-            "Passwords do not match.", target_username=target_username
+            translate(lang, "auth.err_pw_mismatch"), target_username=target_username
         )
 
     password_error = validate_password(form_data.password)
     if password_error:
-        return _render_error(password_error, target_username=target_username)
+        return _render_error(
+            _localize_validation_error(lang, password_error) or password_error,
+            target_username=target_username,
+        )
 
     user, err = db_redeem_password_reset(
         hash_token(clean_token), hash_password(form_data.password)
@@ -641,7 +715,7 @@ def reset_password(
     if err or user is None:
         record_auth_failure(request, "reset")
         return _render_error(
-            err or "Password reset link is invalid, expired, or already used.",
+            translate(lang, "auth.err_reset_invalid"),
             token_valid=False,
         )
 
@@ -948,9 +1022,10 @@ def entries_page(
     }
 
     if is_xhr:
+        xhr_context = {**i18n_template_context(request), **context}
         results_html = templates.env.get_template(
             "_entries_results.html.jinja"
-        ).render(context)
+        ).render(xhr_context)
         return JSONResponse(
             {
                 "count": total_count,
@@ -999,9 +1074,10 @@ def entry_page(
         else ""
     )
     review_bookmark_entry_id = get_review_bookmark(current_user.id)
+    lang = get_request_lang(request)
     context = {
         "visit_count": visit_count,
-        "last_visit_elapsed": get_how_long_ago(entry.last_visit),
+        "last_visit_elapsed": get_how_long_ago(entry.last_visit, lang=lang),
         "is_review_bookmark": entry_id == review_bookmark_entry_id,
         "entry_text": normalize_pronoun_casing(entry.text),
         "context_text": normalize_pronoun_casing(context_text),
@@ -1123,6 +1199,7 @@ def edit_entry(
     current_user: UserRecord = Depends(require_user),
 ):
     verify_csrf_value(request, form_data.csrf_token)
+    lang = get_request_lang(request)
     updated_text, error = validate_entry_fields(form_data.word, form_data.context)
     if error or not updated_text:
         return templates.TemplateResponse(
@@ -1132,7 +1209,7 @@ def edit_entry(
                 "entry_id": entry_id,
                 "word": form_data.word,
                 "context": form_data.context,
-                "error": error,
+                "error": _localize_validation_error(lang, error),
                 "existing_entry_id": None,
             },
             status_code=400,
@@ -1151,7 +1228,7 @@ def edit_entry(
                 "entry_id": entry_id,
                 "word": form_data.word,
                 "context": form_data.context,
-                "error": "An entry with that text already exists.",
+                "error": translate(lang, "val.entry_exists"),
                 "existing_entry_id": existing.id if existing else None,
             },
             status_code=409,
@@ -1224,6 +1301,7 @@ def add_entry(
     current_user: UserRecord = Depends(require_user),
 ):
     verify_csrf_value(request, form_data.csrf_token)
+    lang = get_request_lang(request)
     updated_text, error = validate_entry_fields(form_data.word, form_data.context)
     if error or not updated_text:
         return templates.TemplateResponse(
@@ -1234,7 +1312,7 @@ def add_entry(
                 "context": form_data.context,
                 "definition_text": form_data.definition_text,
                 "example_text": form_data.example_text,
-                "error": error,
+                "error": _localize_validation_error(lang, error),
                 "existing_entry_id": None,
             },
             status_code=400,
@@ -1259,7 +1337,7 @@ def add_entry(
                 "context": form_data.context,
                 "definition_text": form_data.definition_text,
                 "example_text": form_data.example_text,
-                "error": "An entry with that text already exists.",
+                "error": translate(lang, "val.entry_exists"),
                 "existing_entry_id": existing.id if existing else None,
             },
             status_code=409,
@@ -1487,13 +1565,14 @@ async def import_account_json(
     request: Request,
     current_user: UserRecord = Depends(require_user),
 ):
+    lang = get_request_lang(request)
     max_body = MAX_IMPORT_BYTES + _MAX_MULTIPART_OVERHEAD_BYTES
     content_length = request.headers.get("content-length")
     if content_length and content_length.isdigit() and int(content_length) > max_body:
         return _render_account(
             request,
             current_user,
-            import_error="Import file is too large (max 20 MB).",
+            import_error=translate(lang, "account.err_import_too_large"),
             status_code=413,
         )
 
@@ -1504,7 +1583,7 @@ async def import_account_json(
             return _render_account(
                 request,
                 current_user,
-                import_error="Import file is too large (max 20 MB).",
+                import_error=translate(lang, "account.err_import_too_large"),
                 status_code=413,
             )
 
@@ -1518,7 +1597,7 @@ async def import_account_json(
         return _render_account(
             request,
             current_user,
-            import_error="Choose a Glossbook .json file to import.",
+            import_error=translate(lang, "account.err_import_missing"),
             status_code=400,
         )
 
@@ -1527,14 +1606,14 @@ async def import_account_json(
         return _render_account(
             request,
             current_user,
-            import_error="Import file is too large (max 20 MB).",
+            import_error=translate(lang, "account.err_import_too_large"),
             status_code=413,
         )
     if not raw_bytes:
         return _render_account(
             request,
             current_user,
-            import_error="The selected file is empty.",
+            import_error=translate(lang, "account.err_import_empty"),
             status_code=400,
         )
 
@@ -1556,33 +1635,17 @@ async def import_account_json(
         invalidate_words_cache(current_user.id)
         invalidate_quiz_pool_cache(current_user.id)
 
-    parts = [
-        f"Imported {summary.entries_added} "
-        f"{'entry' if summary.entries_added == 1 else 'entries'}"
-    ]
-    if summary.entries_skipped > 0:
-        parts.append(
-            f"{summary.entries_skipped} duplicate "
-            f"{'entry' if summary.entries_skipped == 1 else 'entries'} skipped"
-        )
-    if include_inbox and (summary.notes_added > 0 or summary.notes_skipped > 0):
-        note_bits = []
-        if summary.notes_added > 0:
-            note_bits.append(
-                f"{summary.notes_added} inbox "
-                f"{'page' if summary.notes_added == 1 else 'pages'} added"
-            )
-        if summary.notes_skipped > 0:
-            note_bits.append(
-                f"{summary.notes_skipped} existing "
-                f"{'page' if summary.notes_skipped == 1 else 'pages'} skipped"
-            )
-        parts.append(", ".join(note_bits))
-
     return _render_account(
         request,
         current_user,
-        import_notice="; ".join(parts) + ".",
+        import_notice=format_import_summary(
+            lang,
+            entries_added=summary.entries_added,
+            entries_skipped=summary.entries_skipped,
+            include_inbox=include_inbox,
+            notes_added=summary.notes_added,
+            notes_skipped=summary.notes_skipped,
+        ),
     )
 
 
@@ -1601,19 +1664,20 @@ def change_password(
     current_user: UserRecord = Depends(require_user),
 ):
     verify_csrf_value(request, form_data.csrf_token)
+    lang = get_request_lang(request)
     record = db_get_user_with_password_by_username(current_user.username)
     if not record or not verify_password(form_data.current_password, record[1]):
         return _render_account(
             request,
             current_user,
-            password_error="Current password is incorrect.",
+            password_error=translate(lang, "account.err_current_pw"),
             status_code=400,
         )
     if form_data.new_password != form_data.confirm_password:
         return _render_account(
             request,
             current_user,
-            password_error="New passwords do not match.",
+            password_error=translate(lang, "account.err_new_pw_mismatch"),
             status_code=400,
         )
     pw_err = validate_password(form_data.new_password)
@@ -1621,7 +1685,7 @@ def change_password(
         return _render_account(
             request,
             current_user,
-            password_error=pw_err,
+            password_error=_localize_validation_error(lang, pw_err),
             status_code=400,
         )
 
@@ -1635,7 +1699,7 @@ def change_password(
     return _render_account(
         request,
         updated,
-        password_notice="Password updated. Other sessions have been signed out.",
+        password_notice=translate(lang, "account.notice_pw_changed"),
     )
 
 
@@ -1674,6 +1738,7 @@ def revoke_api_token(
 
 @admin_router.get("/notes/", response_class=HTMLResponse)
 def notes(request: Request):
+    lang = get_request_lang(request)
     text = build_directory_tree_markdown(get_notes_dir())
     note_html = markdown2.markdown(
         text,
@@ -1681,7 +1746,7 @@ def notes(request: Request):
     )
     toc_html = getattr(note_html, "toc_html", "")
     context = {
-        "title": "Study Notes",
+        "title": translate(lang, "notes.title"),
         "toc_html": toc_html,
         "note_html": note_html,
         "is_dir": True,
@@ -1824,19 +1889,20 @@ def admin_toggle_user_active(
     _: None = Depends(verify_form_csrf),
     current_user: UserRecord = Depends(require_admin),
 ):
+    lang = get_request_lang(request)
     target = db_get_user_by_id(user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
     if target.id == current_user.id:
         return _render_admin(
             request,
-            admin_error="You cannot disable your own account.",
+            admin_error=translate(lang, "admin.err_self_disable"),
             status_code=400,
         )
     if target.is_admin and target.is_active and db_count_active_admins() <= 1:
         return _render_admin(
             request,
-            admin_error="Cannot disable the last active admin account.",
+            admin_error=translate(lang, "admin.err_last_admin"),
             status_code=400,
         )
     db_set_user_active(target.id, not target.is_active)
@@ -1850,13 +1916,14 @@ def admin_create_reset_link(
     _: None = Depends(verify_form_csrf),
     current_user: UserRecord = Depends(require_admin),
 ):
+    lang = get_request_lang(request)
     target = db_get_user_by_id(user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
     if not target.is_active:
         return _render_admin(
             request,
-            admin_error="Cannot issue a reset link for a disabled account.",
+            admin_error=translate(lang, "admin.err_reset_disabled"),
             status_code=400,
         )
     raw_token, digest = generate_opaque_token()

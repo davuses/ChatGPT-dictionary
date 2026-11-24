@@ -46,6 +46,7 @@ def test_all_non_login_routes_require_authentication():
         ("POST", "/register"),
         ("GET", "/reset-password"),
         ("POST", "/reset-password"),
+        ("POST", "/language"),
     }
     admin_prefixes = ("/notes/", "/view_note/", "/edit_note/", "/admin")
     for route in main.app.routes:

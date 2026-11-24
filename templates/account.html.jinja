@@ -1,24 +1,24 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Account{% endblock title %}
+{% block title %}{{ t('account.title') }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
-{{ page_header(subtitle="Signed in as " ~ current_user.username ~ (" (admin)" if is_admin else ""), active="account") }}
+{{ page_header(subtitle=t('account.subtitle_admin' if is_admin else 'account.subtitle_user', username=current_user.username), active="account") }}
 
 <main class="account-page">
     <section class="card">
-        <h2>Export &amp; Import Dictionary</h2>
-        <p class="page-subtitle">Download an offline copy of your {{ entry_count }} {{ "entry" if entry_count == 1 else "entries" }} (JSON includes <code>/inbox</code> page notes and visit stats; Markdown formats a clean study notebook).</p>
+        <h2>{{ t('account.export_import_title') }}</h2>
+        <p class="page-subtitle">{{ t('account.export_desc_one' if entry_count == 1 else 'account.export_desc_many', n=entry_count) }}</p>
         <div class="form-actions">
-            <a class="button button-primary" href="/account/export.json">Download JSON</a>
-            <a class="button button-ghost" href="/account/export.md">Download Markdown</a>
+            <a class="button button-primary" href="/account/export.json">{{ t('account.download_json') }}</a>
+            <a class="button button-ghost" href="/account/export.md">{{ t('account.download_md') }}</a>
         </div>
 
         <hr class="account-divider">
 
-        <h3 class="account-subheading">Import Glossbook JSON</h3>
-        <p class="page-subtitle">Merge a Glossbook <code>.json</code> export into your account. Existing entries and page notes are kept untouched and duplicates are skipped.</p>
+        <h3 class="account-subheading">{{ t('account.import_title') }}</h3>
+        <p class="page-subtitle">{{ t('account.import_desc') }}</p>
         {% if import_notice %}<p class="form-notice" role="status">{{ import_notice }}</p>{% endif %}
         {% if import_error %}<p class="form-error" role="alert">{{ import_error }}</p>{% endif %}
         <form class="import-form" method="post" action="/account/import" enctype="multipart/form-data">
@@ -26,52 +26,52 @@
             <input type="file" name="file" accept=".json,application/json" required>
             <label class="import-checkbox">
                 <input type="checkbox" name="include_inbox" value="true" checked>
-                <span>Also import <code>/inbox</code> page notes</span>
+                <span>{{ t('account.import_include_inbox') }}</span>
             </label>
             <div class="form-actions">
-                <button class="button button-ghost" type="submit">Import JSON</button>
+                <button class="button button-ghost" type="submit">{{ t('account.import_btn') }}</button>
             </div>
         </form>
     </section>
 
     <section class="card" id="extension">
-        <h2>Chrome Side Panel API Tokens</h2>
-        <p class="page-subtitle">Generate a separate token per device (e.g. Laptop Chrome, Desktop Chrome). Tokens are only shown once when created.</p>
+        <h2>{{ t('account.tokens_title') }}</h2>
+        <p class="page-subtitle">{{ t('account.tokens_desc') }}</p>
 
         <details class="extension-guide"{% if not api_tokens %} open{% endif %}>
-            <summary>How to install the Chrome extension (v{{ extension_version }})</summary>
+            <summary>{{ t('account.ext_guide_summary', version=extension_version) }}</summary>
             <ol class="extension-steps">
-                <li><a href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">Download <code>glossbook-extension-v{{ extension_version }}.zip</code></a> and unzip it.</li>
-                <li>Open <code>chrome://extensions</code> in Chrome and enable <strong>Developer mode</strong> (top right).</li>
-                <li>Click <strong>Load unpacked</strong> and select the extracted folder (the one containing <code>manifest.json</code>).</li>
-                <li>Generate a token below, click the Glossbook icon to open the Side Panel, open <strong>Settings</strong>, enter server URL <code>{{ server_url }}</code> and your token, then click <strong>Save &amp; test</strong>.</li>
+                <li><a href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('account.ext_step1_link', version=extension_version) }}</a> {{ t('account.ext_step1_after') }}</li>
+                <li>{{ t('account.ext_step2_before') }} <code>chrome://extensions</code> {{ t('account.ext_step2_mid') }} <strong>{{ t('account.ext_step2_bold') }}</strong> {{ t('account.ext_step2_after') }}</li>
+                <li>{{ t('account.ext_step3_before') }} <strong>{{ t('account.ext_step3_bold') }}</strong> {{ t('account.ext_step3_after') }} <code>manifest.json</code>{{ t('account.ext_step3_end') }}</li>
+                <li>{{ t('account.ext_step4_before') }} <strong>{{ t('account.ext_step4_settings') }}</strong>{{ t('account.ext_step4_mid') }} <code>{{ server_url }}</code> {{ t('account.ext_step4_and') }} <strong>{{ t('account.ext_step4_save') }}</strong>{{ t('account.ext_step4_end') }}</li>
             </ol>
         </details>
 
         {% if new_token %}
         <div class="secret-box" role="status">
-            <p><strong>New token created{% if new_token_label %} ({{ new_token_label }}){% endif %}</strong> — copy it now; it won't be shown again:</p>
+            <p><strong>{{ t('account.new_token_title') }}{% if new_token_label %} ({{ new_token_label }}){% endif %}</strong> {{ t('account.new_token_hint') }}</p>
             <div class="secret-box-row">
                 <input type="text" class="secret-input" id="new-api-token" value="{{ new_token }}" readonly>
-                <button type="button" class="button button-primary copy-secret-btn" data-copy-target="new-api-token">Copy</button>
+                <button type="button" class="button button-primary copy-secret-btn" data-copy-target="new-api-token">{{ t('account.copy') }}</button>
             </div>
         </div>
         {% endif %}
 
         <form class="inline-create-form" method="post" action="/account/tokens">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="text" name="label" placeholder="Device label (e.g. Laptop Chrome)" maxlength="64">
-            <button class="button button-primary" type="submit">Generate token</button>
+            <input type="text" name="label" placeholder="{{ t('account.token_label_placeholder') }}" maxlength="64">
+            <button class="button button-primary" type="submit">{{ t('account.generate_token') }}</button>
         </form>
 
         {% if api_tokens %}
         <table class="data-table admin-table">
             <thead>
                 <tr>
-                    <th>Label</th>
-                    <th>Created</th>
-                    <th>Last used</th>
-                    <th>Action</th>
+                    <th>{{ t('account.col_label') }}</th>
+                    <th>{{ t('account.col_created') }}</th>
+                    <th>{{ t('account.col_last_used') }}</th>
+                    <th>{{ t('account.col_action') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -81,9 +81,9 @@
                     <td>{{ how_long_ago(token.created_at) }}</td>
                     <td>{{ how_long_ago(token.last_used_at) }}</td>
                     <td>
-                        <form class="inline-form" method="post" action="/account/tokens/{{ token.id }}/revoke" onsubmit="return confirm('Revoke this API token? Any extension using it will stop syncing.');">
+                        <form class="inline-form" method="post" action="/account/tokens/{{ token.id }}/revoke" onsubmit="return confirm(uiText('confirm_revoke_token', null, 'Revoke this API token? Any extension using it will stop syncing.'));">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button class="button button-danger" type="submit">Revoke</button>
+                            <button class="button button-danger" type="submit">{{ t('account.revoke') }}</button>
                         </form>
                     </td>
                 </tr>
@@ -91,39 +91,41 @@
             </tbody>
         </table>
         {% else %}
-        <p class="page-subtitle">No API tokens yet.</p>
+        <p class="page-subtitle">{{ t('account.no_tokens') }}</p>
         {% endif %}
     </section>
 
     <section class="card">
-        <h2>Change Password</h2>
+        <h2>{{ t('account.pw_title') }}</h2>
         {% if password_notice %}<p class="form-notice" role="status">{{ password_notice }}</p>{% endif %}
         {% if password_error %}<p class="form-error" role="alert">{{ password_error }}</p>{% endif %}
         <form class="login-form" method="post" action="/account/password">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <label for="current_password">Current password</label>
+            <label for="current_password">{{ t('account.current_pw') }}</label>
             <input id="current_password" name="current_password" type="password" autocomplete="current-password" required>
-            <label for="new_password">New password (10–128 characters)</label>
+            <label for="new_password">{{ t('auth.new_password') }}</label>
             <input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
-            <label for="confirm_password">Confirm new password</label>
+            <label for="confirm_password">{{ t('auth.confirm_new_password') }}</label>
             <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
             <div class="form-actions">
-                <button class="button button-primary" type="submit">Update password</button>
+                <button class="button button-primary" type="submit">{{ t('account.update_pw') }}</button>
             </div>
         </form>
     </section>
 </main>
 
 <script>
-document.querySelectorAll(".copy-secret-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-        const input = document.getElementById(btn.dataset.copyTarget);
-        if (!input) return;
-        input.select();
-        navigator.clipboard?.writeText(input.value).then(() => {
-            btn.textContent = "Copied";
-            setTimeout(() => { btn.textContent = "Copy"; }, 1800);
-        }).catch(() => {});
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".copy-secret-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const input = document.getElementById(btn.dataset.copyTarget);
+            if (!input) return;
+            input.select();
+            navigator.clipboard?.writeText(input.value).then(() => {
+                btn.textContent = uiText("copied", null, "Copied");
+                setTimeout(() => { btn.textContent = uiText("copy", null, "Copy"); }, 1800);
+            }).catch(() => {});
+        });
     });
 });
 </script>

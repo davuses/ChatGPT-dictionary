@@ -3,15 +3,15 @@
 <div class="quiz-card" data-entry-id="{{ question.entry_id }}">
     <p class="quiz-sentence">{{ question.blanked_sentence }}</p>
     <div class="quiz-actions">
-        <button type="button" class="button button-primary quiz-reveal-btn" onclick="toggleQuizAnswer(this)">Show answer</button>
+        <button type="button" class="button button-primary quiz-reveal-btn" onclick="toggleQuizAnswer(this)">{{ t('quiz.show_answer') }}</button>
         {% if action_label %}<button type="button" class="button button-ghost" data-exclude="{{ action_exclude or '' }}"{% if action_id %} id="{{ action_id }}"{% endif %}>{{ action_label }}</button>{% endif %}
     </div>
     <p class="quiz-answer" hidden>
         <strong>{{ question.word }}</strong>
-        &mdash; <a href="/entry/{{ question.entry_id }}">View full entry</a>
+        &mdash; <a href="/entry/{{ question.entry_id }}">{{ t('quiz.view_entry') }}</a>
     </p>
 </div>
 {% else %}
-<p class="quiz-empty">No quizzable entries yet &mdash; add some examples first.</p>
+<p class="quiz-empty">{{ t('quiz.empty') }}</p>
 {% endif %}
 {% endmacro %}

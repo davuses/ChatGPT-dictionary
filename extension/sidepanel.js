@@ -1,6 +1,160 @@
+const STRINGS = {
+  en: {
+    inbox: "Inbox",
+    settings: "Settings",
+    loading_tab: "Loading tab…",
+    untitled_tab: "Untitled tab",
+    settings_title: "Connection settings",
+    settings_server_url: "Server URL",
+    settings_api_token: "API Token",
+    settings_token_hint: "(stored locally only)",
+    settings_token_placeholder: "Paste your API token from /account",
+    settings_lang_label: "Language",
+    lang_auto: "Auto (Browser)",
+    save_test: "Save & test",
+    quick_jot: "Quick jot",
+    grab_from_page: "Grab from page",
+    grab_selection: "Grab selection",
+    grab_yt: "Grab timestamp & caption",
+    jot_word_placeholder: "Word or phrase (e.g. finances)",
+    jot_context_placeholder: "Context sentence (optional — Ctrl+Enter to save)",
+    timestamp_label: "Timestamp {ts}",
+    clear_ts: "Clear timestamp",
+    jot_word: "Jot word",
+    lookup: "Lookup",
+    captured_words: "Captured words",
+    select_all: "Select all",
+    select_none: "Select none",
+    add_selected: "Add selected",
+    add_selected_n: "Add selected ({n})",
+    items_empty: "No words jotted for this page yet.",
+    scratchpad: "Page scratchpad",
+    scratchpad_placeholder: "Freeform Markdown notes for this video or article…",
+    play_pronunciation: "Play pronunciation",
+    play_pronunciation_for: "Play pronunciation for {word}",
+    jump_ts: "Jump to timestamp (-2s)",
+    added_badge: "Added →",
+    in_dict_badge: "In dictionary #{id}",
+    edit: "Edit",
+    delete: "Delete",
+    save: "Save",
+    cancel: "Cancel",
+    edit_word_placeholder: "Word or phrase",
+    edit_ctx_placeholder: "Context sentence",
+    edit_def_placeholder: "Optional definition (Markdown)",
+    looking_up: "Looking up…",
+    saved_visits_one: "Saved ({n} visit)",
+    saved_visits_many: "Saved ({n} visits)",
+    synonyms_prefix: "Synonyms: ",
+    no_senses: "No thesaurus senses found.",
+    lookup_failed: "Lookup failed: {err}",
+    err_invalid_url: "Enter a valid http(s) server URL.",
+    err_token_short: "API token must be at least 32 characters.",
+    testing: "Testing…",
+    connected: "Connected!",
+    conn_failed: "Connection failed: {err}",
+    saving: "Saving…",
+    saved: "Saved",
+    save_failed: "Save failed: {err}",
+    delete_failed: "Delete failed: {err}",
+    notice_open_page: "Open a web page or YouTube video to take notes and capture vocabulary.",
+    notice_configure: "Configure your server URL and API token in Settings to connect.",
+    notice_load_failed: "Could not load page notes: {err}",
+    src_transcript: "Full sentence grabbed from transcript",
+    src_captions: "Full sentence grabbed from captions",
+    src_overlay: "Partial caption only — open YouTube Transcript for full sentences",
+    type_word_first: "Type a word first to look it up.",
+    grabbing: "Grabbing…",
+    grab_failed: "Could not grab from page.",
+    adding_to_dict: "Adding to dictionary…",
+    promote_added: "{n} added",
+    promote_linked: "{n} linked to existing",
+    promote_done: "Done",
+    promote_failed: "Promote failed: {err}",
+    failed: "Failed",
+  },
+  "zh-CN": {
+    inbox: "收件箱",
+    settings: "设置",
+    loading_tab: "正在加载标签页…",
+    untitled_tab: "未命名标签页",
+    settings_title: "连接设置",
+    settings_server_url: "服务器地址",
+    settings_api_token: "API 令牌",
+    settings_token_hint: "（仅保存在本地）",
+    settings_token_placeholder: "粘贴来自「账户」页面的 API 令牌",
+    settings_lang_label: "界面语言",
+    lang_auto: "跟随浏览器",
+    save_test: "保存并测试",
+    quick_jot: "随手记词",
+    grab_from_page: "从网页抓取",
+    grab_selection: "抓取选中文本",
+    grab_yt: "抓取时间点与字幕",
+    jot_word_placeholder: "单词或短语（如 finances）",
+    jot_context_placeholder: "语境原句（可选 — Ctrl+Enter 保存）",
+    timestamp_label: "时间点 {ts}",
+    clear_ts: "清除时间点",
+    jot_word: "记下词条",
+    lookup: "查词",
+    captured_words: "本页已收集",
+    select_all: "全选",
+    select_none: "取消全选",
+    add_selected: "入库选中项",
+    add_selected_n: "入库选中项 ({n})",
+    items_empty: "当前页面还没有记下生词。",
+    scratchpad: "本页随手记",
+    scratchpad_placeholder: "记录此视频或文章的自由 Markdown 笔记…",
+    play_pronunciation: "播放发音",
+    play_pronunciation_for: "播放 {word} 的发音",
+    jump_ts: "跳转到时间点（提前 2 秒）",
+    added_badge: "已入库 →",
+    in_dict_badge: "词库已有 #{id}",
+    edit: "编辑",
+    delete: "删除",
+    save: "保存",
+    cancel: "取消",
+    edit_word_placeholder: "单词或短语",
+    edit_ctx_placeholder: "语境原句",
+    edit_def_placeholder: "可选释义（支持 Markdown）",
+    looking_up: "正在查询…",
+    saved_visits_one: "词库已有（访问 {n} 次）",
+    saved_visits_many: "词库已有（访问 {n} 次）",
+    synonyms_prefix: "同义词：",
+    no_senses: "未找到同义词释义。",
+    lookup_failed: "查询失败：{err}",
+    err_invalid_url: "请输入有效的 http(s) 服务器地址。",
+    err_token_short: "API 令牌长度至少为 32 位。",
+    testing: "正在测试连接…",
+    connected: "已连接！",
+    conn_failed: "连接失败：{err}",
+    saving: "正在保存…",
+    saved: "已保存",
+    save_failed: "保存失败：{err}",
+    delete_failed: "删除失败：{err}",
+    notice_open_page: "打开任意网页或 YouTube 视频即可记笔记并收集生词。",
+    notice_configure: "请先在「设置」中配置服务器地址和 API 令牌。",
+    notice_load_failed: "无法加载本页笔记：{err}",
+    src_transcript: "已从视频字幕列表抓取完整句子",
+    src_captions: "已从字幕抓取完整句子",
+    src_overlay: "仅抓取到片段字幕——展开 YouTube 字幕列表可抓取完整句子",
+    type_word_first: "请先输入要查询的单词。",
+    grabbing: "正在抓取…",
+    grab_failed: "无法从当前页面抓取内容。",
+    adding_to_dict: "正在加入词库…",
+    promote_added: "新增 {n} 个",
+    promote_linked: "关联已有 {n} 个",
+    promote_done: "已完成",
+    promote_failed: "入库失败：{err}",
+    failed: "失败",
+  },
+};
+
 const state = {
   serverUrl: "",
   apiToken: "",
+  langPref: "auto",
+  lang: "en",
+  noticeKind: null,
   tabId: null,
   rawUrl: "",
   canonicalUrl: "",
@@ -22,6 +176,7 @@ const els = {
   settingsPanel: document.getElementById("settings-panel"),
   serverUrlInput: document.getElementById("server-url-input"),
   apiTokenInput: document.getElementById("api-token-input"),
+  langSelect: document.getElementById("lang-select"),
   saveSettingsBtn: document.getElementById("save-settings-btn"),
   settingsStatus: document.getElementById("settings-status"),
   pageTitle: document.getElementById("page-title"),
@@ -48,6 +203,64 @@ const els = {
   notesTextarea: document.getElementById("notes-textarea"),
   notesStatus: document.getElementById("notes-status"),
 };
+
+function resolveLang(pref) {
+  if (pref === "en" || pref === "zh-CN") return pref;
+  const uiLang =
+    (typeof chrome !== "undefined" &&
+      chrome.i18n &&
+      typeof chrome.i18n.getUILanguage === "function" &&
+      chrome.i18n.getUILanguage()) ||
+    navigator.language ||
+    "en";
+  return uiLang.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+}
+
+function t(key, vars) {
+  const dict = STRINGS[state.lang] || STRINGS.en;
+  let text = Object.prototype.hasOwnProperty.call(dict, key)
+    ? dict[key]
+    : STRINGS.en[key] || key;
+  if (vars) {
+    text = text.replace(/\{(\w+)\}/g, (match, name) =>
+      Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match
+    );
+  }
+  return text;
+}
+
+function applyLanguage() {
+  state.lang = resolveLang(state.langPref);
+  document.documentElement.lang = state.lang;
+  if (els.langSelect) {
+    els.langSelect.value = state.langPref;
+  }
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.dataset.i18n;
+    if (key) el.textContent = t(key);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    const key = el.dataset.i18nPlaceholder;
+    if (key) el.placeholder = t(key);
+  });
+  if (state.tabId !== null && !state.title) {
+    els.pageTitle.textContent = t("untitled_tab");
+  }
+  if (isHttpUrl(state.rawUrl)) {
+    els.grabPageBtn.textContent = isYouTubeUrl(state.rawUrl)
+      ? t("grab_yt")
+      : t("grab_selection");
+  } else {
+    els.grabPageBtn.textContent = t("grab_from_page");
+  }
+  setPendingTimestamp(state.pendingTimestamp);
+  renderItems();
+  if (els.workspace.hidden && state.noticeKind === "not_http") {
+    showNotice(t("notice_open_page"), false, "not_http");
+  } else if (els.workspace.hidden && state.noticeKind === "no_config") {
+    showNotice(t("notice_configure"), false, "no_config");
+  }
+}
 
 function formatTimestamp(seconds) {
   const sec = Math.max(0, Math.floor(seconds));
@@ -247,8 +460,8 @@ function createAudioButton(word) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "sp-audio-btn";
-  btn.title = "Play pronunciation";
-  btn.setAttribute("aria-label", `Play pronunciation for ${word}`);
+  btn.title = t("play_pronunciation");
+  btn.setAttribute("aria-label", t("play_pronunciation_for", { word }));
 
   const playSvg = createSvgElement("svg", {
     class: "icon-play",
@@ -323,20 +536,24 @@ function setStatus(el, text, isError = false) {
   el.classList.toggle("is-error", isError);
 }
 
-function showNotice(text, isError = false) {
+function showNotice(text, isError = false, kind = null) {
+  state.noticeKind = kind;
   els.globalNotice.textContent = text;
   els.globalNotice.classList.toggle("is-error", isError);
   els.globalNotice.hidden = false;
 }
 
 function hideNotice() {
+  state.noticeKind = null;
   els.globalNotice.hidden = true;
 }
 
 function setPendingTimestamp(seconds) {
   if (typeof seconds === "number" && Number.isFinite(seconds) && seconds >= 0) {
     state.pendingTimestamp = Math.floor(seconds);
-    els.jotTsLabel.textContent = "Timestamp " + formatTimestamp(state.pendingTimestamp);
+    els.jotTsLabel.textContent = t("timestamp_label", {
+      ts: formatTimestamp(state.pendingTimestamp),
+    });
     els.jotTsRow.hidden = false;
   } else {
     state.pendingTimestamp = null;
@@ -381,11 +598,14 @@ async function apiRequest(path, options = {}) {
 }
 
 async function loadSettings() {
-  const stored = await chrome.storage.local.get(["serverUrl", "apiToken"]);
+  const stored = await chrome.storage.local.get(["serverUrl", "apiToken", "langPref"]);
   state.serverUrl = cleanServerUrl(stored.serverUrl || "http://localhost:8000");
   state.apiToken = (stored.apiToken || "").trim();
+  state.langPref =
+    stored.langPref === "en" || stored.langPref === "zh-CN" ? stored.langPref : "auto";
   els.serverUrlInput.value = state.serverUrl;
   els.apiTokenInput.value = state.apiToken;
+  applyLanguage();
   if (state.serverUrl) {
     els.openInboxLink.href = state.serverUrl + "/inbox";
     els.openInboxLink.hidden = false;
@@ -398,29 +618,32 @@ async function loadSettings() {
 async function saveSettings() {
   const serverUrl = cleanServerUrl(els.serverUrlInput.value);
   const apiToken = els.apiTokenInput.value.trim();
+  const langPref = els.langSelect ? els.langSelect.value : state.langPref;
+  state.langPref = langPref === "en" || langPref === "zh-CN" ? langPref : "auto";
+  applyLanguage();
   if (!isHttpUrl(serverUrl)) {
-    setStatus(els.settingsStatus, "Enter a valid http(s) server URL.", true);
+    setStatus(els.settingsStatus, t("err_invalid_url"), true);
     return;
   }
   if (apiToken.length < 32) {
-    setStatus(els.settingsStatus, "API token must be at least 32 characters.", true);
+    setStatus(els.settingsStatus, t("err_token_short"), true);
     return;
   }
   state.serverUrl = serverUrl;
   state.apiToken = apiToken;
-  await chrome.storage.local.set({ serverUrl, apiToken });
+  await chrome.storage.local.set({ serverUrl, apiToken, langPref: state.langPref });
   els.openInboxLink.href = serverUrl + "/inbox";
   els.openInboxLink.hidden = false;
-  setStatus(els.settingsStatus, "Testing…");
+  setStatus(els.settingsStatus, t("testing"));
   try {
     await apiRequest(
       "/api/v1/page-note?url=" + encodeURIComponent("https://example.com/")
     );
-    setStatus(els.settingsStatus, "Connected!");
+    setStatus(els.settingsStatus, t("connected"));
     els.settingsPanel.hidden = true;
     await refreshActiveTab();
   } catch (err) {
-    setStatus(els.settingsStatus, "Connection failed: " + err.message, true);
+    setStatus(els.settingsStatus, t("conn_failed", { err: err.message }), true);
   }
 }
 
@@ -440,7 +663,7 @@ async function flushPendingNotesSave({ keepalive = false } = {}) {
       body: JSON.stringify(payload),
     });
     if (state.rawUrl === payload.url || state.canonicalUrl === payload.url) {
-      setStatus(els.notesStatus, "Saved");
+      setStatus(els.notesStatus, t("saved"));
     }
   } catch (err) {
     // Restore pending payload so a failed save can be retried unless superseded
@@ -449,7 +672,7 @@ async function flushPendingNotesSave({ keepalive = false } = {}) {
       state.pendingSavePayload = payload;
     }
     if (state.rawUrl === payload.url || state.canonicalUrl === payload.url) {
-      setStatus(els.notesStatus, "Save failed: " + err.message, true);
+      setStatus(els.notesStatus, t("save_failed", { err: err.message }), true);
     }
   }
 }
@@ -462,7 +685,7 @@ function scheduleNotesSave() {
     title: state.title,
     notes_md: els.notesTextarea.value,
   };
-  setStatus(els.notesStatus, "Saving…");
+  setStatus(els.notesStatus, t("saving"));
   if (state.notesSaveTimer) clearTimeout(state.notesSaveTimer);
   state.notesSaveTimer = setTimeout(() => {
     flushPendingNotesSave();
@@ -476,12 +699,12 @@ function updatePromoteButton() {
   const count = state.selectedIds.size;
   els.promoteSelectedBtn.hidden = count === 0;
   els.promoteSelectedBtn.textContent =
-    count > 0 ? `Add selected (${count})` : "Add selected";
+    count > 0 ? t("add_selected_n", { n: count }) : t("add_selected");
 
   if (unpromotedIds.length > 0) {
     const allSelected = unpromotedIds.every((id) => state.selectedIds.has(id));
     els.toggleSelectAllBtn.hidden = false;
-    els.toggleSelectAllBtn.textContent = allSelected ? "Select none" : "Select all";
+    els.toggleSelectAllBtn.textContent = allSelected ? t("select_none") : t("select_all");
   } else {
     els.toggleSelectAllBtn.hidden = true;
   }
@@ -543,7 +766,7 @@ function renderItems() {
       tsBtn.type = "button";
       tsBtn.className = "sp-pill sp-pill-btn";
       tsBtn.textContent = formatTimestamp(item.timestamp_seconds);
-      tsBtn.title = "Jump to timestamp (-2s)";
+      tsBtn.title = t("jump_ts");
       tsBtn.addEventListener("click", () => {
         chrome.runtime.sendMessage({
           type: "seekYouTube",
@@ -563,7 +786,7 @@ function renderItems() {
       link.href = `${state.serverUrl}/entry/${item.promoted_entry_id}`;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.textContent = "Added →";
+      link.textContent = t("added_badge");
       meta.appendChild(link);
     } else if (item.existing_entry_ids && item.existing_entry_ids.length) {
       item.existing_entry_ids.slice(0, 3).forEach((eid) => {
@@ -572,7 +795,7 @@ function renderItems() {
         link.href = `${state.serverUrl}/entry/${eid}`;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        link.textContent = `In dictionary #${eid}`;
+        link.textContent = t("in_dict_badge", { id: eid });
         meta.appendChild(link);
       });
     }
@@ -607,14 +830,14 @@ function renderItems() {
     const lookupBtn = document.createElement("button");
     lookupBtn.type = "button";
     lookupBtn.className = "sp-link-btn";
-    lookupBtn.textContent = "Lookup";
+    lookupBtn.textContent = t("lookup");
     actions.appendChild(lookupBtn);
 
     if (!item.promoted_entry_id) {
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.className = "sp-link-btn";
-      editBtn.textContent = "Edit";
+      editBtn.textContent = t("edit");
       actions.appendChild(editBtn);
 
       editBtn.addEventListener("click", () => {
@@ -625,7 +848,7 @@ function renderItems() {
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.className = "sp-link-btn";
-    delBtn.textContent = "Delete";
+    delBtn.textContent = t("delete");
     delBtn.addEventListener("click", async () => {
       try {
         await apiRequest(`/api/v1/page-note/items/${item.id}`, {
@@ -634,7 +857,7 @@ function renderItems() {
         state.items = state.items.filter((it) => it.id !== item.id);
         renderItems();
       } catch (err) {
-        setStatus(els.promoteStatus, "Delete failed: " + err.message, true);
+        setStatus(els.promoteStatus, t("delete_failed", { err: err.message }), true);
       }
     });
     actions.appendChild(delBtn);
@@ -667,19 +890,19 @@ function toggleEditBox(li, item) {
   wordInput.type = "text";
   wordInput.className = "sp-input";
   wordInput.value = item.word;
-  wordInput.placeholder = "Word or phrase";
+  wordInput.placeholder = t("edit_word_placeholder");
 
   const ctxInput = document.createElement("input");
   ctxInput.type = "text";
   ctxInput.className = "sp-input";
   ctxInput.value = item.context || "";
-  ctxInput.placeholder = "Context sentence";
+  ctxInput.placeholder = t("edit_ctx_placeholder");
 
   const defInput = document.createElement("textarea");
   defInput.className = "sp-textarea";
   defInput.rows = 3;
   defInput.value = item.definition_text || "";
-  defInput.placeholder = "Optional definition (Markdown)";
+  defInput.placeholder = t("edit_def_placeholder");
 
   const row = document.createElement("div");
   row.className = "sp-row";
@@ -688,12 +911,12 @@ function toggleEditBox(li, item) {
   const saveBtn = document.createElement("button");
   saveBtn.type = "button";
   saveBtn.className = "sp-btn sp-btn-primary";
-  saveBtn.textContent = "Save";
+  saveBtn.textContent = t("save");
 
   const cancelBtn = document.createElement("button");
   cancelBtn.type = "button";
   cancelBtn.className = "sp-btn";
-  cancelBtn.textContent = "Cancel";
+  cancelBtn.textContent = t("cancel");
 
   const status = document.createElement("span");
   status.className = "sp-status";
@@ -732,7 +955,7 @@ function toggleEditBox(li, item) {
 
 async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {}) {
   box.replaceChildren();
-  box.textContent = "Looking up…";
+  box.textContent = t("looking_up");
   box.hidden = false;
 
   try {
@@ -766,7 +989,10 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {})
         link.href = `${state.serverUrl}/entry/${entry.id}`;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        link.textContent = `Saved (${entry.visit_count} visits)`;
+        link.textContent = t(
+          entry.visit_count === 1 ? "saved_visits_one" : "saved_visits_many",
+          { n: entry.visit_count }
+        );
         line.appendChild(link);
         if (entry.context) {
           const span = document.createElement("span");
@@ -796,7 +1022,7 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {})
         if (sense.synonyms && sense.synonyms.length) {
           const syns = document.createElement("div");
           syns.className = "sp-lookup-syns";
-          syns.textContent = "Synonyms: " + sense.synonyms.slice(0, 8).join(", ");
+          syns.textContent = t("synonyms_prefix") + sense.synonyms.slice(0, 8).join(", ");
           div.appendChild(syns);
         }
         box.appendChild(div);
@@ -809,14 +1035,14 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {})
     } else if (!data.existing_entries || !data.existing_entries.length) {
       const empty = document.createElement("div");
       empty.className = "sp-status";
-      empty.textContent = "No thesaurus senses found.";
+      empty.textContent = t("no_senses");
       box.appendChild(empty);
     }
   } catch (err) {
     box.replaceChildren();
     const errEl = document.createElement("div");
     errEl.className = "sp-status is-error";
-    errEl.textContent = "Lookup failed: " + err.message;
+    errEl.textContent = t("lookup_failed", { err: err.message });
     box.appendChild(errEl);
   }
 }
@@ -885,27 +1111,27 @@ async function loadPageForTab(tab) {
   setStatus(els.promoteStatus, "");
   setStatus(els.notesStatus, "");
 
-  els.pageTitle.textContent = state.title || "Untitled tab";
+  els.pageTitle.textContent = state.title || t("untitled_tab");
   els.pageUrl.textContent = state.rawUrl;
 
   if (!isHttpUrl(state.rawUrl)) {
     els.workspace.hidden = true;
-    showNotice("Open a web page or YouTube video to take notes and capture vocabulary.");
+    showNotice(t("notice_open_page"), false, "not_http");
     return;
   }
 
   if (!hasConfig()) {
     els.workspace.hidden = true;
     els.settingsPanel.hidden = false;
-    showNotice("Configure your server URL and API token in Settings to connect.");
+    showNotice(t("notice_configure"), false, "no_config");
     return;
   }
 
   hideNotice();
   els.workspace.hidden = false;
   els.grabPageBtn.textContent = isYouTubeUrl(state.rawUrl)
-    ? "Grab timestamp & caption"
-    : "Grab selection";
+    ? t("grab_yt")
+    : t("grab_selection");
 
   const controller = new AbortController();
   state.loadAbortController = controller;
@@ -928,7 +1154,7 @@ async function loadPageForTab(tab) {
     renderItems();
   } catch (err) {
     if (err.name === "AbortError" || gen !== state.loadGeneration) return;
-    showNotice("Could not load page notes: " + err.message, true);
+    showNotice(t("notice_load_failed", { err: err.message }), true);
   }
 }
 
@@ -951,14 +1177,11 @@ function applyCapturedPayload(captured, { verifyTabUrl = false } = {}) {
   if (captured.context) els.jotContext.value = captured.context;
   setPendingTimestamp(captured.timestampSeconds);
   if (captured.source === "transcript") {
-    setStatus(els.jotStatus, "Full sentence grabbed from transcript");
+    setStatus(els.jotStatus, t("src_transcript"));
   } else if (captured.source === "captions") {
-    setStatus(els.jotStatus, "Full sentence grabbed from captions");
+    setStatus(els.jotStatus, t("src_captions"));
   } else if (captured.source === "overlay") {
-    setStatus(
-      els.jotStatus,
-      "Partial caption only — open YouTube Transcript for full sentences"
-    );
+    setStatus(els.jotStatus, t("src_overlay"));
   }
   if (!els.jotWord.value) {
     els.jotWord.focus();
@@ -979,13 +1202,22 @@ els.toggleSettingsBtn.addEventListener("click", () => {
   els.settingsPanel.hidden = !els.settingsPanel.hidden;
 });
 
+if (els.langSelect) {
+  els.langSelect.addEventListener("change", () => {
+    const nextPref = els.langSelect.value;
+    state.langPref = nextPref === "en" || nextPref === "zh-CN" ? nextPref : "auto";
+    chrome.storage.local.set({ langPref: state.langPref });
+    applyLanguage();
+  });
+}
+
 els.saveSettingsBtn.addEventListener("click", saveSettings);
 els.clearTsBtn.addEventListener("click", () => setPendingTimestamp(null));
 
 els.jotLookupBtn.addEventListener("click", async () => {
   const word = els.jotWord.value.trim();
   if (!word) {
-    setStatus(els.jotStatus, "Type a word first to look it up.", true);
+    setStatus(els.jotStatus, t("type_word_first"), true);
     els.jotWord.focus();
     return;
   }
@@ -1016,7 +1248,7 @@ els.toggleSelectAllBtn.addEventListener("click", () => {
 
 els.grabPageBtn.addEventListener("click", () => {
   const gen = state.loadGeneration;
-  setStatus(els.jotStatus, "Grabbing…");
+  setStatus(els.jotStatus, t("grabbing"));
   chrome.runtime.sendMessage(
     { type: "grabFromActiveTab", hintWord: els.jotWord.value.trim() },
     (resp) => {
@@ -1024,7 +1256,7 @@ els.grabPageBtn.addEventListener("click", () => {
       if (chrome.runtime.lastError || !resp || !resp.ok) {
         setStatus(
           els.jotStatus,
-          (resp && resp.error) || "Could not grab from page.",
+          (resp && resp.error) || t("grab_failed"),
           true
         );
         return;
@@ -1048,7 +1280,7 @@ els.jotForm.addEventListener("submit", async (event) => {
   if (gen === state.loadGeneration) state.title = freshTitle;
 
   els.jotSubmitBtn.disabled = true;
-  setStatus(els.jotStatus, "Saving…");
+  setStatus(els.jotStatus, t("saving"));
   try {
     const resp = await apiRequest("/api/v1/page-note/items", {
       method: "POST",
@@ -1071,7 +1303,7 @@ els.jotForm.addEventListener("submit", async (event) => {
     els.jotLookupBox.hidden = true;
     els.jotLookupBox.replaceChildren();
     setPendingTimestamp(null);
-    setStatus(els.jotStatus, "Saved");
+    setStatus(els.jotStatus, t("saved"));
     els.jotWord.focus();
   } catch (err) {
     if (gen === state.loadGeneration) {
@@ -1087,7 +1319,7 @@ els.promoteSelectedBtn.addEventListener("click", async () => {
   if (!itemIds.length || els.promoteSelectedBtn.disabled) return;
   const gen = state.loadGeneration;
   els.promoteSelectedBtn.disabled = true;
-  setStatus(els.promoteStatus, "Adding to dictionary…");
+  setStatus(els.promoteStatus, t("adding_to_dict"));
   try {
     const resp = await apiRequest("/api/v1/page-note/promote", {
       method: "POST",
@@ -1108,7 +1340,7 @@ els.promoteSelectedBtn.addEventListener("click", async () => {
         duplicates += 1;
         state.itemErrors.delete(item.id);
       } else {
-        const msg = r.error || r.status || "Failed";
+        const msg = r.error || r.status || t("failed");
         state.itemErrors.set(item.id, msg);
         errorMessages.push(`${item.word}: ${msg}`);
       }
@@ -1120,13 +1352,13 @@ els.promoteSelectedBtn.addEventListener("click", async () => {
     state.selectedIds.clear();
     renderItems();
     const parts = [];
-    if (created) parts.push(`${created} added`);
-    if (duplicates) parts.push(`${duplicates} linked to existing`);
+    if (created) parts.push(t("promote_added", { n: created }));
+    if (duplicates) parts.push(t("promote_linked", { n: duplicates }));
     if (errorMessages.length) parts.push(errorMessages.join("; "));
-    setStatus(els.promoteStatus, parts.join(" · ") || "Done", errorMessages.length > 0);
+    setStatus(els.promoteStatus, parts.join(" · ") || t("promote_done"), errorMessages.length > 0);
   } catch (err) {
     if (gen === state.loadGeneration) {
-      setStatus(els.promoteStatus, "Promote failed: " + err.message, true);
+      setStatus(els.promoteStatus, t("promote_failed", { err: err.message }), true);
     }
   } finally {
     els.promoteSelectedBtn.disabled = false;

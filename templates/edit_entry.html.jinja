@@ -1,33 +1,33 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
-{% block title %}Edit Entry{% endblock title %}
+{% block title %}{{ t('form.edit_entry_title') }}{% endblock title %}
 
 {% block body %}
-{% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">Entry</a>{% endset %}
+{% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">{{ t('nav.entry') }}</a>{% endset %}
 {{ page_header(extra_nav=entry_link) }}
 <main class="form-page">
-<h1>Edit Entry</h1>
+<h1>{{ t('form.edit_entry_title') }}</h1>
 {% if error %}
 <p class="form-error" role="alert">
     {{ error }}
     {% if existing_entry_id %}
-    <a href="/entry/{{ existing_entry_id }}">View existing entry</a>
+    <a href="/entry/{{ existing_entry_id }}">{{ t('form.view_existing') }}</a>
     {% endif %}
 </p>
 {% endif %}
 <form method="post" action="/edit_entry/{{ entry_id }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-field">
-        <label for="word">Word or phrase</label>
+        <label for="word">{{ t('form.word_label') }}</label>
         <input id="word" name="word" type="text" value="{{ word }}" required autofocus>
     </div>
     <div class="form-field">
-        <label for="context">Context <span class="field-hint">(optional)</span></label>
+        <label for="context">{{ t('form.context_label') }} <span class="field-hint">{{ t('form.optional_hint') }}</span></label>
         <input id="context" name="context" type="text" value="{{ context }}">
     </div>
     <div class="form-actions">
-        <input type="submit" value="Save changes">
-        <a class="button button-ghost" href="/entry/{{ entry_id }}">Cancel</a>
+        <input type="submit" value="{{ t('form.save_changes') }}">
+        <a class="button button-ghost" href="/entry/{{ entry_id }}">{{ t('form.cancel') }}</a>
     </div>
 </form>
 </main>

@@ -72,7 +72,7 @@ body {
   --surface: #f4f8fa;
   color: var(--ink);
   font-size: 17px;
-  font-family: "BBC Reith Sans", system-ui, -apple-system, sans-serif;
+  font-family: "BBC Reith Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif;
   line-height: 1.55;
   margin: 0 auto;
   max-width: 1200px;
@@ -427,7 +427,7 @@ tr.selected {
    * macro's brand_as_h1 doc comment), only the tag itself differs - the
    * weight must be pinned here or it silently follows the h1-vs-p default
    * instead of staying consistent. */
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-size: 30px;
   font-weight: bold;
   line-height: 1.1;
@@ -602,9 +602,23 @@ tr.selected {
 
 .page-subtitle {
   color: var(--muted);
-  font-family: monospace;
+  font-family: inherit;
   font-size: 15px;
+  font-variant-numeric: tabular-nums;
   margin: 4px 0 0;
+}
+
+.subtitle-link,
+.subtitle-link:visited {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 2px;
+}
+
+.subtitle-link:hover {
+  color: var(--accent-dark);
+  text-decoration-color: var(--accent);
 }
 
 .dashboard-search {
@@ -627,7 +641,7 @@ tr.selected {
 }
 
 .card h2 {
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-size: 21px;
   margin: 0 0 10px;
 }
@@ -651,9 +665,9 @@ tr.selected {
 
 .quiz-sentence {
   color: #20333d;
-  font-family: "BBC Reith Serif", serif;
-  font-size: 20px;
-  line-height: 1.5;
+  font-family: inherit;
+  font-size: 19px;
+  line-height: 1.55;
   margin: 0 0 14px;
 }
 
@@ -688,7 +702,7 @@ tr.selected {
 
 .content-section h2 {
   color: #243c47;
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-size: 24px;
   margin: 0 0 8px;
 }
@@ -859,14 +873,14 @@ button:hover,
 }
 
 caption {
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-weight: bold;
   font-size: 1.2em;
 }
 
 /* Word detail page */
 .word-title {
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-size: 34px;
   line-height: 1.15;
 }
@@ -931,7 +945,7 @@ caption {
 
 .entry-context {
   color: var(--ink);
-  font-family: "BBC Reith Serif", serif;
+  font-family: inherit;
   font-size: 18px;
   line-height: 1.55;
   margin: 0;
@@ -942,7 +956,7 @@ caption {
 }
 
 .form-page h1 {
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   margin-bottom: 12px;
 }
 
@@ -1014,7 +1028,7 @@ input[type="submit"]:hover {
 }
 
 .error-page h1 {
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
 }
 
 @media only screen and (max-width: 600px) {
@@ -1382,7 +1396,7 @@ input[type="submit"]:hover {
 }
 
 .review-title {
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-size: 26px;
   margin: 0;
 }
@@ -1425,7 +1439,7 @@ input[type="submit"]:hover {
 
 .review-headword {
   color: var(--ink);
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-size: 22px;
   margin-right: 8px;
 }
@@ -1496,7 +1510,7 @@ input[type="submit"]:hover {
 }
 
 .account-subheading {
-  font-family: "BBC Reith Serif", serif;
+  font-family: "BBC Reith Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   font-size: 18px;
   margin: 0 0 6px;
 }

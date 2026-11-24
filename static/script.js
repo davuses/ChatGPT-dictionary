@@ -1,3 +1,31 @@
+let _i18nCache = null;
+
+function _getI18nMap() {
+  if (_i18nCache !== null) return _i18nCache;
+  const el = document.getElementById("i18n-data");
+  if (!el) {
+    _i18nCache = {};
+    return _i18nCache;
+  }
+  try {
+    _i18nCache = JSON.parse(el.textContent || "{}") || {};
+  } catch (_) {
+    _i18nCache = {};
+  }
+  return _i18nCache;
+}
+
+function uiText(key, vars = {}, fallback = "") {
+  const map = _getI18nMap();
+  let template = Object.prototype.hasOwnProperty.call(map, key)
+    ? map[key]
+    : fallback || key;
+  for (const [k, v] of Object.entries(vars)) {
+    template = template.replaceAll("{" + k + "}", String(v));
+  }
+  return template;
+}
+
 function shouldIgnoreShortcut(event, { allowAlt = false } = {}) {
   if (event.defaultPrevented || event.isComposing) return true;
   if (event.ctrlKey || event.metaKey || (!allowAlt && event.altKey)) {
@@ -46,7 +74,7 @@ function fetchJson(url, options = {}) {
 }
 
 function deleteEntry(entryId) {
-  if (confirm("Are you sure you want to delete this entry?")) {
+  if (confirm(uiText("confirm_delete_entry", {}, "Are you sure you want to delete this entry?"))) {
     fetch("/delete_entry/" + entryId, {
       method: "DELETE",
       headers: csrfHeaders(),
@@ -65,7 +93,9 @@ function toggleQuizAnswer(button) {
   if (!answer) return;
   const isHidden = answer.hidden;
   answer.hidden = !isHidden;
-  button.textContent = isHidden ? "Hide answer" : "Show answer";
+  button.textContent = isHidden
+    ? uiText("hide_answer", {}, "Hide answer")
+    : uiText("show_answer", {}, "Show answer");
   if (isHidden && card.dataset.entryId && card.dataset.seen !== "true") {
     card.dataset.seen = "true";
     fetch("/quiz/" + encodeURIComponent(card.dataset.entryId) + "/seen", {
@@ -98,8 +128,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!data.entry_id) {
           delete card.dataset.entryId;
           delete card.dataset.seen;
-          card.querySelector(".quiz-sentence").textContent =
-            "No quizzable entries yet — add some examples first.";
+          card.querySelector(".quiz-sentence").textContent = uiText(
+            "quiz_empty",
+            {},
+            "No quizzable entries yet — add some examples first."
+          );
           nextBtn.hidden = true;
           return;
         }
@@ -114,7 +147,7 @@ document.addEventListener("DOMContentLoaded", function () {
         answerEl.querySelector("a").href = "/entry/" + data.entry_id;
 
         const revealBtn = card.querySelector(".quiz-reveal-btn");
-        revealBtn.textContent = "Show answer";
+        revealBtn.textContent = uiText("show_answer", {}, "Show answer");
 
         nextBtn.dataset.exclude = data.next_exclude || "";
       })

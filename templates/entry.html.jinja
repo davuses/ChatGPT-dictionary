@@ -23,7 +23,7 @@
 {% endmacro %}
 
 {% block body %}
-    {% set synonyms_link %}<a class="button button-ghost" href="/show_synonyms/{{ entry_id }}">Synonyms</a>{% endset %}
+    {% set synonyms_link %}<a class="button button-ghost" href="/show_synonyms/{{ entry_id }}">{{ t('nav.synonyms') }}</a>{% endset %}
     {{ page_header(extra_nav=synonyms_link) }}
     <article class="entry-page" id="entry-article" data-entry-text="{{ entry_text }}">
         <header class="word-hero">
@@ -32,11 +32,11 @@
                 <div class="section-actions">
                     <button class="button button-ghost"
                         onclick="location.href='/edit_entry/{{ entry_id }}'"
-                        type="button">Edit</button>
+                        type="button">{{ t('entry.edit') }}</button>
                     <button class="button button-danger"
                         onclick="deleteEntry({{ entry_id }})"
                         type="button"
-                        id="dbt">Delete</button>
+                        id="dbt">{{ t('entry.delete') }}</button>
                 </div>
             </div>
 
@@ -52,7 +52,7 @@
                     <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ oxford_audio_slug }}--_us_1.mp3"
                         type="audio/mp3">
                 </audio>
-                {{ audio_button("audio-icon-1", "1-ipa-audio", "Play pronunciation 1") }}
+                {{ audio_button("audio-icon-1", "1-ipa-audio", t('entry.play_1')) }}
 
                 <audio id="2-ipa-audio"
                     class="ipa-audio"
@@ -62,7 +62,7 @@
                         src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_2.mp3"
                         type="audio/mp3">
                 </audio>
-                {{ audio_button("audio-icon-2", "2-ipa-audio", "Play pronunciation 2") }}
+                {{ audio_button("audio-icon-2", "2-ipa-audio", t('entry.play_2')) }}
 
                 <audio id="google-translate-audio"
                     preload="metadata"
@@ -71,21 +71,21 @@
                         src="https://www.google.com/speech-api/v1/synthesize?text={{ tts_audio_query }}&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1"
                         type="audio/mp3">
                 </audio>
-                {{ audio_button("google-translate-audio-icon", "google-translate-audio", "Play pronunciation") }}
+                {{ audio_button("google-translate-audio-icon", "google-translate-audio", t('entry.play')) }}
             </div>
 
             <div class="word-meta">
                 <div class="word-meta-stats">
-                    <span>{{ visit_count }} {{ "visit" if visit_count == 1 else "visits" }}</span>
+                    <span>{{ t('entry.visit_one' if visit_count == 1 else 'entry.visit_many', n=visit_count) }}</span>
                     <span aria-hidden="true">&middot;</span>
-                    <span>Last visit: {{ last_visit_elapsed }}</span>
+                    <span>{{ t('entry.last_visit', elapsed=last_visit_elapsed) }}</span>
                 </div>
                 <span class="word-meta-bookmark">
                     {% if is_review_bookmark %}
-                    <span class="bookmark-badge">Resume point</span>
-                    <button class="button button-danger" id="clear-review-bookmark" onclick="handleClearReviewBookmark()" type="button">Clear</button>
+                    <span class="bookmark-badge">{{ t('entry.resume_point') }}</span>
+                    <button class="button button-danger" id="clear-review-bookmark" onclick="handleClearReviewBookmark()" type="button">{{ t('entry.clear') }}</button>
                     {% else %}
-                    <button class="button button-ghost" id="set-review-bookmark" onclick="handleSetReviewBookmark()" type="button">Mark here</button>
+                    <button class="button button-ghost" id="set-review-bookmark" onclick="handleSetReviewBookmark()" type="button">{{ t('entry.mark_here') }}</button>
                     {% endif %}
                 </span>
             </div>
@@ -94,7 +94,7 @@
         {% if context_text %}
         <section class="content-section">
             <div class="section-header">
-                <h2>Context</h2>
+                <h2>{{ t('entry.context') }}</h2>
             </div>
             <p class="entry-context">{{ context_text }}</p>
         </section>
@@ -102,22 +102,22 @@
 
         <section class="content-section">
             <div class="section-header">
-                <h2>Definition</h2>
+                <h2>{{ t('entry.definition') }}</h2>
                 {% if definition_exists %}
                 <div class="section-actions">
                     <button class="button button-ghost"
                         onclick="location.href='/edit_definition/{{ definition_id }}'"
-                        type="button">Edit</button>
+                        type="button">{{ t('entry.edit') }}</button>
                     <button class="button button-danger"
                         onclick="deleteDefinition(this, {{ definition_id }})"
-                        type="button">Delete</button>
+                        type="button">{{ t('entry.delete') }}</button>
                 </div>
                 {% endif %}
             </div>
             {% if not definition_exists %}
             <button class="button button-ghost"
                 onclick="location.href='/add_definition?entry_id={{ entry_id }}'"
-                type="button">Add definition</button>
+                type="button">{{ t('entry.add_definition') }}</button>
             {% else %}
             <div id="definition-div" class="markdown-body">
                 {{ definition_html | safe }}
@@ -127,11 +127,11 @@
 
         <section class="content-section">
             <div class="section-header">
-                <h2>Example</h2>
+                <h2>{{ t('entry.example') }}</h2>
                 <button class="button button-ghost"
                     onclick="location.href='/edit_example/{{ entry_id }}'"
                     type="button"
-                    id="edit-example">Edit</button>
+                    id="edit-example">{{ t('entry.edit') }}</button>
             </div>
             <div class="markdown-body">{{ example_html | safe }}</div>
         </section>
@@ -141,7 +141,7 @@
         var entryId = "{{ entry_id }}";
 
         function deleteDefinition(button, definitionId) {
-            if (confirm("Are you sure you want to delete this definition?")) {
+            if (confirm(uiText("confirm_delete_def", null, "Are you sure you want to delete this definition?"))) {
                 fetch("/delete_definition/" + definitionId, {
                     method: "DELETE",
                     headers: csrfHeaders()
@@ -159,7 +159,7 @@
             }).then(handleProtectedResponse)
                 .then(response => {
                     if (response.ok) location.reload();
-                    else alert('Failed to set resume point.');
+                    else alert(uiText('bookmark_set_failed', null, 'Failed to set resume point.'));
                 });
         }
 
@@ -169,7 +169,7 @@
             }).then(handleProtectedResponse)
                 .then(response => {
                     if (response.ok) location.reload();
-                    else alert('Failed to clear resume point.');
+                    else alert(uiText('bookmark_clear_failed', null, 'Failed to clear resume point.'));
                 });
         }
 
