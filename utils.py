@@ -13,7 +13,9 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, NavigableString
 from fastapi import HTTPException
+import markdown2
 from markupsafe import Markup, escape
+import nh3
 from phonemizer import phonemize
 
 from database import (
@@ -187,26 +189,24 @@ def get_IPA(word: str) -> str:
     return str(a)
 
 
-cached_all_words: dict[str, list[int]] | None = None
+_cached_all_words: dict[int, dict[str, list[int]]] = {}
 
 
-def invalidate_words_cache() -> None:
-    global cached_all_words
+def invalidate_words_cache(user_id: int | None = None) -> None:
     with _words_cache_lock:
-        cached_all_words = None
+        if user_id is None:
+            _cached_all_words.clear()
+        else:
+            _cached_all_words.pop(user_id, None)
 
 
-def get_all_words() -> dict[str, list[int]]:
-    global cached_all_words
-    snapshot = cached_all_words
-    if snapshot is not None:
-        return snapshot
-
+def get_all_words(user_id: int) -> dict[str, list[int]]:
     with _words_cache_lock:
-        if cached_all_words is not None:
-            return cached_all_words
+        cached = _cached_all_words.get(user_id)
+        if cached is not None:
+            return cached
         words: dict[str, list[int]] = {}
-        for entry in db_get_all_entries():
+        for entry in db_get_all_entries(user_id):
             _, word = parse_entry_text(entry.text)
             key = word.lower()
             if not key:
@@ -215,7 +215,7 @@ def get_all_words() -> dict[str, list[int]]:
                 ids.append(entry.id)
             else:
                 words[key] = [entry.id]
-        cached_all_words = words
+        _cached_all_words[user_id] = words
         return words
 
 
@@ -335,30 +335,28 @@ class QuizQuestion:
     blanked_sentence: str
 
 
-cached_quiz_pool: list[QuizCandidate] | None = None
+_cached_quiz_pool: dict[int, list[QuizCandidate]] = {}
 
 
-def invalidate_quiz_pool_cache() -> None:
-    global cached_quiz_pool
+def invalidate_quiz_pool_cache(user_id: int | None = None) -> None:
     with _quiz_pool_lock:
-        cached_quiz_pool = None
+        if user_id is None:
+            _cached_quiz_pool.clear()
+        else:
+            _cached_quiz_pool.pop(user_id, None)
 
 
-def get_quiz_pool() -> list[QuizCandidate]:
+def get_quiz_pool(user_id: int) -> list[QuizCandidate]:
     """Entries quizzable with a plain fill-in-the-blank: the headword must
     appear as a whole word in the entry's own context clause and/or its
     example. Entries without a clean match are left out rather than
     guessed at (no stemming, no LLM-generated sentences)."""
-    global cached_quiz_pool
-    snapshot = cached_quiz_pool
-    if snapshot is not None:
-        return snapshot
-
     with _quiz_pool_lock:
-        if cached_quiz_pool is not None:
-            return cached_quiz_pool
+        cached = _cached_quiz_pool.get(user_id)
+        if cached is not None:
+            return cached
         pool: list[QuizCandidate] = []
-        for entry_id, entry_text, entry_example in db_get_quiz_source_entries():
+        for entry_id, entry_text, entry_example in db_get_quiz_source_entries(user_id):
             context, word = parse_entry_text(entry_text)
             if not word:
                 continue
@@ -373,7 +371,7 @@ def get_quiz_pool() -> list[QuizCandidate]:
                 pool.append(
                     QuizCandidate(entry_id=entry_id, word=word, sentences=sentences)
                 )
-        cached_quiz_pool = pool
+        _cached_quiz_pool[user_id] = pool
         return pool
 
 
@@ -445,12 +443,13 @@ def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> Qu
 
 
 def pick_random_question(
+    user_id: int,
     exclude_entry_ids: Collection[int] = frozenset(),
 ) -> QuizQuestion | None:
-    pool = get_quiz_pool()
+    pool = get_quiz_pool(user_id)
     if not pool:
         return None
-    visit_stats = db_get_entry_visit_stats()
+    visit_stats = db_get_entry_visit_stats(user_id)
     candidate = _pick_weighted_candidate(pool, visit_stats, exclude_entry_ids)
     if not candidate:
         return None
@@ -615,6 +614,65 @@ def get_thesaurus_senses_plain(word: str) -> tuple[dict[str, object], ...]:
         }
         for sense in senses
     )
+
+
+_SAFE_MARKDOWN_TAGS = {
+    "a",
+    "blockquote",
+    "br",
+    "code",
+    "del",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "s",
+    "strong",
+    "sub",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
+    "ul",
+}
+_SAFE_MARKDOWN_ATTRIBUTES = {
+    "a": {"href", "title"},
+    "th": {"align"},
+    "td": {"align"},
+}
+_SAFE_URL_SCHEMES = {"http", "https", "mailto"}
+
+
+def render_safe_markdown(
+    text: str, *, extras: list[str] | None = None, wrap_ipa: bool = False
+) -> str:
+    """Render user-authored Markdown to sanitized HTML via nh3.
+
+    Sanitization runs *before* highlight_ipa() so untrusted Markdown cannot
+    inject arbitrary attributes/classes while highlight_ipa() can safely add
+    `<span class="ipa">` around text-node IPA transcripts.
+    """
+    raw_html = markdown2.markdown(text, extras=extras or ["strike"])
+    clean_html = nh3.clean(
+        raw_html,
+        tags=_SAFE_MARKDOWN_TAGS,
+        attributes=_SAFE_MARKDOWN_ATTRIBUTES,
+        url_schemes=_SAFE_URL_SCHEMES,
+    )
+    if wrap_ipa:
+        return highlight_ipa(clean_html)
+    return clean_html
 
 
 def highlight_ipa(html: str) -> str:

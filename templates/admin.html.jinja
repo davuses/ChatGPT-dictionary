@@ -1,0 +1,150 @@
+{% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header with context %}
+{% block title %}Admin{% endblock title %}
+{% block body_class %}page-narrow{% endblock body_class %}
+
+{% block body %}
+{{ page_header(subtitle="Manage invite links and user accounts", active="admin", show_notes=True, show_inbox=True, show_account=True) }}
+
+<main class="admin-page">
+    {% if admin_error %}
+    <p class="form-error" role="alert">{{ admin_error }}</p>
+    {% endif %}
+
+    {% if created_invite_url %}
+    <section class="card secret-box" role="status">
+        <p><strong>One-time invite link created{% if created_invite_note %} for {{ created_invite_note }}{% endif %}</strong> (valid for 7 days — copy it now):</p>
+        <div class="secret-box-row">
+            <input type="text" class="secret-input" id="created-invite-url" value="{{ created_invite_url }}" readonly>
+            <button type="button" class="button button-primary copy-secret-btn" data-copy-target="created-invite-url">Copy</button>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if created_reset_url %}
+    <section class="card secret-box" role="status">
+        <p><strong>One-time password reset link created for {{ created_reset_username }}</strong> (valid for 24 hours — copy it now):</p>
+        <div class="secret-box-row">
+            <input type="text" class="secret-input" id="created-reset-url" value="{{ created_reset_url }}" readonly>
+            <button type="button" class="button button-primary copy-secret-btn" data-copy-target="created-reset-url">Copy</button>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="card">
+        <h2>Invite Links</h2>
+        <p class="page-subtitle">Each invite link can be used once to register a new private account.</p>
+
+        <form class="inline-create-form" method="post" action="/admin/invites">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="text" name="note" placeholder="Optional note (e.g. Alice)" maxlength="100">
+            <button class="button button-primary" type="submit">Create invite link</button>
+        </form>
+
+        {% if invites %}
+        <table class="data-table admin-table">
+            <thead>
+                <tr>
+                    <th>Note</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in invites %}
+                <tr>
+                    <td>{{ inv.note or "—" }}</td>
+                    <td>
+                        {% if inv.used_at %}
+                        <span class="status-pill status-used">Used{% if inv.used_by_username %} by {{ inv.used_by_username }}{% endif %}</span>
+                        {% elif inv.expires_at <= now_ts %}
+                        <span class="status-pill status-expired">Expired</span>
+                        {% else %}
+                        <span class="status-pill status-active">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ how_long_ago(inv.created_at) }}</td>
+                    <td>
+                        {% if not inv.used_at %}
+                        <form class="inline-form" method="post" action="/admin/invites/{{ inv.id }}/revoke">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button class="button button-danger" type="submit">Revoke</button>
+                        </form>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="page-subtitle">No invite links generated yet.</p>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Users ({{ users | length }})</h2>
+        <table class="data-table admin-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Entries</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><strong>{{ u.username }}</strong>{% if u.id == current_user.id %} (you){% endif %}</td>
+                    <td>{{ "Admin" if u.is_admin else "Member" }}</td>
+                    <td>{{ u.entry_count }}</td>
+                    <td>
+                        {% if u.is_active %}
+                        <span class="status-pill status-active">Active</span>
+                        {% else %}
+                        <span class="status-pill status-expired">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="admin-user-actions">
+                            {% if u.is_active %}
+                            <form class="inline-form" method="post" action="/admin/users/{{ u.id }}/reset-link">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button class="button button-ghost" type="submit">Reset link</button>
+                            </form>
+                            {% endif %}
+                            {% if u.id != current_user.id %}
+                            <form class="inline-form" method="post" action="/admin/users/{{ u.id }}/toggle-active">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button class="button {% if u.is_active %}button-danger{% else %}button-ghost{% endif %}" type="submit">
+                                    {{ "Disable" if u.is_active else "Enable" }}
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+
+<script>
+document.querySelectorAll(".copy-secret-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const input = document.getElementById(btn.dataset.copyTarget);
+        if (!input) return;
+        input.select();
+        navigator.clipboard?.writeText(input.value).then(() => {
+            btn.textContent = "Copied";
+            setTimeout(() => { btn.textContent = "Copy"; }, 1800);
+        }).catch(() => {});
+    });
+});
+</script>
+{% endblock body %}

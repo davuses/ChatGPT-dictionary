@@ -16,12 +16,14 @@ os.environ.setdefault(
 )
 os.environ.setdefault("DICTIONARY_HTTPS_ONLY", "true")
 
+import auth  # noqa: E402
 import database  # noqa: E402
 from main import app  # noqa: E402
+import thesaurus  # noqa: E402
 import utils  # noqa: E402
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def isolated_db(monkeypatch, tmp_path):
     db_path = tmp_path / "test.db"
     test_engine = create_engine(
@@ -29,16 +31,31 @@ def isolated_db(monkeypatch, tmp_path):
         future=True,
         connect_args={"check_same_thread": False},
     )
-    database.Base.metadata.create_all(test_engine)
     monkeypatch.setattr(database, "engine", test_engine)
+    database.bootstrap_database(
+        admin_username=os.environ["DICTIONARY_ADMIN_USERNAME"],
+        admin_password_hash=os.environ["DICTIONARY_ADMIN_PASSWORD_HASH"],
+        target_engine=test_engine,
+    )
+    auth.clear_all_rate_limits()
     utils.invalidate_words_cache()
     utils.invalidate_quiz_pool_cache()
+    thesaurus.fetch_thesaurus_senses.cache_clear()
     try:
         yield test_engine
     finally:
+        auth.clear_all_rate_limits()
         utils.invalidate_words_cache()
         utils.invalidate_quiz_pool_cache()
+        thesaurus.fetch_thesaurus_senses.cache_clear()
         test_engine.dispose()
+
+
+@pytest.fixture
+def admin_user(isolated_db) -> database.UserRecord:
+    user = database.db_get_user_by_username(os.environ["DICTIONARY_ADMIN_USERNAME"])
+    assert user is not None
+    return user
 
 
 @pytest.fixture

@@ -37,35 +37,11 @@ async def _login(client):
 
 
 @pytest.fixture
-def isolated_db(monkeypatch, tmp_path):
-    db_path = tmp_path / "capture.db"
-    test_engine = create_engine(
-        f"sqlite:///{db_path}",
-        future=True,
-        connect_args={"check_same_thread": False},
+def configured_api_token(admin_user):
+    database.db_create_api_token(
+        admin_user.id, "Test Chrome", database.hash_token(TEST_API_TOKEN)
     )
-    database.Base.metadata.create_all(test_engine)
-    monkeypatch.setattr(database, "engine", test_engine)
-    utils.invalidate_words_cache()
-    utils.invalidate_quiz_pool_cache()
-    thesaurus.fetch_thesaurus_senses.cache_clear()
-    try:
-        yield test_engine
-    finally:
-        utils.invalidate_words_cache()
-        utils.invalidate_quiz_pool_cache()
-        thesaurus.fetch_thesaurus_senses.cache_clear()
-        test_engine.dispose()
-
-
-@pytest.fixture
-def configured_api_token(monkeypatch):
-    monkeypatch.setenv("DICTIONARY_API_TOKEN", TEST_API_TOKEN)
-    auth.get_auth_settings.cache_clear()
-    try:
-        yield TEST_API_TOKEN
-    finally:
-        auth.get_auth_settings.cache_clear()
+    return TEST_API_TOKEN
 
 
 def test_normalize_page_url_variants():
@@ -123,77 +99,70 @@ def test_normalize_page_url_variants():
 
 
 async def test_api_auth_bearer_fail_closed_and_session_csrf(
-    client, isolated_db, monkeypatch
+    client, admin_user
 ):
-    # Unconfigured api_token rejects bearer even if header is sent
-    monkeypatch.delenv("DICTIONARY_API_TOKEN", raising=False)
-    monkeypatch.setattr(auth, "load_auth_config", lambda: {})
-    auth.get_auth_settings.cache_clear()
-    try:
-        r_unconf = await client.get(
-            "/api/v1/page-note?url=https://example.com/a",
-            headers={"Authorization": f"Bearer {TEST_API_TOKEN}"},
-        )
-        assert r_unconf.status_code == 401
-        assert r_unconf.headers.get("www-authenticate") == "Bearer"
-    finally:
-        auth.get_auth_settings.cache_clear()
+    # No DB token yet -> bearer rejected fail-closed
+    r_unconf = await client.get(
+        "/api/v1/page-note?url=https://example.com/a",
+        headers={"Authorization": f"Bearer {TEST_API_TOKEN}"},
+    )
+    assert r_unconf.status_code == 401
+    assert r_unconf.headers.get("www-authenticate") == "Bearer"
 
-    # Configure token
-    monkeypatch.setenv("DICTIONARY_API_TOKEN", TEST_API_TOKEN)
-    auth.get_auth_settings.cache_clear()
-    try:
-        # Unauthenticated without header -> 401 JSON
-        r_none = await client.get("/api/v1/page-note?url=https://example.com/a")
-        assert r_none.status_code == 401
-        assert r_none.json()["detail"] == "Authentication required"
+    # Provision a per-user DB token
+    database.db_create_api_token(
+        admin_user.id, "Test Chrome", database.hash_token(TEST_API_TOKEN)
+    )
 
-        # Valid bearer works
-        r_ok = await client.get(
-            "/api/v1/page-note?url=https://example.com/a",
-            headers={"Authorization": f"Bearer {TEST_API_TOKEN}"},
-        )
-        assert r_ok.status_code == 200
+    # Unauthenticated without header -> 401 JSON
+    r_none = await client.get("/api/v1/page-note?url=https://example.com/a")
+    assert r_none.status_code == 401
+    assert r_none.json()["detail"] == "Authentication required"
 
-        # Logged-in session still fails closed if a bad Authorization header is sent
-        await _login(client)
-        r_bad_bearer = await client.get(
-            "/api/v1/page-note?url=https://example.com/a",
-            headers={"Authorization": "Bearer wrong-token"},
-        )
-        assert r_bad_bearer.status_code == 401
-        assert r_bad_bearer.headers.get("www-authenticate") == "Bearer"
+    # Valid bearer works
+    r_ok = await client.get(
+        "/api/v1/page-note?url=https://example.com/a",
+        headers={"Authorization": f"Bearer {TEST_API_TOKEN}"},
+    )
+    assert r_ok.status_code == 200
 
-        # Session without Authorization works on GET, requires CSRF header on PUT
-        assert (
-            await client.get("/api/v1/page-note?url=https://example.com/a")
-        ).status_code == 200
-        assert (
-            await client.put(
-                "/api/v1/page-note",
-                json={"url": "https://example.com/a", "notes_md": "hi"},
-            )
-        ).status_code == 403
+    # Logged-in session still fails closed if a bad Authorization header is sent
+    await _login(client)
+    r_bad_bearer = await client.get(
+        "/api/v1/page-note?url=https://example.com/a",
+        headers={"Authorization": "Bearer wrong-token"},
+    )
+    assert r_bad_bearer.status_code == 401
+    assert r_bad_bearer.headers.get("www-authenticate") == "Bearer"
 
-        inbox_html = (await client.get("/inbox")).text
-        csrf = _csrf_from_html(inbox_html)
-        r_put = await client.put(
+    # Session without Authorization works on GET, requires CSRF header on PUT
+    assert (
+        await client.get("/api/v1/page-note?url=https://example.com/a")
+    ).status_code == 200
+    assert (
+        await client.put(
             "/api/v1/page-note",
             json={"url": "https://example.com/a", "notes_md": "hi"},
-            headers={"X-CSRF-Token": csrf},
         )
-        assert r_put.status_code == 200
+    ).status_code == 403
 
-        # Unmatched /api/* route returns JSON 404 (not HTML)
-        r_404 = await client.get("/api/v1/nonexistent")
-        assert r_404.status_code == 404
-        assert "detail" in r_404.json()
-    finally:
-        auth.get_auth_settings.cache_clear()
+    inbox_html = (await client.get("/inbox")).text
+    csrf = _csrf_from_html(inbox_html)
+    r_put = await client.put(
+        "/api/v1/page-note",
+        json={"url": "https://example.com/a", "notes_md": "hi"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r_put.status_code == 200
+
+    # Unmatched /api/* route returns JSON 404 (not HTML)
+    r_404 = await client.get("/api/v1/nonexistent")
+    assert r_404.status_code == 404
+    assert "detail" in r_404.json()
 
 
 async def test_page_note_and_capture_item_lifecycle(
-    client, isolated_db, configured_api_token
+    client, admin_user, configured_api_token
 ):
     headers = {"Authorization": f"Bearer {configured_api_token}"}
     yt_short = "https://youtu.be/VeHFu956WKE?t=2460"
@@ -206,7 +175,7 @@ async def test_page_note_and_capture_item_lifecycle(
     assert r_empty.status_code == 200
     assert r_empty.json()["url"] == yt_canonical
     assert r_empty.json()["items"] == []
-    assert database.db_list_page_notes() == []
+    assert database.db_list_page_notes(admin_user.id) == []
 
     # Rejects chrome:// URLs
     r_bad = await client.get(
@@ -260,7 +229,7 @@ async def test_page_note_and_capture_item_lifecycle(
         f"/api/v1/page-note/items/{item_id}", headers=headers
     )
     assert r_del.status_code == 200
-    assert len(database.db_list_page_notes()) == 1
+    assert len(database.db_list_page_notes(admin_user.id)) == 1
 
     # Clearing notes_md with 0 items cleans up the empty PageNote row
     r_clear = await client.put(
@@ -270,14 +239,14 @@ async def test_page_note_and_capture_item_lifecycle(
     )
     assert r_clear.status_code == 200
     assert r_clear.json()["id"] is None
-    assert database.db_list_page_notes() == []
+    assert database.db_list_page_notes(admin_user.id) == []
 
 
 async def test_batch_promote_handles_new_duplicate_invalid_and_idempotent(
-    client, isolated_db, configured_api_token
+    client, admin_user, configured_api_token
 ):
     headers = {"Authorization": f"Bearer {configured_api_token}"}
-    existing_id = database.db_add_entry("already here - existing")
+    existing_id = database.db_add_entry(admin_user.id, "already here - existing")
 
     def add_item(word, context="", definition=""):
         return client.post(
@@ -305,7 +274,7 @@ async def test_batch_promote_handles_new_duplicate_invalid_and_idempotent(
     results = {r["item_id"]: r for r in r_promote.json()["results"]}
 
     assert results[i_new]["status"] == "created"
-    created_entry = database.db_get_entry_by_id(results[i_new]["entry_id"])
+    created_entry = database.db_get_entry_by_id(admin_user.id, results[i_new]["entry_id"])
     assert created_entry is not None
     assert created_entry.text == "impact on their finances - finances"
     assert len(created_entry.definitions) == 1
@@ -333,10 +302,10 @@ async def test_batch_promote_handles_new_duplicate_invalid_and_idempotent(
 
 
 async def test_lookup_returns_plain_text_and_degrades_gracefully(
-    client, isolated_db, configured_api_token, monkeypatch
+    client, admin_user, configured_api_token, monkeypatch
 ):
     headers = {"Authorization": f"Bearer {configured_api_token}"}
-    eid = database.db_add_entry("impact on their finances - finances")
+    eid = database.db_add_entry(admin_user.id, "impact on their finances - finances")
     monkeypatch.setattr(capture, "get_IPA", lambda w: "fəˈnænsɪz")
     monkeypatch.setattr(
         capture,
@@ -378,10 +347,10 @@ async def test_lookup_returns_plain_text_and_degrades_gracefully(
 
 
 async def test_inbox_page_renders_captured_notes(
-    client, isolated_db, configured_api_token
+    client, admin_user, configured_api_token
 ):
     headers = {"Authorization": f"Bearer {configured_api_token}"}
-    existing_id = database.db_add_entry("ctx - finances")
+    existing_id = database.db_add_entry(admin_user.id, "ctx - finances")
     add_fin = await client.post(
         "/api/v1/page-note/items",
         json={
@@ -429,7 +398,7 @@ async def test_inbox_page_renders_captured_notes(
 
 
 async def test_delete_page_note_and_clear_promoted_items(
-    client, isolated_db, configured_api_token
+    client, admin_user, configured_api_token
 ):
     headers = {"Authorization": f"Bearer {configured_api_token}"}
 
@@ -484,7 +453,7 @@ async def test_delete_page_note_and_clear_promoted_items(
     assert r_clear.status_code == 200
     assert r_clear.json() == {"deleted": 3}
 
-    remaining = {n.url: n for n in database.db_list_page_notes()}
+    remaining = {n.url: n for n in database.db_list_page_notes(admin_user.id)}
     assert "https://example.com/one" not in remaining
     assert [i.id for i in remaining["https://example.com/two"].items] == [n2_keep]
     assert remaining["https://example.com/three"].items == []
@@ -498,5 +467,5 @@ async def test_delete_page_note_and_clear_promoted_items(
     r_del_again = await client.delete(f"/api/v1/page-note/{two_id}", headers=headers)
     assert r_del_again.status_code == 404
     assert "https://example.com/two" not in {
-        n.url for n in database.db_list_page_notes()
+        n.url for n in database.db_list_page_notes(admin_user.id)
     }

@@ -39,22 +39,35 @@ async def _login(client, next_path: str = "/add_entry"):
 
 
 def test_all_non_login_routes_require_authentication():
-    public_routes = {("GET", "/login"), ("POST", "/login")}
+    public_routes = {
+        ("GET", "/login"),
+        ("POST", "/login"),
+        ("GET", "/register"),
+        ("POST", "/register"),
+        ("GET", "/reset-password"),
+        ("POST", "/reset-password"),
+    }
+    admin_prefixes = ("/notes/", "/view_note/", "/edit_note/", "/admin")
     for route in main.app.routes:
         if not isinstance(route, APIRoute):
             continue
         dep_calls = {dep.call for dep in route.dependant.dependencies}
         for method in route.methods:
             if (method, route.path) in public_routes:
+                assert auth.require_user not in dep_calls
                 assert auth.require_admin not in dep_calls
-                assert auth.require_api_auth not in dep_calls
+                assert auth.require_api_user not in dep_calls
             elif route.path.startswith("/api/v1/"):
-                assert auth.require_api_auth in dep_calls, (
-                    f"API route {method} {route.path} is missing require_api_auth"
+                assert auth.require_api_user in dep_calls, (
+                    f"API route {method} {route.path} is missing require_api_user"
+                )
+            elif route.path.startswith(admin_prefixes):
+                assert auth.require_admin in dep_calls, (
+                    f"Admin route {method} {route.path} is missing require_admin"
                 )
             else:
-                assert auth.require_admin in dep_calls, (
-                    f"Route {method} {route.path} is missing require_admin"
+                assert auth.require_user in dep_calls, (
+                    f"Route {method} {route.path} is missing require_user"
                 )
 
 
@@ -178,7 +191,7 @@ async def test_authenticated_form_mutation_requires_csrf(client, monkeypatch):
     monkeypatch.setattr(
         main,
         "db_add_entry",
-        lambda text, definition_text="", example_text="": calls.append(text) or 123,
+        lambda user_id, text, definition_text="", example_text="": calls.append((user_id, text)) or 123,
     )
 
     rejected = await client.post(
@@ -198,7 +211,7 @@ async def test_authenticated_form_mutation_requires_csrf(client, monkeypatch):
     )
     assert accepted.status_code == 303
     assert accepted.headers["location"] == "/entry/123"
-    assert calls == ["test entry"]
+    assert calls == [(1, "test entry")]
 
 
 async def test_api_documentation_is_disabled(client):

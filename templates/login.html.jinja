@@ -6,6 +6,7 @@
 {{ page_header() }}
 <main class="form-page">
     <h1>Log in</h1>
+    {% if notice %}<p class="form-notice" role="status">{{ notice }}</p>{% endif %}
     {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
     <form class="login-form" method="post" action="/login">
         <input type="hidden" name="csrf_token" value="{{ login_csrf_token }}">

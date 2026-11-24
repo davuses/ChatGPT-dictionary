@@ -2,9 +2,15 @@ notes_folder = "/path/to/your/notes"
 mw_thesaurus_api_key = "your-merriam-webster-thesaurus-api-key"
 
 [auth]
-admin_username = "admin"
-admin_password_hash = "$argon2id$..."
+# Required: random secret (at least 32 characters) for signing session cookies
 session_secret = "replace-with-a-random-secret-at-least-32-characters"
 https_only = true
-# Optional personal API token (at least 32 chars) for the Chrome Side Panel extension
+
+# Bootstrap-only: used once when initializing an empty database or migrating
+# from a single-user database. Afterwards, users and passwords live in SQLite.
+admin_username = "admin"
+admin_password_hash = "$argon2id$..."
+
+# Optional bootstrap-only API token (migrated into the admin's /account tokens
+# on first startup; manage per-device tokens in /account afterwards).
 # api_token = "replace-with-a-random-token-at-least-32-characters"

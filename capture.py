@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from auth import require_api_auth
+from auth import require_api_user
 from database import (
     CaptureItemRecord,
     PageNoteRecord,
+    UserRecord,
     db_add_capture_item,
     db_clear_promoted_items,
     db_delete_capture_item,
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 api_router = APIRouter(
     prefix="/api/v1",
-    dependencies=[Depends(require_api_auth)],
+    dependencies=[Depends(require_api_user)],
 )
 
 
@@ -118,10 +119,14 @@ def _serialize_page_note(
 
 
 @api_router.get("/page-note", response_class=JSONResponse)
-def get_page_note(url: str = Query(...), title: str = Query("")):
+def get_page_note(
+    url: str = Query(...),
+    title: str = Query(""),
+    current_user: UserRecord = Depends(require_api_user),
+):
     canonical_url = _canonical_url_or_400(url)
-    note = db_get_page_note_by_url(canonical_url)
-    all_words = get_all_words()
+    note = db_get_page_note_by_url(current_user.id, canonical_url)
+    all_words = get_all_words(current_user.id)
     return JSONResponse(
         _serialize_page_note(canonical_url, note, all_words, fallback_title=title),
         headers={"Cache-Control": "no-store"},
@@ -129,10 +134,15 @@ def get_page_note(url: str = Query(...), title: str = Query("")):
 
 
 @api_router.put("/page-note", response_class=JSONResponse)
-def put_page_note(payload: UpsertPageNoteRequest):
+def put_page_note(
+    payload: UpsertPageNoteRequest,
+    current_user: UserRecord = Depends(require_api_user),
+):
     canonical_url = _canonical_url_or_400(payload.url)
-    note = db_upsert_page_note(canonical_url, payload.title, payload.notes_md)
-    all_words = get_all_words()
+    note = db_upsert_page_note(
+        current_user.id, canonical_url, payload.title, payload.notes_md
+    )
+    all_words = get_all_words(current_user.id)
     return JSONResponse(
         _serialize_page_note(
             canonical_url, note, all_words, fallback_title=payload.title
@@ -141,27 +151,37 @@ def put_page_note(payload: UpsertPageNoteRequest):
     )
 
 
+@api_router.post("/page-note/clear-promoted", response_class=JSONResponse)
+def clear_promoted_items(
+    payload: Optional[ClearPromotedRequest] = None,
+    current_user: UserRecord = Depends(require_api_user),
+):
+    note_id = payload.note_id if payload is not None else None
+    deleted = db_clear_promoted_items(current_user.id, note_id)
+    return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
+
+
 @api_router.delete("/page-note/{note_id}", response_class=JSONResponse)
-def delete_page_note(note_id: int):
-    if not db_delete_page_note(note_id):
+def delete_page_note(
+    note_id: int,
+    current_user: UserRecord = Depends(require_api_user),
+):
+    if not db_delete_page_note(current_user.id, note_id):
         raise HTTPException(status_code=404, detail="Page note not found")
     return JSONResponse({"message": "deleted"}, headers={"Cache-Control": "no-store"})
 
 
-@api_router.post("/page-note/clear-promoted", response_class=JSONResponse)
-def clear_promoted_items(payload: Optional[ClearPromotedRequest] = None):
-    note_id = payload.note_id if payload is not None else None
-    deleted = db_clear_promoted_items(note_id)
-    return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
-
-
 @api_router.post("/page-note/items", response_class=JSONResponse, status_code=201)
-def add_capture_item(payload: AddCaptureItemRequest):
+def add_capture_item(
+    payload: AddCaptureItemRequest,
+    current_user: UserRecord = Depends(require_api_user),
+):
     canonical_url = _canonical_url_or_400(payload.url)
     clean_word = " ".join(payload.word.split())
     if not clean_word:
         raise HTTPException(status_code=400, detail="Word cannot be empty.")
     note, item = db_add_capture_item(
+        current_user.id,
         normalized_url=canonical_url,
         title=payload.title,
         word=clean_word,
@@ -169,7 +189,7 @@ def add_capture_item(payload: AddCaptureItemRequest):
         definition_text=payload.definition_text,
         timestamp_seconds=payload.timestamp_seconds,
     )
-    all_words = get_all_words()
+    all_words = get_all_words(current_user.id)
     return JSONResponse(
         {
             "url": note.url,
@@ -181,7 +201,11 @@ def add_capture_item(payload: AddCaptureItemRequest):
 
 
 @api_router.patch("/page-note/items/{item_id}", response_class=JSONResponse)
-def patch_capture_item(item_id: int, payload: UpdateCaptureItemRequest):
+def patch_capture_item(
+    item_id: int,
+    payload: UpdateCaptureItemRequest,
+    current_user: UserRecord = Depends(require_api_user),
+):
     word = None
     if payload.word is not None:
         word = " ".join(payload.word.split())
@@ -191,6 +215,7 @@ def patch_capture_item(item_id: int, payload: UpdateCaptureItemRequest):
         " ".join(payload.context.split()) if payload.context is not None else None
     )
     updated = db_update_capture_item(
+        current_user.id,
         item_id,
         word=word,
         context=context,
@@ -198,7 +223,7 @@ def patch_capture_item(item_id: int, payload: UpdateCaptureItemRequest):
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Capture item not found")
-    all_words = get_all_words()
+    all_words = get_all_words(current_user.id)
     return JSONResponse(
         {"item": _serialize_item(updated, all_words)},
         headers={"Cache-Control": "no-store"},
@@ -206,33 +231,44 @@ def patch_capture_item(item_id: int, payload: UpdateCaptureItemRequest):
 
 
 @api_router.delete("/page-note/items/{item_id}", response_class=JSONResponse)
-def delete_capture_item(item_id: int):
-    if not db_delete_capture_item(item_id):
+def delete_capture_item(
+    item_id: int,
+    current_user: UserRecord = Depends(require_api_user),
+):
+    if not db_delete_capture_item(current_user.id, item_id):
         raise HTTPException(status_code=404, detail="Capture item not found")
     return JSONResponse({"message": "deleted"}, headers={"Cache-Control": "no-store"})
 
 
 @api_router.post("/page-note/promote", response_class=JSONResponse)
-def promote_capture_items(payload: PromoteItemsRequest):
+def promote_capture_items(
+    payload: PromoteItemsRequest,
+    current_user: UserRecord = Depends(require_api_user),
+):
     if not payload.item_ids:
         raise HTTPException(status_code=400, detail="No item_ids provided")
-    results = db_promote_capture_items(payload.item_ids, validate_entry_fields)
+    results = db_promote_capture_items(
+        current_user.id, payload.item_ids, validate_entry_fields
+    )
     if any(r.get("status") == "created" for r in results):
-        invalidate_words_cache()
-        invalidate_quiz_pool_cache()
+        invalidate_words_cache(current_user.id)
+        invalidate_quiz_pool_cache(current_user.id)
     return JSONResponse({"results": results}, headers={"Cache-Control": "no-store"})
 
 
 @api_router.get("/lookup", response_class=JSONResponse)
-def lookup_word(word: str = Query(...)):
+def lookup_word(
+    word: str = Query(...),
+    current_user: UserRecord = Depends(require_api_user),
+):
     clean_word = " ".join(word.split())
     if not clean_word:
         raise HTTPException(status_code=400, detail="Word cannot be empty.")
 
-    all_words = get_all_words()
+    all_words = get_all_words(current_user.id)
     existing_ids = list(all_words.get(clean_word.lower(), []))
     existing_entries = []
-    for summary in db_get_entries_by_ids(existing_ids):
+    for summary in db_get_entries_by_ids(current_user.id, existing_ids):
         ctx, parsed_word = parse_entry_text(summary.text)
         existing_entries.append(
             {

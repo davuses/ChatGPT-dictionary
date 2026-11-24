@@ -1,0 +1,14 @@
+{% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header with context %}
+{% block title %}Forbidden{% endblock title %}
+
+{% block body %}
+{{ page_header() }}
+<main class="error-page">
+<h1>Access Denied</h1>
+
+<p>{{ detail or "You do not have permission to view this page." }}</p>
+<p><a class="button button-ghost" href="/">Back to dashboard</a></p>
+</main>
+
+{% endblock body %}

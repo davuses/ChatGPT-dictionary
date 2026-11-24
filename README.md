@@ -17,8 +17,9 @@ A private, personal English vocabulary builder and active-recall web app, built 
 - **Review bookmark** — mark your place in the entry list and jump back to it later
 - **Visit tracking** — each entry tracks visit count and last-visited time
 - **Multiple views** — browse all entries, entries-only, or entries with examples
-- **Study notes** — browse and edit a folder of personal English study Markdown notes with a generated table of contents
-- **Markdown editing** — definitions, examples, and study notes are edited with [EasyMDE](https://github.com/Ionaru/easy-markdown-editor), while entries use quick plain-text word and context fields
+- **Study notes** — browse and edit a folder of personal English study Markdown notes with a generated table of contents (admin-only)
+- **Invite-only multi-user** — generate one-time invite links and password reset links from `/admin`; each user gets a completely isolated dictionary, quiz, `/inbox`, and per-device Chrome extension API tokens under `/account`
+- **Markdown editing** — definitions, examples, and study notes are edited with [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) (sanitized with `nh3` on render), while entries use quick plain-text word and context fields
 
 ## Tech stack
 
@@ -102,28 +103,48 @@ Requires Python 3.12+.
    Open `http://<computer-lan-ip>:8000`. Restore
    `DICTIONARY_HTTPS_ONLY=true` (or remove the override) for production.
 
-## Access control
+## Access control & multi-user
 
-- The entire app is private: all dictionary pages, quizzes, synonyms,
-  bookmarks, notes, `/inbox`, and mutation endpoints require signing in at `/login`.
-- Only `/login` and `/static/*` assets are accessible before authentication.
+- The entire app is private and invite-only: all dictionary pages, quizzes,
+  synonyms, bookmarks, `/inbox`, `/account`, and mutation endpoints require
+  signing in at `/login`.
+- Only `/login`, `/register` (with a valid one-time invite link),
+  `/reset-password` (with an admin-issued one-time reset link), and `/static/*`
+  assets are accessible before authentication.
+- Each user's entries, definitions, quizzes, bookmarks, and `/inbox` are
+  strictly isolated. Filesystem study notes (`/notes/*`) and `/admin` are
+  admin-only (`403` for non-admin accounts).
 - Signed sessions use `HttpOnly`, `SameSite=Lax` cookies (and `Secure` when
-  `https_only = true`) with a 30-day lifetime.
-- Every browser state-changing request also requires a CSRF token.
+  `https_only = true`) with a 30-day lifetime and instant invalidation via
+  `session_version` on password changes, resets, or account disable.
+- Every browser state-changing request requires a CSRF token, and user-authored
+  Markdown is sanitized with `nh3` before rendering.
 - The `/api/v1/*` capture endpoints accept either an authenticated browser
-  session (with `X-CSRF-Token` on mutations) or a `Bearer` token matching
-  `auth.api_token` / `DICTIONARY_API_TOKEN` (fail-closed when unconfigured or invalid).
+  session (with `X-CSRF-Token` on mutations) or a per-user `Bearer` token
+  created in `/account` (stored SHA-256 hashed, revocable per device,
+  fail-closed when invalid or disabled).
 - FastAPI's `/docs`, `/redoc`, and `/openapi.json` endpoints are disabled.
+- If deployed behind a reverse proxy (Caddy/nginx/Cloudflare Tunnel), pass
+  `--proxy-headers --forwarded-allow-ips=...` to Uvicorn so auth rate limiting
+  sees real client IPs.
+- Emergency admin password reset from the server CLI:
+
+  ```bash
+  python database.py reset-password --username admin
+  ```
 
 ## Notes
 
 - Data is stored locally in `dictionary.db` (SQLite) and is not tracked in git.
+- On startup against a legacy single-user `dictionary.db`, the app automatically
+  creates a WAL-safe backup (`dictionary.db.bak-*`) and migrates existing data
+  to the bootstrap admin account.
 
 ## Chrome Side Panel extension (optional)
 
 An unpacked Manifest V3 Chrome extension lives in [`extension/`](extension/) for taking per-page Markdown scratchpad notes and batch-capturing words/phrases (with YouTube playback timestamps + full-sentence captions or article sentence selection) directly into your dictionary:
 
-1. Generate a personal API token (at least 32 characters) and add `api_token = "..."` under `[auth]` in `config.toml` (or set `DICTIONARY_API_TOKEN`).
+1. Sign in to the web app, open **Account** (`/account`), and generate a per-device API token (each user can create separate tokens for laptop/desktop and revoke them individually).
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the `extension/` folder.
-3. Click the extension icon to open the Side Panel, click **Settings**, enter your server URL (e.g. `http://localhost:8000`) and API token, and click **Save & test**.
+3. Click the extension icon to open the Side Panel, click **Settings**, enter your server URL (e.g. `http://localhost:8000`) and your API token, and click **Save & test**.
 4. You can also review, edit, and batch-promote captured items from any device at `/inbox`.

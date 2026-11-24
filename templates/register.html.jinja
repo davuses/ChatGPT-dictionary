@@ -1,0 +1,29 @@
+{% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header with context %}
+{% block title %}Create Account{% endblock title %}
+
+{% block body %}
+{{ page_header() }}
+<main class="form-page">
+    <h1>Create account</h1>
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+    {% if invite_valid %}
+    <form class="login-form" method="post" action="/register">
+        <input type="hidden" name="csrf_token" value="{{ form_csrf_token }}">
+        <input type="hidden" name="code" value="{{ code }}">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" value="{{ username }}" autocomplete="username" minlength="2" maxlength="32" required autofocus>
+        <label for="password">Password (10–128 characters)</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+        <label for="confirm_password">Confirm password</label>
+        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+        <div class="form-actions">
+            <button class="button button-primary" type="submit">Create account</button>
+            <a class="button button-ghost" href="/login">Back to log in</a>
+        </div>
+    </form>
+    {% else %}
+    <p><a class="button button-ghost" href="/login">Back to log in</a></p>
+    {% endif %}
+</main>
+{% endblock body %}

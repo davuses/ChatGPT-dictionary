@@ -34,40 +34,20 @@ async def _login(client):
     assert response.status_code == 303
 
 
-@pytest.fixture
-def isolated_db(monkeypatch, tmp_path):
-    db_path = tmp_path / "polish.db"
-    test_engine = create_engine(
-        f"sqlite:///{db_path}",
-        future=True,
-        connect_args={"check_same_thread": False},
-    )
-    database.Base.metadata.create_all(test_engine)
-    monkeypatch.setattr(database, "engine", test_engine)
-    utils.invalidate_words_cache()
-    utils.invalidate_quiz_pool_cache()
-    try:
-        yield test_engine
-    finally:
-        utils.invalidate_words_cache()
-        utils.invalidate_quiz_pool_cache()
-        test_engine.dispose()
+def test_db_search_escapes_sql_like_wildcards(admin_user):
+    database.db_add_entry(admin_user.id, "100% effort - percent")
+    database.db_add_entry(admin_user.id, "snake_case name - underscore")
+    database.db_add_entry(admin_user.id, "ordinary phrase - plain")
 
-
-def test_db_search_escapes_sql_like_wildcards(isolated_db):
-    database.db_add_entry("100% effort - percent")
-    database.db_add_entry("snake_case name - underscore")
-    database.db_add_entry("ordinary phrase - plain")
-
-    pct_entries, pct_total = database.db_get_entries_page(query="100%")
+    pct_entries, pct_total = database.db_get_entries_page(admin_user.id, query="100%")
     assert pct_total == 1
     assert pct_entries[0].text == "100% effort - percent"
 
-    under_entries, under_total = database.db_get_entries_page(query="snake_case")
+    under_entries, under_total = database.db_get_entries_page(admin_user.id, query="snake_case")
     assert under_total == 1
     assert under_entries[0].text == "snake_case name - underscore"
 
-    only_percent, only_percent_total = database.db_get_entries_page(query="%")
+    only_percent, only_percent_total = database.db_get_entries_page(admin_user.id, query="%")
     assert only_percent_total == 1
     assert only_percent[0].text == "100% effort - percent"
 
@@ -107,10 +87,10 @@ def test_get_notes_dir_resolves_relative_to_config_path(monkeypatch, tmp_path):
 
 
 async def test_show_synonyms_redacts_api_key_in_500_response_and_logs(
-    client, isolated_db, monkeypatch, caplog
+    client, admin_user, monkeypatch, caplog
 ):
     await _login(client)
-    eid = database.db_add_entry("ctx - candid")
+    eid = database.db_add_entry(admin_user.id, "ctx - candid")
     secret_key = "SUPER_SECRET_MW_KEY_12345"
 
     def boom(word):
@@ -129,7 +109,7 @@ async def test_show_synonyms_redacts_api_key_in_500_response_and_logs(
 
 
 async def test_delete_entry_and_definition_return_404_json_when_missing(
-    client, isolated_db
+    client, admin_user
 ):
     await _login(client)
     csrf_token = _csrf_from_html((await client.get("/add_entry")).text)
@@ -143,8 +123,8 @@ async def test_delete_entry_and_definition_return_404_json_when_missing(
     assert missing_def.status_code == 404
     assert missing_def.json() == {"detail": "Definition not found"}
 
-    eid = database.db_add_entry("ctx - ephemeral", definition_text="short-lived")
-    def_id = database.db_get_entry_by_id(eid).definitions[0].id
+    eid = database.db_add_entry(admin_user.id, "ctx - ephemeral", definition_text="short-lived")
+    def_id = database.db_get_entry_by_id(admin_user.id, eid).definitions[0].id
 
     del_def = await client.delete(f"/delete_definition/{def_id}", headers=headers)
     assert del_def.status_code == 200
@@ -155,9 +135,9 @@ async def test_delete_entry_and_definition_return_404_json_when_missing(
     assert del_entry.json() == {"message": "deleted"}
 
 
-async def test_entry_page_encodes_audio_urls_cleanly(client, isolated_db, monkeypatch):
+async def test_entry_page_encodes_audio_urls_cleanly(client, admin_user, monkeypatch):
     await _login(client)
-    eid = database.db_add_entry("ctx - Pipe dream/wish")
+    eid = database.db_add_entry(admin_user.id, "ctx - Pipe dream/wish")
     monkeypatch.setattr(main, "get_IPA", lambda w: "paɪp driːm")
 
     resp = await client.get(f"/entry/{eid}")
@@ -208,14 +188,14 @@ def test_get_how_long_ago_formatting():
 
 
 async def test_entry_page_ui_polish_and_offline_audio(
-    client, isolated_db, monkeypatch
+    client, admin_user, monkeypatch
 ):
     await _login(client)
-    eid = database.db_add_entry("She spoke with candor - candor")
+    eid = database.db_add_entry(admin_user.id, "She spoke with candor - candor")
     monkeypatch.setattr(main, "get_IPA", lambda w: "ˈkændər")
 
     # Newly created entry has visit_count=0 -> simulate 1 visit
-    database.db_record_entry_visit(eid, now=int(2_000_000_000))
+    database.db_record_entry_visit(admin_user.id, eid, now=int(2_000_000_000))
     resp = await client.get(f"/entry/{eid}")
     assert resp.status_code == 200
     assert "fonts.googleapis.com" not in resp.text
@@ -228,15 +208,17 @@ async def test_entry_page_ui_polish_and_offline_audio(
 
 
 async def test_dashboard_quick_search_and_entries_visit_tiers(
-    client, isolated_db
+    client, admin_user
 ):
     await _login(client)
-    e0 = database.db_add_entry("ctx zero - zero")
-    e5 = database.db_add_entry("ctx five - five")
+    e0 = database.db_add_entry(admin_user.id, "ctx zero - zero")
+    e5 = database.db_add_entry(admin_user.id, "ctx five - five")
     base_ts = 2_000_000_000
     for step in range(5):
         database.db_record_entry_visit(
-            e5, now=base_ts + step * (database.VISIT_COOLDOWN_SECONDS + 1)
+            admin_user.id,
+            e5,
+            now=base_ts + step * (database.VISIT_COOLDOWN_SECONDS + 1),
         )
 
     dash = await client.get("/")
@@ -253,12 +235,12 @@ async def test_dashboard_quick_search_and_entries_visit_tiers(
 
 
 async def test_synonyms_handles_sim_list_stems_phrases_and_escaping(
-    client, isolated_db, monkeypatch
+    client, admin_user, monkeypatch
 ):
     thesaurus.fetch_thesaurus_senses.cache_clear()
     await _login(client)
-    e_phrase = database.db_add_entry("ctx - zero in on")
-    e_linked = database.db_add_entry("ctx - Focus")
+    e_phrase = database.db_add_entry(admin_user.id, "ctx - zero in on")
+    e_linked = database.db_add_entry(admin_user.id, "ctx - Focus")
 
     mw_payload = [
         {
@@ -378,7 +360,7 @@ def test_highlight_ipa_preserves_escaped_html_and_wraps_ipa():
 
 
 async def test_notes_special_chars_and_entries_edge_cases(
-    client, isolated_db, monkeypatch, tmp_path
+    client, admin_user, monkeypatch, tmp_path
 ):
     await _login(client)
     note_file = tmp_path / "C# 100% notes.md"
@@ -390,7 +372,7 @@ async def test_notes_special_chars_and_entries_edge_cases(
     assert "/edit_note/C%23%20100%25%20notes.md" in view_resp.text
 
     # Page clamping + empty search state
-    database.db_add_entry("ctx - alpha")
+    database.db_add_entry(admin_user.id, "ctx - alpha")
     clamped = await client.get("/entries?page=999")
     assert clamped.status_code == 200
     assert "alpha" in clamped.text
@@ -401,7 +383,7 @@ async def test_notes_special_chars_and_entries_edge_cases(
 
     # Blank definition rejected with 400
     csrf_token = _csrf_from_html((await client.get("/add_entry")).text)
-    eid = database.db_add_entry("ctx - beta")
+    eid = database.db_add_entry(admin_user.id, "ctx - beta")
     blank_def = await client.post(
         "/add_definition",
         data={"entry_id": eid, "definition_text": "   ", "csrf_token": csrf_token},

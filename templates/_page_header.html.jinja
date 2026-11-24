@@ -15,7 +15,7 @@
   point reachable from those two hubs, not something every entry/edit/note
   page needs a shortcut to.
 #}
-{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False, subtitle_id=None, show_add=False, show_inbox=False) %}
+{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False, subtitle_id=None, show_add=False, show_inbox=False, show_account=False, show_admin=False) %}
 <header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
     <div>
         {% if brand_as_h1 %}
@@ -29,8 +29,10 @@
     <nav class="page-nav" aria-label="Main navigation">
         <a class="button button-ghost{% if active == 'browse' %} active{% endif %}" href="/entries">Browse</a>
         {% if show_inbox or active == 'inbox' %}<a class="button button-ghost{% if active == 'inbox' %} active{% endif %}" href="/inbox">Inbox</a>{% endif %}
-        {% if show_notes %}<a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>{% endif %}
+        {% if is_admin and (show_notes or active == 'notes') %}<a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>{% endif %}
         {% if show_add %}<a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>{% endif %}
+        {% if show_account or active == 'account' %}<a class="button button-ghost{% if active == 'account' %} active{% endif %}" href="/account">Account</a>{% endif %}
+        {% if is_admin and (show_admin or active == 'admin') %}<a class="button button-ghost{% if active == 'admin' %} active{% endif %}" href="/admin">Admin</a>{% endif %}
         {{ extra_nav | safe }}
         <form class="inline-form" method="post" action="/logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

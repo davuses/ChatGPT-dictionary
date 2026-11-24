@@ -31,26 +31,6 @@ async def _login(client):
     assert response.status_code == 303
 
 
-@pytest.fixture
-def isolated_db(monkeypatch, tmp_path):
-    db_path = tmp_path / "test.db"
-    test_engine = create_engine(
-        f"sqlite:///{db_path}",
-        future=True,
-        connect_args={"check_same_thread": False},
-    )
-    database.Base.metadata.create_all(test_engine)
-    monkeypatch.setattr(database, "engine", test_engine)
-    utils.invalidate_words_cache()
-    utils.invalidate_quiz_pool_cache()
-    try:
-        yield test_engine
-    finally:
-        utils.invalidate_words_cache()
-        utils.invalidate_quiz_pool_cache()
-        test_engine.dispose()
-
-
 def test_parse_and_format_entry_text():
     assert utils.parse_entry_text("She spoke - softly - terse") == (
         "She spoke - softly",
@@ -64,25 +44,27 @@ def test_parse_and_format_entry_text():
 
 
 def test_bare_word_with_example_is_quizzable_without_blanking_whole_sentence(
-    isolated_db,
+    admin_user,
 ):
     e1 = database.db_add_entry(
+        admin_user.id,
         "ephemeral",
         example_text="> Fame in the digital age is often ephemeral and fleeting.",
     )
     # Multi-word phrase whose example is almost just the phrase itself must be skipped
     database.db_add_entry(
+        admin_user.id,
         "take for granted",
         example_text="> We take for granted.",
     )
 
-    pool = utils.get_quiz_pool()
+    pool = utils.get_quiz_pool(admin_user.id)
     assert [c.entry_id for c in pool] == [e1]
     assert pool[0].word == "ephemeral"
 
 
 async def test_one_step_add_entry_creates_entry_definition_and_example(
-    client, isolated_db
+    client, admin_user
 ):
     await _login(client)
     add_page = await client.get("/add_entry")
@@ -103,7 +85,7 @@ async def test_one_step_add_entry_creates_entry_definition_and_example(
     assert response.status_code == 303
     entry_id = int(response.headers["location"].rsplit("/", 1)[-1])
 
-    saved = database.db_get_entry_by_id(entry_id)
+    saved = database.db_get_entry_by_id(admin_user.id, entry_id)
     assert saved is not None
     assert saved.text == "Her candor disarmed the whole room. - candor"
     assert len(saved.definitions) == 1
@@ -111,7 +93,7 @@ async def test_one_step_add_entry_creates_entry_definition_and_example(
     assert saved.example == "> I appreciate your candor on this matter."
 
 
-async def test_add_entry_skips_blank_definition_and_example(client, isolated_db):
+async def test_add_entry_skips_blank_definition_and_example(client, admin_user):
     await _login(client)
     csrf_token = _csrf_from_html((await client.get("/add_entry")).text)
 
@@ -127,14 +109,14 @@ async def test_add_entry_skips_blank_definition_and_example(client, isolated_db)
     )
     assert response.status_code == 303
     entry_id = int(response.headers["location"].rsplit("/", 1)[-1])
-    saved = database.db_get_entry_by_id(entry_id)
+    saved = database.db_get_entry_by_id(admin_user.id, entry_id)
     assert saved is not None
     assert saved.text == "laconic"
     assert saved.definitions == []
     assert saved.example is None
 
 
-async def test_add_entry_inline_400_and_409_preserve_draft(client, isolated_db):
+async def test_add_entry_inline_400_and_409_preserve_draft(client, admin_user):
     await _login(client)
     csrf_token = _csrf_from_html((await client.get("/add_entry")).text)
 
@@ -166,7 +148,7 @@ async def test_add_entry_inline_400_and_409_preserve_draft(client, isolated_db):
     assert "reserved as the context separator" in sep_resp.text
     assert "foo - bar" in sep_resp.text
 
-    existing_id = database.db_add_entry("Some context - vivid")
+    existing_id = database.db_add_entry(admin_user.id, "Some context - vivid")
     dup_resp = await client.post(
         "/add_entry",
         data={
@@ -183,11 +165,11 @@ async def test_add_entry_inline_400_and_409_preserve_draft(client, isolated_db):
 
 
 async def test_edit_entry_splits_fields_handles_duplicates_and_404s(
-    client, isolated_db
+    client, admin_user
 ):
     await _login(client)
-    e1 = database.db_add_entry("First - part - alpha")
-    e2 = database.db_add_entry("Second context - beta")
+    e1 = database.db_add_entry(admin_user.id, "First - part - alpha")
+    e2 = database.db_add_entry(admin_user.id, "Second context - beta")
 
     edit_page = await client.get(f"/edit_entry/{e1}")
     assert edit_page.status_code == 200
@@ -209,7 +191,7 @@ async def test_edit_entry_splits_fields_handles_duplicates_and_404s(
     )
     assert updated.status_code == 303
     assert updated.headers["location"] == f"/entry/{e1}"
-    assert database.db_get_entry_by_id(e1).text == "Updated context - gamma"
+    assert database.db_get_entry_by_id(admin_user.id, e1).text == "Updated context - gamma"
 
     missing_entry = await client.post(
         "/edit_entry/999999",

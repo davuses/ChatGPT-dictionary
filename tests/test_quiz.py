@@ -108,39 +108,41 @@ def test_example_sentences_and_blank_word():
     assert blanked == "They wanted to _____ the crowd, hoping to _____ ease."
 
 
-def test_db_record_entry_visit_handles_null_and_cooldown(monkeypatch):
-    test_engine = create_engine("sqlite:///:memory:", future=True)
-    database.Base.metadata.create_all(test_engine)
-    monkeypatch.setattr(database, "engine", test_engine)
-
-    with Session(test_engine) as session:
-        e1 = database.Entry(text="ctx - alpha", visit_count=None, last_visit=None)
-        e2 = database.Entry(text="ctx - hidden", is_hidden=True, visit_count=0)
+def test_db_record_entry_visit_handles_null_and_cooldown(admin_user):
+    with Session(database.engine) as session:
+        e1 = database.Entry(
+            user_id=admin_user.id, text="ctx - alpha", visit_count=None, last_visit=None
+        )
+        e2 = database.Entry(
+            user_id=admin_user.id, text="ctx - hidden", is_hidden=True, visit_count=0
+        )
         session.add_all([e1, e2])
         session.commit()
         e1_id, e2_id = e1.id, e2.id
 
     t0 = 1_750_000_000
-    assert database.db_record_entry_visit(e1_id, now=t0) is True
-    assert database.db_record_entry_visit(e1_id, now=t0 + 3600) is False
-    assert database.db_record_entry_visit(e1_id, now=t0 + 3600 * 12) is True
-    assert database.db_record_entry_visit(e2_id, now=t0) is None
-    assert database.db_record_entry_visit(999999, now=t0) is None
+    assert database.db_record_entry_visit(admin_user.id, e1_id, now=t0) is True
+    assert database.db_record_entry_visit(admin_user.id, e1_id, now=t0 + 3600) is False
+    assert database.db_record_entry_visit(admin_user.id, e1_id, now=t0 + 3600 * 12) is True
+    assert database.db_record_entry_visit(admin_user.id, e2_id, now=t0) is None
+    assert database.db_record_entry_visit(admin_user.id, 999999, now=t0) is None
 
-    stats = database.db_get_entry_visit_stats()
+    stats = database.db_get_entry_visit_stats(admin_user.id)
     assert stats == {e1_id: (2, t0 + 3600 * 12)}
 
 
 async def test_dashboard_and_quiz_next_do_not_mutate_visits(client, monkeypatch):
     await _login(client)
     question = main.QuizQuestion(42, "serendipity", "It was pure _____ to meet there.")
-    monkeypatch.setattr(main, "pick_random_question", lambda **_: question)
-    monkeypatch.setattr(main, "db_count_entries", lambda: 10)
-    monkeypatch.setattr(main, "db_count_entries_visited_since", lambda _: 2)
-    monkeypatch.setattr(main, "get_review_bookmark", lambda: None)
+    monkeypatch.setattr(main, "pick_random_question", lambda *_a, **_kw: question)
+    monkeypatch.setattr(main, "db_count_entries", lambda _uid: 10)
+    monkeypatch.setattr(main, "db_count_entries_visited_since", lambda _uid, _ts: 2)
+    monkeypatch.setattr(main, "get_review_bookmark", lambda _uid: None)
     recorded_calls = []
     monkeypatch.setattr(
-        main, "db_record_entry_visit", lambda entry_id: recorded_calls.append(entry_id) or True
+        main,
+        "db_record_entry_visit",
+        lambda _uid, entry_id: recorded_calls.append(entry_id) or True,
     )
 
     root = await client.get("/")
@@ -168,7 +170,7 @@ async def test_quiz_seen_endpoint_enforces_auth_csrf_and_records_visit(
     monkeypatch.setattr(
         main,
         "db_record_entry_visit",
-        lambda entry_id: calls.append(entry_id) or (True if entry_id == 42 else None),
+        lambda _uid, entry_id: calls.append(entry_id) or (True if entry_id == 42 else None),
     )
 
     ok = await client.post("/quiz/42/seen", headers={"X-CSRF-Token": csrf_token})
