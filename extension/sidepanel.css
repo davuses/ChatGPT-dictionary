@@ -283,12 +283,51 @@ a:hover {
 .sp-item-top {
   align-items: center;
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 5px 6px;
 }
 
 .sp-item-word {
   font-weight: 700;
   word-break: break-word;
+}
+
+.sp-item-ipa {
+  color: var(--muted);
+  font-family: "Lucida Sans Unicode", system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.sp-audio-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--accent);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 22px;
+  justify-content: center;
+  padding: 0;
+  width: 22px;
+}
+
+.sp-audio-btn:hover {
+  background: var(--surface);
+  color: var(--accent-dark);
+}
+
+.sp-audio-btn .icon-pause {
+  display: none;
+}
+
+.sp-audio-btn.is-playing .icon-play {
+  display: none;
+}
+
+.sp-audio-btn.is-playing .icon-pause {
+  display: block;
 }
 
 .sp-item-meta {
@@ -355,10 +394,18 @@ a:hover {
   margin: 4px 0 0 20px;
 }
 
+.sp-lookup-ipa-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
 .sp-lookup-ipa {
   color: var(--muted);
+  font-family: "Lucida Sans Unicode", system-ui, sans-serif;
   font-size: 12px;
-  margin-bottom: 4px;
 }
 
 .sp-lookup-sense {

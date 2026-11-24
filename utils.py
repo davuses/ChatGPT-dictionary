@@ -7,7 +7,8 @@ import threading
 import time
 import tomllib
 import urllib.parse
-from collections.abc import Collection
+from collections import OrderedDict
+from collections.abc import Collection, Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from functools import lru_cache
@@ -183,15 +184,75 @@ _ipa_lock = threading.Lock()
 _words_cache_lock = threading.Lock()
 _quiz_pool_lock = threading.Lock()
 
+_IPA_CACHE_MAX = 4096
+_ipa_cache: OrderedDict[str, str] = OrderedDict()
 
-@lru_cache(maxsize=2048)
+
+def _format_ipa(raw: object) -> str:
+    text = raw if isinstance(raw, str) else str(raw)
+    return text.replace("ɹ", "r").replace("ɐ", "ə")
+
+
+def _clear_ipa_cache() -> None:
+    with _ipa_lock:
+        _ipa_cache.clear()
+
+
 def get_IPA(word: str) -> str:
     # libespeak-ng is not thread-safe, so serialize phonemize() on cache misses.
     with _ipa_lock:
-        a = phonemize(word, strip=True, with_stress=True)
-    if isinstance(a, str):
-        return a.replace("ɹ", "r").replace("ɐ", "ə")
-    return str(a)
+        cached = _ipa_cache.get(word)
+        if cached is not None:
+            _ipa_cache.move_to_end(word)
+            return cached
+        raw = phonemize(word, strip=True, with_stress=True)
+        formatted = _format_ipa(raw)
+        _ipa_cache[word] = formatted
+        if len(_ipa_cache) > _IPA_CACHE_MAX:
+            _ipa_cache.popitem(last=False)
+        return formatted
+
+
+get_IPA.cache_clear = _clear_ipa_cache  # type: ignore[attr-defined]
+
+
+def get_IPA_batch(words: Iterable[str]) -> dict[str, str]:
+    """Return {word: ipa} using the shared IPA cache and at most one batched
+    phonemize() call for all cache-miss words (returns '' on failure)."""
+    unique_words = [w for w in dict.fromkeys(words) if w and w.strip()]
+    if not unique_words:
+        return {}
+
+    result: dict[str, str] = {}
+    missing: list[str] = []
+    with _ipa_lock:
+        for w in unique_words:
+            cached = _ipa_cache.get(w)
+            if cached is not None:
+                _ipa_cache.move_to_end(w)
+                result[w] = cached
+            else:
+                missing.append(w)
+
+        if missing:
+            try:
+                raw_list = phonemize(missing, strip=True, with_stress=True)
+                if isinstance(raw_list, str):
+                    raw_list = [raw_list]
+                if len(raw_list) == len(missing):
+                    for w, raw in zip(missing, raw_list):
+                        formatted = _format_ipa(raw)
+                        _ipa_cache[w] = formatted
+                        if len(_ipa_cache) > _IPA_CACHE_MAX:
+                            _ipa_cache.popitem(last=False)
+                        result[w] = formatted
+                else:
+                    for w in missing:
+                        result[w] = ""
+            except Exception:
+                for w in missing:
+                    result[w] = ""
+    return result
 
 
 _cached_all_words: dict[int, dict[str, list[int]]] = {}

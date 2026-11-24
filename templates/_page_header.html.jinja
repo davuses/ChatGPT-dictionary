@@ -1,23 +1,17 @@
 {#
-  Shared global header, used by every page so nav items/order/labels can't
-  drift per-template. `active` highlights the current section (browse/notes/
-  add, or omitted on pages that aren't one of those - an entry page, a
-  form, an error page). `brand_as_h1` is true only on the dashboard, where
-  "Glossbook" is the actual subject of the page; everywhere else the
-  page's own content is the real <h1> and the brand is a styled
-  (non-heading) link back home - font-weight is pinned explicitly in CSS
-  so that choice of tag can't visibly change how bold it renders.
-  `show_notes` is true only on the dashboard: Notes is a secondary section,
-  not something every page needs a shortcut to. Quiz isn't in this nav at
-  all - the dashboard already features it as an on-page card, and it isn't
-  a frequent-enough destination from everywhere else to earn a global slot.
-  `show_add` is true only on the dashboard and Browse: Add is a starting
-  point reachable from those two hubs, not something every entry/edit/note
-  page needs a shortcut to.
+  Shared global header, used by every page so nav items, order, and labels
+  stay consistent across the entire app.
+  - Primary navigation (`Browse`, `Inbox`, and admin-only `Notes`) is rendered
+    as borderless links on every authenticated page.
+  - Contextual page actions (`extra_nav` and hub-page `+ Add`) sit between
+    primary navigation and the user account menu.
+  - The right-aligned user menu (`<details class="nav-account-menu">`) keeps
+    `Account`, admin-only `Admin`, and `Log out` consistently reachable from
+    every authenticated page without cramming 7 boxed buttons onto 2 rows.
 #}
-{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", show_notes=False, subtitle_id=None, show_add=False, show_inbox=False, show_account=False, show_admin=False) %}
+{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", subtitle_id=None, show_add=False) %}
 <header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
-    <div>
+    <div class="page-header-brand">
         {% if brand_as_h1 %}
         <h1><a href="/">Glossbook</a></h1>
         {% else %}
@@ -27,17 +21,32 @@
     </div>
     {% if is_authenticated %}
     <nav class="page-nav" aria-label="Main navigation">
-        <a class="button button-ghost{% if active == 'browse' %} active{% endif %}" href="/entries">Browse</a>
-        {% if show_inbox or active == 'inbox' %}<a class="button button-ghost{% if active == 'inbox' %} active{% endif %}" href="/inbox">Inbox</a>{% endif %}
-        {% if is_admin and (show_notes or active == 'notes') %}<a class="button button-ghost{% if active == 'notes' %} active{% endif %}" href="/notes/">Notes</a>{% endif %}
-        {% if show_add %}<a class="button button-ghost{% if active == 'add' %} active{% endif %}" href="/add_entry">Add</a>{% endif %}
-        {% if show_account or active == 'account' %}<a class="button button-ghost{% if active == 'account' %} active{% endif %}" href="/account">Account</a>{% endif %}
-        {% if is_admin and (show_admin or active == 'admin') %}<a class="button button-ghost{% if active == 'admin' %} active{% endif %}" href="/admin">Admin</a>{% endif %}
+        <a class="nav-link{% if active == 'browse' %} active{% endif %}" href="/entries"{% if active == 'browse' %} aria-current="page"{% endif %}>Browse</a>
+        <a class="nav-link{% if active == 'inbox' %} active{% endif %}" href="/inbox"{% if active == 'inbox' %} aria-current="page"{% endif %}>Inbox</a>
+        {% if is_admin %}
+        <a class="nav-link{% if active == 'notes' %} active{% endif %}" href="/notes/"{% if active == 'notes' %} aria-current="page"{% endif %}>Notes</a>
+        {% endif %}
         {{ extra_nav | safe }}
-        <form class="inline-form" method="post" action="/logout">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="button button-ghost" type="submit">Log out</button>
-        </form>
+        {% if show_add %}<a class="button button-primary nav-add-btn{% if active == 'add' %} active{% endif %}" href="/add_entry">+ Add</a>{% endif %}
+        <details class="nav-account-menu">
+            <summary class="button button-ghost nav-account-trigger{% if active in ('account', 'admin') %} active{% endif %}" aria-label="Account menu">
+                <span class="nav-account-name">{{ current_user.username if current_user else "Account" }}</span>
+                <svg class="nav-caret" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                    <path d="M2.5 4.25L6 7.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </summary>
+            <div class="nav-account-dropdown">
+                <a class="nav-menu-item{% if active == 'account' %} active{% endif %}" href="/account"{% if active == 'account' %} aria-current="page"{% endif %}>Account</a>
+                {% if is_admin %}
+                <a class="nav-menu-item{% if active == 'admin' %} active{% endif %}" href="/admin"{% if active == 'admin' %} aria-current="page"{% endif %}>Admin</a>
+                {% endif %}
+                <hr class="nav-menu-divider">
+                <form class="nav-menu-form" method="post" action="/logout">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="nav-menu-item nav-menu-danger" type="submit">Log out</button>
+                </form>
+            </div>
+        </details>
     </nav>
     {% endif %}
 </header>

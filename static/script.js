@@ -124,6 +124,146 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+let activeAudio = null;
+let activeAudioButton = null;
+let activeAudioToken = 0;
+
+function stopWordPronunciation() {
+  activeAudioToken += 1;
+  if (activeAudio) {
+    activeAudio.onended = null;
+    activeAudio.onerror = null;
+    activeAudio.pause();
+    activeAudio = null;
+  }
+  if (activeAudioButton) {
+    activeAudioButton.classList.remove("is-playing");
+    activeAudioButton = null;
+  }
+  if ("speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (_) {}
+  }
+}
+
+function buildPronunciationUrls(word) {
+  const clean = (word || "").trim();
+  if (!clean) return [];
+  const urls = [];
+  if (!/\s/.test(clean)) {
+    urls.push(
+      "https://ssl.gstatic.com/dictionary/static/sounds/oxford/" +
+        encodeURIComponent(clean.toLowerCase()) +
+        "--_us_1.mp3"
+    );
+  }
+  urls.push(
+    "https://www.google.com/speech-api/v1/synthesize?text=" +
+      encodeURIComponent(clean) +
+      "&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1"
+  );
+  return urls;
+}
+
+function playWordPronunciation(word, button) {
+  const clean = (word || "").trim();
+  if (!clean || !button) return;
+  if (activeAudioButton === button) {
+    stopWordPronunciation();
+    return;
+  }
+  stopWordPronunciation();
+
+  const token = activeAudioToken;
+  const urls = buildPronunciationUrls(clean);
+  activeAudioButton = button;
+  button.classList.add("is-playing");
+
+  function finishIfCurrent() {
+    if (token !== activeAudioToken) return;
+    if (activeAudio) {
+      activeAudio.onended = null;
+      activeAudio.onerror = null;
+      activeAudio = null;
+    }
+    if (activeAudioButton === button) {
+      button.classList.remove("is-playing");
+      activeAudioButton = null;
+    }
+  }
+
+  function speakFallback() {
+    if (token !== activeAudioToken) return;
+    if (!("speechSynthesis" in window)) {
+      finishIfCurrent();
+      return;
+    }
+    try {
+      const utter = new SpeechSynthesisUtterance(clean);
+      utter.lang = "en-US";
+      utter.onend = finishIfCurrent;
+      utter.onerror = finishIfCurrent;
+      window.speechSynthesis.speak(utter);
+    } catch (_) {
+      finishIfCurrent();
+    }
+  }
+
+  function tryUrl(index) {
+    if (token !== activeAudioToken) return;
+    if (index >= urls.length) {
+      speakFallback();
+      return;
+    }
+    const audio = new Audio();
+    audio.referrerPolicy = "no-referrer";
+    audio.preload = "auto";
+    audio.src = urls[index];
+    activeAudio = audio;
+
+    let failed = false;
+    function onFailure() {
+      if (failed || token !== activeAudioToken) return;
+      failed = true;
+      audio.onended = null;
+      audio.onerror = null;
+      if (activeAudio === audio) activeAudio = null;
+      tryUrl(index + 1);
+    }
+
+    audio.onended = finishIfCurrent;
+    audio.onerror = onFailure;
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(onFailure);
+    }
+  }
+
+  tryUrl(0);
+}
+
+// Close the header account menu on outside click or Escape, restoring focus.
+document.addEventListener("click", function (event) {
+  document.querySelectorAll("details.nav-account-menu[open]").forEach((menu) => {
+    if (!menu.contains(event.target)) {
+      menu.open = false;
+    }
+  });
+});
+
+document.addEventListener("keydown", function (event) {
+  if (event.key !== "Escape") return;
+  document.querySelectorAll("details.nav-account-menu[open]").forEach((menu) => {
+    const hadFocus = menu.contains(document.activeElement);
+    menu.open = false;
+    if (hadFocus) {
+      const summary = menu.querySelector("summary");
+      if (summary) summary.focus();
+    }
+  });
+});
+
 document.addEventListener("DOMContentLoaded", function () {
   const editors = document.querySelectorAll("textarea.markdown-editor");
   if (!editors.length || typeof EasyMDE === "undefined") return;

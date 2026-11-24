@@ -113,6 +113,211 @@ function createDictionaryLinksRow(word) {
   return row;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+let activeAudio = null;
+let activeAudioButton = null;
+let activeAudioToken = 0;
+
+function stopPronunciation() {
+  activeAudioToken += 1;
+  if (activeAudio) {
+    activeAudio.onended = null;
+    activeAudio.onerror = null;
+    activeAudio.pause();
+    activeAudio = null;
+  }
+  if (activeAudioButton) {
+    activeAudioButton.classList.remove("is-playing");
+    activeAudioButton = null;
+  }
+  if ("speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // Ignore speechSynthesis cancellation errors
+    }
+  }
+}
+
+function buildPronunciationUrls(word) {
+  const clean = (word || "").trim();
+  if (!clean) return [];
+  const urls = [];
+  if (!/\s/.test(clean)) {
+    urls.push(
+      `https://ssl.gstatic.com/dictionary/static/sounds/oxford/${encodeURIComponent(
+        clean.toLowerCase()
+      )}--_us_1.mp3`
+    );
+  }
+  urls.push(
+    `https://www.google.com/speech-api/v1/synthesize?text=${encodeURIComponent(
+      clean
+    )}&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1`
+  );
+  return urls;
+}
+
+function playPronunciation(word, button) {
+  const clean = (word || "").trim();
+  if (!clean || !button) return;
+  if (activeAudioButton === button) {
+    stopPronunciation();
+    return;
+  }
+  stopPronunciation();
+
+  const token = activeAudioToken;
+  const urls = buildPronunciationUrls(clean);
+  activeAudioButton = button;
+  button.classList.add("is-playing");
+
+  function finishIfCurrent() {
+    if (token !== activeAudioToken) return;
+    if (activeAudio) {
+      activeAudio.onended = null;
+      activeAudio.onerror = null;
+      activeAudio = null;
+    }
+    if (activeAudioButton === button) {
+      button.classList.remove("is-playing");
+      activeAudioButton = null;
+    }
+  }
+
+  function speakFallback() {
+    if (token !== activeAudioToken) return;
+    if (!("speechSynthesis" in window)) {
+      finishIfCurrent();
+      return;
+    }
+    try {
+      const utter = new SpeechSynthesisUtterance(clean);
+      utter.lang = "en-US";
+      utter.onend = finishIfCurrent;
+      utter.onerror = finishIfCurrent;
+      window.speechSynthesis.speak(utter);
+    } catch {
+      finishIfCurrent();
+    }
+  }
+
+  function tryUrl(index) {
+    if (token !== activeAudioToken) return;
+    if (index >= urls.length) {
+      speakFallback();
+      return;
+    }
+    const audio = new Audio();
+    audio.referrerPolicy = "no-referrer";
+    audio.preload = "auto";
+    audio.src = urls[index];
+    activeAudio = audio;
+
+    let failed = false;
+    function onFailure() {
+      if (failed || token !== activeAudioToken) return;
+      failed = true;
+      audio.onended = null;
+      audio.onerror = null;
+      if (activeAudio === audio) activeAudio = null;
+      tryUrl(index + 1);
+    }
+
+    audio.onended = finishIfCurrent;
+    audio.onerror = onFailure;
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(onFailure);
+    }
+  }
+
+  tryUrl(0);
+}
+
+function createSvgElement(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    el.setAttribute(k, v);
+  }
+  return el;
+}
+
+function createAudioButton(word) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "sp-audio-btn";
+  btn.title = "Play pronunciation";
+  btn.setAttribute("aria-label", `Play pronunciation for ${word}`);
+
+  const playSvg = createSvgElement("svg", {
+    class: "icon-play",
+    viewBox: "0 0 24 24",
+    width: "16",
+    height: "16",
+    "aria-hidden": "true",
+  });
+  playSvg.appendChild(
+    createSvgElement("circle", {
+      cx: "12",
+      cy: "12",
+      r: "10",
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+    })
+  );
+  playSvg.appendChild(
+    createSvgElement("polygon", {
+      points: "10,8 16.5,12 10,16",
+      fill: "currentColor",
+    })
+  );
+
+  const pauseSvg = createSvgElement("svg", {
+    class: "icon-pause",
+    viewBox: "0 0 24 24",
+    width: "16",
+    height: "16",
+    "aria-hidden": "true",
+  });
+  pauseSvg.appendChild(
+    createSvgElement("circle", {
+      cx: "12",
+      cy: "12",
+      r: "10",
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+    })
+  );
+  pauseSvg.appendChild(
+    createSvgElement("rect", {
+      x: "9",
+      y: "8",
+      width: "2.4",
+      height: "8",
+      rx: "0.6",
+      fill: "currentColor",
+    })
+  );
+  pauseSvg.appendChild(
+    createSvgElement("rect", {
+      x: "12.6",
+      y: "8",
+      width: "2.4",
+      height: "8",
+      rx: "0.6",
+      fill: "currentColor",
+    })
+  );
+
+  btn.appendChild(playSvg);
+  btn.appendChild(pauseSvg);
+  btn.addEventListener("click", () => playPronunciation(word, btn));
+  return btn;
+}
+
 function setStatus(el, text, isError = false) {
   el.textContent = text;
   el.classList.toggle("is-error", isError);
@@ -283,6 +488,9 @@ function updatePromoteButton() {
 }
 
 function renderItems() {
+  if (activeAudioButton && els.itemsList.contains(activeAudioButton)) {
+    stopPronunciation();
+  }
   els.itemsList.replaceChildren();
   const items = state.items;
   const unpromotedCount = items.filter((it) => !it.promoted_entry_id).length;
@@ -320,6 +528,15 @@ function renderItems() {
     wordEl.className = "sp-item-word";
     wordEl.textContent = item.word;
     top.appendChild(wordEl);
+
+    if (item.ipa) {
+      const ipaEl = document.createElement("span");
+      ipaEl.className = "sp-item-ipa";
+      ipaEl.textContent = "/" + item.ipa + "/";
+      top.appendChild(ipaEl);
+    }
+
+    top.appendChild(createAudioButton(item.word));
 
     if (typeof item.timestamp_seconds === "number") {
       const tsBtn = document.createElement("button");
@@ -530,12 +747,16 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {})
       box.appendChild(linksRow);
     }
 
+    const ipaRow = document.createElement("div");
+    ipaRow.className = "sp-lookup-ipa-row";
     if (data.ipa) {
-      const ipaEl = document.createElement("div");
+      const ipaEl = document.createElement("span");
       ipaEl.className = "sp-lookup-ipa";
       ipaEl.textContent = "/" + data.ipa + "/";
-      box.appendChild(ipaEl);
+      ipaRow.appendChild(ipaEl);
     }
+    ipaRow.appendChild(createAudioButton(word));
+    box.appendChild(ipaRow);
 
     if (data.existing_entries && data.existing_entries.length) {
       data.existing_entries.forEach((entry) => {
@@ -640,6 +861,7 @@ function samePageUrl(urlA, urlB) {
 }
 
 async function loadPageForTab(tab) {
+  stopPronunciation();
   await flushPendingNotesSave();
 
   const gen = ++state.loadGeneration;

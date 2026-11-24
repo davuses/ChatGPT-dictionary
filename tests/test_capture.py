@@ -394,6 +394,9 @@ async def test_inbox_page_renders_captured_notes(
     assert "Delete page" in resp.text
     assert "inbox-edit-form" in resp.text
     assert "inbox-scratchpad-input" in resp.text
+    assert 'class="audio-btn audio-btn--sm inbox-audio-btn"' in resp.text
+    assert 'data-word="finances"' in resp.text
+    assert "ipa" in add_fin.json()["item"]
     assert add_fin.status_code == 201
 
 

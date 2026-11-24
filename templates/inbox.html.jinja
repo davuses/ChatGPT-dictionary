@@ -73,6 +73,25 @@
                 <div class="inbox-item-main">
                     <div class="inbox-item-head">
                         <strong class="inbox-item-word">{{ item.word }}</strong>
+                        {% set item_ipa = item_ipas.get(item.word, "") %}
+                        {% if item_ipa %}
+                        <span class="ipa inbox-item-ipa">/{{ item_ipa }}/</span>
+                        {% endif %}
+                        <button type="button"
+                            class="audio-btn audio-btn--sm inbox-audio-btn"
+                            data-word="{{ item.word }}"
+                            aria-label="Play pronunciation for {{ item.word }}"
+                            title="Play pronunciation">
+                            <svg class="icon-play" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+                                <polygon points="10,8 16.5,12 10,16" fill="currentColor" />
+                            </svg>
+                            <svg class="icon-pause" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+                                <rect x="9" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
+                                <rect x="12.6" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
+                            </svg>
+                        </button>
                         {% if item.timestamp_seconds is not none %}
                         {% set ts_url = note.url ~ ("&t=" if "?" in note.url else "?t=") ~ item.timestamp_seconds %}
                         <a class="inbox-ts-badge" href="{{ ts_url }}" target="_blank" rel="noopener noreferrer">{{ format_ts(item.timestamp_seconds) }}</a>
@@ -208,6 +227,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (triggerBtn) triggerBtn.disabled = false;
             });
     }
+
+    document.querySelectorAll(".inbox-audio-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            playWordPronunciation(btn.dataset.word || "", btn);
+        });
+    });
 
     document.querySelectorAll(".inbox-promote-one").forEach((btn) => {
         btn.addEventListener("click", () => promoteIds([Number(btn.dataset.itemId)], btn));

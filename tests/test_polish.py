@@ -68,6 +68,38 @@ def test_get_ipa_is_cached(monkeypatch):
         utils.get_IPA.cache_clear()
 
 
+def test_get_ipa_batch_single_call_and_error_fallback(monkeypatch):
+    utils.get_IPA.cache_clear()
+    batch_calls = []
+
+    def fake_phonemize(words, strip=True, with_stress=True):
+        batch_calls.append(words)
+        if isinstance(words, list):
+            return ["hˈʌŋkɚ dˈaʊn", "mˈaɪlɪdʒ"][: len(words)]
+        return "hˈʌŋkɚ dˈaʊn"
+
+    monkeypatch.setattr(utils, "phonemize", fake_phonemize)
+    try:
+        first = utils.get_IPA_batch(["hunker down", "mileage", "hunker down", ""])
+        assert first == {"hunker down": "hˈʌŋkɚ dˈaʊn", "mileage": "mˈaɪlɪdʒ"}
+        assert batch_calls == [["hunker down", "mileage"]]
+
+        # Cached entries hit memory without calling phonemize again
+        assert utils.get_IPA("mileage") == "mˈaɪlɪdʒ"
+        assert utils.get_IPA_batch(["mileage"]) == {"mileage": "mˈaɪlɪdʒ"}
+        assert len(batch_calls) == 1
+
+        # Failures degrade to "" without crashing or poisoning the cache
+        monkeypatch.setattr(
+            utils,
+            "phonemize",
+            lambda *_a, **_kw: (_ for _ in ()).throw(RuntimeError("espeak missing")),
+        )
+        assert utils.get_IPA_batch(["unseen"]) == {"unseen": ""}
+    finally:
+        utils.get_IPA.cache_clear()
+
+
 def test_get_notes_dir_resolves_relative_to_config_path(monkeypatch, tmp_path):
     config_file = tmp_path / "config.toml"
     config_file.write_text('notes_folder = "my_notes"\nmw_thesaurus_api_key = "k"\n')

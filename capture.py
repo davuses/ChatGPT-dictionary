@@ -23,6 +23,7 @@ from database import (
 from utils import (
     get_all_words,
     get_IPA,
+    get_IPA_batch,
     get_thesaurus_senses_plain,
     invalidate_quiz_pool_cache,
     invalidate_words_cache,
@@ -76,12 +77,15 @@ def _canonical_url_or_400(raw_url: str) -> str:
 
 
 def _serialize_item(
-    item: CaptureItemRecord, all_words: dict[str, list[int]]
+    item: CaptureItemRecord,
+    all_words: dict[str, list[int]],
+    ipa_map: dict[str, str] | None = None,
 ) -> dict[str, object]:
     return {
         "id": item.id,
         "page_note_id": item.page_note_id,
         "word": item.word,
+        "ipa": (ipa_map or {}).get(item.word, ""),
         "context": item.context,
         "definition_text": item.definition_text,
         "timestamp_seconds": item.timestamp_seconds,
@@ -107,6 +111,7 @@ def _serialize_page_note(
             "updated_at": None,
             "items": [],
         }
+    ipa_map = get_IPA_batch(item.word for item in note.items)
     return {
         "id": note.id,
         "url": note.url,
@@ -114,7 +119,7 @@ def _serialize_page_note(
         "notes_md": note.notes_md,
         "created_at": note.created_at,
         "updated_at": note.updated_at,
-        "items": [_serialize_item(item, all_words) for item in note.items],
+        "items": [_serialize_item(item, all_words, ipa_map) for item in note.items],
     }
 
 
@@ -190,10 +195,11 @@ def add_capture_item(
         timestamp_seconds=payload.timestamp_seconds,
     )
     all_words = get_all_words(current_user.id)
+    ipa_map = get_IPA_batch([item.word])
     return JSONResponse(
         {
             "url": note.url,
-            "item": _serialize_item(item, all_words),
+            "item": _serialize_item(item, all_words, ipa_map),
         },
         status_code=201,
         headers={"Cache-Control": "no-store"},
@@ -224,8 +230,9 @@ def patch_capture_item(
     if not updated:
         raise HTTPException(status_code=404, detail="Capture item not found")
     all_words = get_all_words(current_user.id)
+    ipa_map = get_IPA_batch([updated.word])
     return JSONResponse(
-        {"item": _serialize_item(updated, all_words)},
+        {"item": _serialize_item(updated, all_words, ipa_map)},
         headers={"Cache-Control": "no-store"},
     )
 

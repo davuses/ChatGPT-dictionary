@@ -4,7 +4,7 @@
 {% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
-{{ page_header(subtitle=total_quizzable ~ " quizzable " ~ ("entry" if total_quizzable == 1 else "entries"), show_inbox=True, show_account=True) }}
+{{ page_header(subtitle=total_quizzable ~ " quizzable " ~ ("entry" if total_quizzable == 1 else "entries")) }}
 
 <main class="review-page">
     <div class="review-header-row">

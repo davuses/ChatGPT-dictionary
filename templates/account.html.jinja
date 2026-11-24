@@ -4,7 +4,7 @@
 {% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
-{{ page_header(subtitle="Signed in as " ~ current_user.username ~ (" (admin)" if is_admin else ""), active="account", show_notes=True, show_inbox=True, show_admin=True) }}
+{{ page_header(subtitle="Signed in as " ~ current_user.username ~ (" (admin)" if is_admin else ""), active="account") }}
 
 <main class="account-page">
     <section class="card">

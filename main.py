@@ -103,6 +103,7 @@ from utils import (
     get_all_words,
     get_how_long_ago,
     get_IPA,
+    get_IPA_batch,
     get_notes_dir,
     get_thesaurus_senses,
     highlight_matches,
@@ -123,7 +124,7 @@ auth_settings = get_auth_settings()
 
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 PASSWORD_RESET_TTL_SECONDS = 24 * 60 * 60
-EXTENSION_VERSION = "0.1.0"
+EXTENSION_VERSION = "0.2.0"
 EXTENSION_DOWNLOAD_URL = (
     f"https://github.com/davuses/glossbook/releases/download/"
     f"extension-v{EXTENSION_VERSION}/glossbook-extension-v{EXTENSION_VERSION}.zip"
@@ -1367,9 +1368,13 @@ def inbox_page(
         for item in note.items
         if item.promoted_entry_id is not None
     )
+    item_ipas = get_IPA_batch(
+        item.word for note in page_notes for item in note.items
+    )
     context = {
         "page_notes": page_notes,
         "all_words": all_words,
+        "item_ipas": item_ipas,
         "promoted_count": promoted_count,
     }
     return templates.TemplateResponse(

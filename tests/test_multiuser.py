@@ -700,3 +700,12 @@ async def test_extension_onboarding_dismisses_after_token_created(admin_user):
         acct_after = await bob_c.get("/account")
         assert '<details class="extension-guide">' in acct_after.text
         assert '<details class="extension-guide" open>' not in acct_after.text
+
+        # Account menu is consistently reachable from /entries too, without Admin/Notes
+        entries_page = await bob_c.get("/entries")
+        assert entries_page.status_code == 200
+        assert 'class="nav-account-menu"' in entries_page.text
+        assert 'href="/account"' in entries_page.text
+        assert 'href="/inbox"' in entries_page.text
+        assert 'href="/admin"' not in entries_page.text
+        assert 'href="/notes/"' not in entries_page.text
