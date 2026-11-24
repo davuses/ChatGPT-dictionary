@@ -6,7 +6,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "jot-to-dictionary",
-      title: "Jot to My Dictionary",
+      title: "Jot to Glossbook",
       contexts: ["selection", "page"],
     });
   });

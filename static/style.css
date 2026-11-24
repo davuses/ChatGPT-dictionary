@@ -395,7 +395,7 @@ tr.selected {
 
 /* Shared by every page (see templates/_page_header.html.jinja). The site
  * brand is normally a styled paragraph, not a heading - only the dashboard
- * passes brand_as_h1, since "My Dictionary" is that page's actual subject;
+ * passes brand_as_h1, since "Glossbook" is that page's actual subject;
  * everywhere else the page's own content (a word, "Add Entry", "Not
  * Found"...) is the real <h1>. */
 .page-header {

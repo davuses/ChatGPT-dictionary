@@ -1,6 +1,6 @@
 {
-  "name": "My Dictionary",
-  "short_name": "My Dictionary",
+  "name": "Glossbook",
+  "short_name": "Glossbook",
   "description": "Personal English vocabulary builder and active-recall web app",
   "start_url": "/",
   "display": "standalone",

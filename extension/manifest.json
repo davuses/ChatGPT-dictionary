@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "My Dictionary Side Panel",
+  "name": "Glossbook Side Panel",
   "version": "0.1.0",
-  "description": "Per-page scratchpad notes and batch vocabulary capture for My Dictionary.",
+  "description": "Per-page scratchpad notes and batch vocabulary capture for Glossbook.",
   "permissions": [
     "sidePanel",
     "tabs",
@@ -27,7 +27,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Open My Dictionary Side Panel",
+    "default_title": "Open Glossbook Side Panel",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
@@ -40,7 +40,7 @@
       "suggested_key": {
         "default": "Alt+Shift+D"
       },
-      "description": "Capture selection or YouTube line into My Dictionary"
+      "description": "Capture selection or YouTube line into Glossbook"
     }
   }
 }

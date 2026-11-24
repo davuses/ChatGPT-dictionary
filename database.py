@@ -1768,7 +1768,7 @@ def db_promote_capture_items(
 
 
 def main():
-    parser = ArgumentParser(description="Database utility for My Dictionary")
+    parser = ArgumentParser(description="Database utility for Glossbook")
 
     subparsers = parser.add_subparsers(dest="mode", help="Mode selection")
     subparsers.add_parser("create-table")

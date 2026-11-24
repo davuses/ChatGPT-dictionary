@@ -1,4 +1,4 @@
-# My Dictionary
+# Glossbook
 
 [中文说明](README.zh-CN.md)
 

@@ -1,5 +1,5 @@
 [project]
-name = "chatgpt-dictionary"
+name = "glossbook"
 version = "0.1.0"
 description = "A private, personal English vocabulary builder and active-recall web app"
 readme = "README.md"
