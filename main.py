@@ -4,6 +4,7 @@ import time
 import urllib.parse
 from contextlib import asynccontextmanager
 from dataclasses import asdict, replace
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -14,6 +15,7 @@ from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
+    Response,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -55,6 +57,7 @@ from database import (
     db_add_entry,
     db_clear_review_bookmark,
     db_count_active_admins,
+    db_count_api_tokens,
     db_count_entries,
     db_count_entries_visited_since,
     db_count_undefined_entries,
@@ -63,6 +66,7 @@ from database import (
     db_create_password_reset_token,
     db_delete_definition,
     db_delete_entry,
+    db_get_all_entries,
     db_get_definition_by_id,
     db_get_entries_page,
     db_get_entry_by_id,
@@ -94,6 +98,8 @@ from utils import (
     EntryDisplay,
     QuizQuestion,
     build_directory_tree_markdown,
+    build_user_export_json,
+    build_user_export_markdown,
     get_all_words,
     get_how_long_ago,
     get_IPA,
@@ -108,6 +114,7 @@ from utils import (
     pick_review_session,
     render_safe_markdown,
     safe_path_note,
+    sanitize_export_slug,
     validate_entry_fields,
 )
 
@@ -116,6 +123,11 @@ auth_settings = get_auth_settings()
 
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 PASSWORD_RESET_TTL_SECONDS = 24 * 60 * 60
+EXTENSION_VERSION = "0.1.0"
+EXTENSION_DOWNLOAD_URL = (
+    f"https://github.com/davuses/glossbook/releases/download/"
+    f"extension-v{EXTENSION_VERSION}/glossbook-extension-v{EXTENSION_VERSION}.zip"
+)
 _SENSITIVE_TOKEN_HEADERS = {
     "Cache-Control": "no-store",
     "Referrer-Policy": "no-referrer",
@@ -170,6 +182,8 @@ templates = Jinja2Templates(
 )
 templates.env.globals["static_url"] = static_url
 templates.env.globals["how_long_ago"] = get_how_long_ago
+templates.env.globals["extension_version"] = EXTENSION_VERSION
+templates.env.globals["extension_download_url"] = EXTENSION_DOWNLOAD_URL
 
 protected_router = APIRouter(dependencies=[Depends(require_user)])
 admin_router = APIRouter(dependencies=[Depends(require_admin)])
@@ -660,6 +674,7 @@ def _wants_json_error(request: Request) -> bool:
     if route_response_class is not None and route_response_class not in (
         HTMLResponse,
         RedirectResponse,
+        Response,
     ):
         return True
     return False
@@ -752,6 +767,7 @@ def root_page(
             current_user.id, seven_days_ago
         ),
         "review_bookmark_entry_id": review_bookmark_entry_id,
+        "has_api_token": db_count_api_tokens(current_user.id) > 0,
         "question": question,
         "next_exclude": next_exclude,
     }
@@ -1381,6 +1397,8 @@ def _render_account(
         name="account.html.jinja",
         context={
             "api_tokens": db_list_api_tokens(current_user.id),
+            "entry_count": db_count_entries(current_user.id),
+            "server_url": str(request.base_url).rstrip("/"),
             "password_error": password_error,
             "password_notice": password_notice,
             "new_token": new_token,
@@ -1389,6 +1407,64 @@ def _render_account(
         status_code=status_code,
         headers={"Cache-Control": "no-store"},
     )
+
+
+def _export_user_dictionary(
+    request: Request, current_user: UserRecord, fmt: str
+) -> Response:
+    if request.headers.get("Sec-Fetch-Site") == "cross-site":
+        raise HTTPException(status_code=403, detail="Cross-site export blocked")
+
+    now = datetime.now(timezone.utc)
+    slug = sanitize_export_slug(current_user.username)
+    date_tag = now.strftime("%Y-%m-%d")
+    entries = db_get_all_entries(current_user.id)
+
+    if fmt == "json":
+        page_notes = db_list_page_notes(current_user.id, limit=None)
+        body = build_user_export_json(
+            username=current_user.username,
+            last_review_question_id=current_user.last_review_question_id,
+            exported_at=now,
+            entries=entries,
+            page_notes=page_notes,
+        )
+        media_type = "application/json; charset=utf-8"
+        filename = f"glossbook-{slug}-{date_tag}.json"
+    else:
+        body = build_user_export_markdown(
+            username=current_user.username,
+            exported_at=now,
+            entries=entries,
+        )
+        media_type = "text/markdown; charset=utf-8"
+        filename = f"glossbook-{slug}-{date_tag}.md"
+
+    return Response(
+        content=body,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@protected_router.get("/account/export.json", response_class=Response)
+def export_account_json(
+    request: Request,
+    current_user: UserRecord = Depends(require_user),
+):
+    return _export_user_dictionary(request, current_user, "json")
+
+
+@protected_router.get("/account/export.md", response_class=Response)
+def export_account_markdown(
+    request: Request,
+    current_user: UserRecord = Depends(require_user),
+):
+    return _export_user_dictionary(request, current_user, "md")
 
 
 @protected_router.get("/account", response_class=HTMLResponse)

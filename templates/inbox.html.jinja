@@ -26,6 +26,10 @@
     <section class="card">
         <h2>Inbox is empty</h2>
         <p>Notes and words you jot down with the Chrome Side Panel extension will show up here for batch review and promotion into your dictionary.</p>
+        <div class="form-actions">
+            <a class="button button-primary" href="/account#extension">Install Chrome extension</a>
+            <a class="button button-ghost" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">Download .zip</a>
+        </div>
     </section>
     {% else %}
     {% for note in page_notes %}

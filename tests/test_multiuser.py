@@ -545,3 +545,158 @@ async def test_login_rate_limiting(client):
         },
     )
     assert other.status_code == 303
+
+
+async def test_per_user_account_export_json_and_markdown(admin_user):
+    import json
+
+    # Admin private data that must never leak into Alice's export
+    admin_entry_id = database.db_add_entry(
+        admin_user.id,
+        "Admin private context - clandestine",
+        definition_text="Kept secret.",
+    )
+    database.db_upsert_page_note(
+        admin_user.id,
+        "https://example.com/admin-only",
+        "Admin Article",
+        "Admin private scratchpad",
+    )
+
+    alice = database.db_create_user("alice", auth.hash_password("alice-password-10"))
+    a1 = database.db_add_entry(
+        alice.id,
+        "We got a lot of mileage out of that model. - mileage",
+        definition_text="Practical value /mˈaɪlɪdʒ/.",
+        example_text="> How much mileage can you get out of it?",
+    )
+    database.db_add_definition(alice.id, a1, "Secondary sense.")
+    a2 = database.db_add_entry(alice.id, "laconic")
+    database.db_set_review_bookmark(alice.id, a1)
+    database.db_upsert_page_note(
+        alice.id,
+        "https://example.com/alice-read",
+        "Alice Reading",
+        "Alice scratchpad note",
+    )
+    database.db_add_capture_item(
+        alice.id,
+        normalized_url="https://example.com/alice-read",
+        title="Alice Reading",
+        word="terse",
+        context="A terse reply.",
+        definition_text="",
+        timestamp_seconds=None,
+    )
+
+    # Unauthenticated browser clicks redirect 303 to /login?next=... (not raw 401 JSON)
+    async with _new_client() as anon_c:
+        r_json_nav = await anon_c.get(
+            "/account/export.json", headers={"Accept": "text/html"}
+        )
+        assert r_json_nav.status_code == 303
+        assert "/login?next=%2Faccount%2Fexport.json" in r_json_nav.headers["location"]
+
+        r_md_nav = await anon_c.get(
+            "/account/export.md", headers={"Accept": "text/html"}
+        )
+        assert r_md_nav.status_code == 303
+        assert "/login?next=%2Faccount%2Fexport.md" in r_md_nav.headers["location"]
+
+        r_api = await anon_c.get(
+            "/account/export.json", headers={"Accept": "application/json"}
+        )
+        assert r_api.status_code == 401
+
+    async with _new_client() as alice_c:
+        await _login_as(alice_c, "alice", "alice-password-10")
+
+        acct = await alice_c.get("/account")
+        assert acct.status_code == 200
+        assert 'href="/account/export.json"' in acct.text
+        assert 'href="/account/export.md"' in acct.text
+        assert "download=" not in acct.text
+        assert "2 entries" in acct.text
+
+        # Cross-site navigation is rejected with 403
+        cross = await alice_c.get(
+            "/account/export.json", headers={"Sec-Fetch-Site": "cross-site"}
+        )
+        assert cross.status_code == 403
+
+        json_resp = await alice_c.get("/account/export.json")
+        assert json_resp.status_code == 200
+        assert "application/json" in json_resp.headers["content-type"]
+        assert 'attachment; filename="glossbook-alice-' in json_resp.headers["content-disposition"]
+        assert json_resp.headers["cache-control"] == "no-store"
+        assert json_resp.headers["x-content-type-options"] == "nosniff"
+        assert "password_hash" not in json_resp.text
+        assert "clandestine" not in json_resp.text
+        assert "Admin private scratchpad" not in json_resp.text
+
+        data = json.loads(json_resp.text)
+        assert data["app"] == "Glossbook"
+        assert data["username"] == "alice"
+        assert data["entry_count"] == 2
+        assert data["review_bookmark_entry_id"] == a1
+        assert [e["word"] for e in data["entries"]] == ["laconic", "mileage"]
+        mileage_entry = data["entries"][1]
+        assert mileage_entry["definitions"] == [
+            "Practical value /mˈaɪlɪdʒ/.",
+            "Secondary sense.",
+        ]
+        assert len(data["inbox_page_notes"]) == 1
+        assert data["inbox_page_notes"][0]["notes_md"] == "Alice scratchpad note"
+        assert data["inbox_page_notes"][0]["items"][0]["word"] == "terse"
+
+        # Dangling bookmark ID (e.g. pointing to another/hidden row) normalizes to None
+        database.db_set_review_bookmark(alice.id, a2)
+        with database.Session(database.engine) as s:
+            row = s.get(database.Entry, a2)
+            row.is_hidden = True
+            s.commit()
+        json_after_hide = json.loads((await alice_c.get("/account/export.json")).text)
+        assert json_after_hide["review_bookmark_entry_id"] is None
+        assert admin_entry_id not in {e["id"] for e in json_after_hide["entries"]}
+
+        md_resp = await alice_c.get("/account/export.md")
+        assert md_resp.status_code == 200
+        assert "text/markdown" in md_resp.headers["content-type"]
+        assert 'attachment; filename="glossbook-alice-' in md_resp.headers["content-disposition"]
+        assert "# Glossbook — alice" in md_resp.text
+        assert "## mileage" in md_resp.text
+        assert "> **Context:** We got a lot of mileage out of that model." in md_resp.text
+        assert "### Definition" in md_resp.text
+        assert "### Example" in md_resp.text
+        assert "clandestine" not in md_resp.text
+
+
+async def test_extension_onboarding_dismisses_after_token_created(admin_user):
+    bob = database.db_create_user("bob", auth.hash_password("bob-password-10"))
+
+    async with _new_client() as bob_c:
+        await _login_as(bob_c, "bob", "bob-password-10")
+
+        dash_before = await bob_c.get("/")
+        assert dash_before.status_code == 200
+        assert "extension-promo-card" in dash_before.text
+        assert main.EXTENSION_DOWNLOAD_URL in dash_before.text
+        assert 'href="/account#extension"' in dash_before.text
+
+        acct_before = await bob_c.get("/account")
+        assert '<details class="extension-guide" open>' in acct_before.text
+        assert main.EXTENSION_DOWNLOAD_URL in acct_before.text
+
+        inbox_empty = await bob_c.get("/inbox")
+        assert 'href="/account#extension"' in inbox_empty.text
+
+        # Creating an API token dismisses the dashboard promo and collapses the guide
+        _, digest = auth.generate_opaque_token()
+        database.db_create_api_token(bob.id, "Laptop", digest)
+
+        dash_after = await bob_c.get("/")
+        assert "extension-promo-card" not in dash_after.text
+
+        acct_after = await bob_c.get("/account")
+        assert '<details class="extension-guide">' in acct_after.text
+        assert '<details class="extension-guide" open>' not in acct_after.text

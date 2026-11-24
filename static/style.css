@@ -1291,3 +1291,37 @@ input[type="submit"]:hover {
   font-size: 12px;
   padding: 1px 5px;
 }
+
+.extension-guide {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  margin: 12px 0 14px;
+  padding: 10px 14px;
+}
+
+.extension-guide summary {
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.extension-steps {
+  color: var(--ink);
+  font-size: 15px;
+  margin: 10px 0 2px;
+  padding-left: 20px;
+}
+
+.extension-steps li {
+  margin-bottom: 6px;
+}
+
+.extension-steps code {
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 13px;
+  padding: 1px 5px;
+}

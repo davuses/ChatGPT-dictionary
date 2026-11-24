@@ -8,8 +8,27 @@
 
 <main class="account-page">
     <section class="card">
+        <h2>Export Dictionary</h2>
+        <p class="page-subtitle">Download an offline copy of your {{ entry_count }} {{ "entry" if entry_count == 1 else "entries" }} (JSON includes <code>/inbox</code> page notes and visit stats; Markdown formats a clean study notebook).</p>
+        <div class="form-actions">
+            <a class="button button-primary" href="/account/export.json">Download JSON</a>
+            <a class="button button-ghost" href="/account/export.md">Download Markdown</a>
+        </div>
+    </section>
+
+    <section class="card" id="extension">
         <h2>Chrome Side Panel API Tokens</h2>
         <p class="page-subtitle">Generate a separate token per device (e.g. Laptop Chrome, Desktop Chrome). Tokens are only shown once when created.</p>
+
+        <details class="extension-guide"{% if not api_tokens %} open{% endif %}>
+            <summary>How to install the Chrome extension (v{{ extension_version }})</summary>
+            <ol class="extension-steps">
+                <li><a href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">Download <code>glossbook-extension-v{{ extension_version }}.zip</code></a> and unzip it.</li>
+                <li>Open <code>chrome://extensions</code> in Chrome and enable <strong>Developer mode</strong> (top right).</li>
+                <li>Click <strong>Load unpacked</strong> and select the extracted folder (the one containing <code>manifest.json</code>).</li>
+                <li>Generate a token below, click the Glossbook icon to open the Side Panel, open <strong>Settings</strong>, enter server URL <code>{{ server_url }}</code> and your token, then click <strong>Save &amp; test</strong>.</li>
+            </ol>
+        </details>
 
         {% if new_token %}
         <div class="secret-box" role="status">

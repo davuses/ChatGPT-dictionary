@@ -26,6 +26,17 @@
 </section>
 {% endblock dashboard_widgets %}
 
+{% if not has_api_token %}
+<section class="card extension-promo-card">
+    <h2>Capture words with the Chrome Side Panel</h2>
+    <p>Jot down vocabulary from articles and YouTube transcripts right alongside what you're reading or watching, then batch-add them to Glossbook.</p>
+    <div class="quiz-actions">
+        <a class="button button-primary" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">Download extension (.zip)</a>
+        <a class="button button-ghost" href="/account#extension">Get API token &amp; install guide</a>
+    </div>
+</section>
+{% endif %}
+
 {% if review_bookmark_entry_id %}
 <p class="dashboard-secondary-action">Pick up where you left off &mdash; <a href="/resume_review">Resume from last mark</a></p>
 {% endif %}

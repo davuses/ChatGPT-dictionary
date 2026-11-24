@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import random
@@ -7,7 +8,8 @@ import time
 import tomllib
 import urllib.parse
 from collections.abc import Collection
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
@@ -21,6 +23,8 @@ from phonemizer import phonemize
 from database import (
     Entry,
     EntrySummary,
+    PageNoteRecord,
+    SCHEMA_VERSION,
     db_get_all_entries,
     db_get_entry_visit_stats,
     db_get_primary_definitions_by_entry_ids,
@@ -820,3 +824,85 @@ def highlight_ipa(html: str) -> str:
         text_node.replace_with(*nodes)
 
     return str(soup)
+
+
+def sanitize_export_slug(username: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", username.strip()).strip(".-")[:40]
+    return slug or "user"
+
+
+def build_user_export_json(
+    *,
+    username: str,
+    last_review_question_id: int | None,
+    exported_at: datetime,
+    entries: list[Entry],
+    page_notes: list[PageNoteRecord],
+) -> str:
+    entry_ids = {entry.id for entry in entries}
+    bookmark_id = (
+        last_review_question_id if last_review_question_id in entry_ids else None
+    )
+    exported_entries = []
+    for entry in entries:
+        context_text, word = parse_entry_text(entry.text)
+        exported_entries.append(
+            {
+                "id": entry.id,
+                "word": word,
+                "context": context_text,
+                "text": entry.text,
+                "definitions": [d.text for d in entry.definitions],
+                "example": entry.example,
+                "visit_count": entry.visit_count or 0,
+                "last_visit": entry.last_visit,
+            }
+        )
+
+    payload = {
+        "app": "Glossbook",
+        "schema_version": SCHEMA_VERSION,
+        "exported_at": exported_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "username": username,
+        "review_bookmark_entry_id": bookmark_id,
+        "entry_count": len(exported_entries),
+        "entries": exported_entries,
+        "inbox_page_notes": [asdict(note) for note in page_notes],
+    }
+    return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+
+
+def build_user_export_markdown(
+    *,
+    username: str,
+    exported_at: datetime,
+    entries: list[Entry],
+) -> str:
+    clean_user = " ".join(username.split()) or "User"
+    date_str = exported_at.strftime("%Y-%m-%d")
+    count = len(entries)
+    lines = [
+        f"# Glossbook — {clean_user}",
+        "",
+        f"Exported on {date_str} UTC · {count} {'entry' if count == 1 else 'entries'}",
+    ]
+    if not entries:
+        lines.extend(["", "_No entries saved yet._"])
+        return "\n".join(lines) + "\n"
+
+    for entry in entries:
+        context_text, word = parse_entry_text(entry.text)
+        heading_word = " ".join(word.split()) or " ".join(entry.text.split())
+        clean_context = " ".join(context_text.split())
+        defs = [d.text.strip() for d in entry.definitions if d.text and d.text.strip()]
+        clean_example = (entry.example or "").strip()
+
+        lines.extend(["", "---", "", f"## {heading_word}"])
+        if clean_context:
+            lines.extend(["", f"> **Context:** {clean_context}"])
+        if defs:
+            lines.extend(["", "### Definition", "", "\n\n".join(defs)])
+        if clean_example:
+            lines.extend(["", "### Example", "", clean_example])
+
+    return "\n".join(lines) + "\n"

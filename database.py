@@ -814,6 +814,16 @@ def db_list_api_tokens(user_id: int) -> list[ApiTokenRecord]:
         return [_to_api_token_record(t) for t in tokens]
 
 
+def db_count_api_tokens(user_id: int) -> int:
+    with Session(engine) as session:
+        return (
+            session.query(func.count(ApiToken.id))
+            .filter(ApiToken.user_id == user_id)
+            .scalar()
+            or 0
+        )
+
+
 def db_revoke_api_token(user_id: int, token_id: int) -> bool:
     with Session(engine) as session:
         deleted = (
@@ -1542,16 +1552,19 @@ def db_get_page_note_by_url(
         return _to_page_note_record(note) if note else None
 
 
-def db_list_page_notes(user_id: int, limit: int = 100) -> list[PageNoteRecord]:
+def db_list_page_notes(
+    user_id: int, limit: int | None = 100
+) -> list[PageNoteRecord]:
     with Session(engine) as session:
-        notes = (
+        query = (
             session.query(PageNote)
             .options(joinedload(PageNote.items))
             .filter(PageNote.user_id == user_id)
             .order_by(PageNote.updated_at.desc(), PageNote.id.desc())
-            .limit(limit)
-            .all()
         )
+        if limit is not None:
+            query = query.limit(limit)
+        notes = query.all()
         return [_to_page_note_record(note) for note in notes]
 
 
