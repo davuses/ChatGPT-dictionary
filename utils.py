@@ -23,6 +23,7 @@ from database import (
     EntrySummary,
     db_get_all_entries,
     db_get_entry_visit_stats,
+    db_get_primary_definitions_by_entry_ids,
     db_get_quiz_source_entries,
 )
 from thesaurus import ThesaurusSense, fetch_thesaurus_senses, lookup_thesaurus
@@ -262,6 +263,21 @@ def _blank_word(sentence: str, word: str) -> tuple[str, str]:
     return pattern.sub("_____", sentence), display_word
 
 
+def _split_cloze_sentence(
+    sentence: str, word: str
+) -> tuple[list[str], list[str], str]:
+    """Split `sentence` around whole-word matches of `word`.
+
+    Returns (parts, matches, blanked_sentence) where len(parts) == len(matches) + 1,
+    so the UI can show `blanked_sentence` before reveal and reconstruct the filled
+    sentence with safe DOM text + `<strong>` nodes on reveal.
+    """
+    pattern = re.compile(r"(?<!\w)" + re.escape(word) + r"(?!\w)", re.IGNORECASE)
+    parts = pattern.split(sentence)
+    matches = pattern.findall(sentence)
+    return parts, matches, "_____".join(parts)
+
+
 # Lexicographic metadata labels seen in this data ("Related: rosy, ...",
 # "ADJ: ...", "SYN: pillage, plunder"), as opposed to a real sentence.
 # Deliberately a specific denylist rather than a general "Word:" pattern —
@@ -333,6 +349,17 @@ class QuizQuestion:
     entry_id: int
     word: str
     blanked_sentence: str
+
+
+@dataclass(frozen=True)
+class ReviewCard:
+    entry_id: int
+    headword: str
+    ipa: str
+    blanked_sentence: str
+    sentence_parts: list[str]
+    sentence_matches: list[str]
+    definition_html: str
 
 
 _cached_quiz_pool: dict[int, list[QuizCandidate]] = {}
@@ -454,6 +481,95 @@ def pick_random_question(
     if not candidate:
         return None
     return _question_from_candidate(candidate, random)
+
+
+def _pick_weighted_candidates(
+    pool: list[QuizCandidate],
+    visit_stats: dict[int, tuple[int, int | None]],
+    limit: int,
+    exclude_entry_ids: Collection[int] = frozenset(),
+    *,
+    now: int | None = None,
+    rng: random.Random = random,
+) -> tuple[list[QuizCandidate], int]:
+    """Sample up to `limit` distinct quiz candidates without replacement using
+    log-space Efraimidis-Spirakis keys (`-rng.expovariate(weight)`), avoiding
+    float underflow on small cooldown weights. Returns (chosen, active_pool_size)."""
+    active_pool = [c for c in pool if c.entry_id in visit_stats]
+    if not active_pool or limit <= 0:
+        return [], len(active_pool)
+
+    target = min(limit, len(active_pool))
+    current_time = int(time.time()) if now is None else now
+
+    def _sample_subset(
+        candidates: list[QuizCandidate], k: int
+    ) -> list[QuizCandidate]:
+        if k <= 0 or not candidates:
+            return []
+        keyed = [
+            (
+                -rng.expovariate(
+                    max(_quiz_weight(*visit_stats[c.entry_id], now=current_time), 1e-12)
+                ),
+                c,
+            )
+            for c in candidates
+        ]
+        keyed.sort(key=lambda item: item[0], reverse=True)
+        return [c for _, c in keyed[:k]]
+
+    excluded = set(exclude_entry_ids)
+    fresh = [c for c in active_pool if c.entry_id not in excluded]
+    picked = _sample_subset(fresh, target)
+    if len(picked) < target:
+        fallback = [c for c in active_pool if c.entry_id in excluded]
+        picked.extend(_sample_subset(fallback, target - len(picked)))
+    return picked, len(active_pool)
+
+
+def pick_review_session(
+    user_id: int,
+    limit: int = 10,
+    exclude_entry_ids: Collection[int] = frozenset(),
+    *,
+    rng: random.Random = random,
+) -> tuple[list[ReviewCard], int]:
+    pool = get_quiz_pool(user_id)
+    if not pool:
+        return [], 0
+    visit_stats = db_get_entry_visit_stats(user_id)
+    chosen, active_count = _pick_weighted_candidates(
+        pool, visit_stats, limit, exclude_entry_ids, rng=rng
+    )
+    if not chosen:
+        return [], active_count
+
+    definitions_by_id = db_get_primary_definitions_by_entry_ids(
+        user_id, [c.entry_id for c in chosen]
+    )
+    cards: list[ReviewCard] = []
+    for candidate in chosen:
+        sentence = normalize_pronoun_casing(rng.choice(candidate.sentences))
+        parts, matches, blanked = _split_cloze_sentence(sentence, candidate.word)
+        raw_def = definitions_by_id.get(candidate.entry_id, "")
+        definition_html = (
+            render_safe_markdown(raw_def, extras=["strike", "tables"], wrap_ipa=True)
+            if raw_def
+            else ""
+        )
+        cards.append(
+            ReviewCard(
+                entry_id=candidate.entry_id,
+                headword=candidate.word,
+                ipa=get_IPA(candidate.word),
+                blanked_sentence=blanked,
+                sentence_parts=parts,
+                sentence_matches=matches,
+                definition_html=definition_html,
+            )
+        )
+    return cards, active_count
 
 
 def get_how_long_ago(timestamp: int | None, now: int | None = None) -> str:

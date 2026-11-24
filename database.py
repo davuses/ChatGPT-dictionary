@@ -18,6 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
     event,
+    exists,
     func,
     or_,
     update,
@@ -222,6 +223,7 @@ class Entry(Base):
         "Definition",
         back_populates="entry",
         lazy="joined",
+        order_by="Definition.id.asc()",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
@@ -246,7 +248,7 @@ class Definition(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     text: Mapped[str] = mapped_column(String, nullable=False)
     question_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("question.id", ondelete="CASCADE")
+        Integer, ForeignKey("question.id", ondelete="CASCADE"), index=True
     )
     entry: Mapped[Entry] = relationship(Entry, back_populates="definitions")
 
@@ -581,6 +583,9 @@ def create_tables(target_engine: Engine | None = None) -> None:
     eng = target_engine or engine
     Base.metadata.create_all(eng)
     with eng.begin() as conn:
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_answer_question_id ON answer (question_id)"
+        )
         current_version = conn.exec_driver_sql("PRAGMA user_version").scalar() or 0
         if current_version < SCHEMA_VERSION:
             conn.exec_driver_sql(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -1101,6 +1106,20 @@ def db_count_entries(user_id: int) -> int:
         )
 
 
+def db_count_undefined_entries(user_id: int) -> int:
+    with Session(engine) as session:
+        return (
+            session.query(func.count(Entry.id))
+            .filter(
+                Entry.user_id == user_id,
+                Entry.is_hidden == False,
+                ~exists().where(Definition.question_id == Entry.id),
+            )
+            .scalar()
+            or 0
+        )
+
+
 def db_get_entry_page_number(
     user_id: int, entry_id: int, page_size: int = ENTRIES_PAGE_SIZE
 ) -> int | None:
@@ -1132,6 +1151,7 @@ def db_get_entries_page(
     user_id: int,
     query: str = "",
     include_examples: bool = False,
+    needs_definition: bool = False,
     page: int = 1,
     page_size: int = ENTRIES_PAGE_SIZE,
 ) -> tuple[list[EntrySummary], int]:
@@ -1144,6 +1164,10 @@ def db_get_entries_page(
         base_query = session.query(*columns).filter(
             Entry.user_id == user_id, Entry.is_hidden == False
         )
+        if needs_definition:
+            base_query = base_query.filter(
+                ~exists().where(Definition.question_id == Entry.id)
+            )
 
         query = query.strip()
         if query:
@@ -1442,6 +1466,28 @@ def db_get_entries_by_ids(
             for row in rows
         }
         return [by_id[eid] for eid in entry_ids if eid in by_id]
+
+
+def db_get_primary_definitions_by_entry_ids(
+    user_id: int, entry_ids: list[int]
+) -> dict[int, str]:
+    """Return {entry_id: first_definition_text} for active entries owned by `user_id`."""
+    if not entry_ids:
+        return {}
+    with Session(engine) as session:
+        entries = (
+            session.query(Entry)
+            .filter(
+                Entry.user_id == user_id,
+                Entry.is_hidden == False,
+                Entry.id.in_(entry_ids),
+            )
+            .all()
+        )
+        return {
+            entry.id: (entry.definitions[0].text if entry.definitions else "")
+            for entry in entries
+        }
 
 
 # ---------------------------------------------------------------------------

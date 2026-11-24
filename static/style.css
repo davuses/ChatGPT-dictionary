@@ -100,6 +100,10 @@ body.page-narrow {
   width: 1px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 button,
 .button {
   align-items: center;
@@ -486,9 +490,21 @@ tr.selected {
   margin: 0 0 10px;
 }
 
+.card .section-header {
+  margin-bottom: 10px;
+}
+
+.card .section-header h2 {
+  margin: 0;
+}
+
 .card p {
   color: var(--muted);
   margin: 0 0 12px;
+}
+
+.card .markdown-body p {
+  color: var(--ink);
 }
 
 .quiz-sentence {
@@ -1183,4 +1199,95 @@ input[type="submit"]:hover {
 .status-expired {
   background: #fef2f2;
   color: #991b1b;
+}
+
+/* Focused /review session */
+.quiz-filled-word {
+  background: #e4f1f6;
+  border-radius: 3px;
+  color: var(--accent-dark);
+  padding: 0 4px;
+}
+
+.review-header-row {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 14px 0 8px;
+}
+
+.review-title {
+  font-family: "BBC Reith Serif", serif;
+  font-size: 26px;
+  margin: 0;
+}
+
+.review-counter {
+  color: var(--muted);
+  font-family: monospace;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-progress {
+  background: var(--border-subtle);
+  border-radius: 999px;
+  height: 5px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.review-progress-fill {
+  background: var(--accent);
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.review-answer-panel {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.review-answer-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.review-headword {
+  color: var(--ink);
+  font-family: "BBC Reith Serif", serif;
+  font-size: 22px;
+  margin-right: 8px;
+}
+
+.review-definition {
+  margin-bottom: 14px;
+}
+
+.review-no-definition {
+  color: var(--muted);
+  font-size: 15px;
+  margin: 0 0 14px;
+}
+
+.review-shortcuts {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 14px 0 0;
+}
+
+.review-shortcuts kbd {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 1px 5px;
 }

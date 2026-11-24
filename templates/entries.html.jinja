@@ -5,6 +5,8 @@
 Entries Only
 {%- elif show_example -%}
 Show Example
+{%- elif needs_definition -%}
+Needs Definition
 {%- else -%}
 Glossbook
 {%- endif -%}
@@ -20,17 +22,18 @@ Glossbook
 <form class="search-form" role="search" action="/entries" method="get">
     {% if entries_only %}<input type="hidden" name="entries_only" value="true">{% endif %}
     {% if show_example %}<input type="hidden" name="show_example" value="true">{% endif %}
+    {% if needs_definition %}<input type="hidden" name="needs_definition" value="true">{% endif %}
     <input type="search"
         name="q"
         value="{{ search_query }}"
         placeholder="Search words, context, or examples&hellip;"
         aria-label="Search entries">
     <button class="button button-primary" type="submit">Search</button>
-    <a class="button button-ghost" id="clear-search-link" href="/entries{% if entries_only %}?entries_only=true{% elif show_example %}?show_example=true{% endif %}"{% if not search_query %} hidden{% endif %}>Clear</a>
+    <a class="button button-ghost" id="clear-search-link" href="/entries{% if entries_only %}?entries_only=true{% elif show_example %}?show_example=true{% elif needs_definition %}?needs_definition=true{% endif %}"{% if not search_query %} hidden{% endif %}>Clear</a>
 </form>
 
 <nav class="view-tabs" aria-label="Entry views">
-    <a class="view-tab {% if not entries_only and not show_example %}active{% endif %}"
+    <a class="view-tab {% if not entries_only and not show_example and not needs_definition %}active{% endif %}"
         id="tab-all"
         href="/entries{{ view_qs('?') }}">All</a>
     <a class="view-tab {% if entries_only %}active{% endif %}"
@@ -39,6 +42,9 @@ Glossbook
     <a class="view-tab {% if show_example %}active{% endif %}"
         id="tab-examples"
         href="/entries?show_example=true{{ view_qs('&') }}">Examples</a>
+    <a class="view-tab {% if needs_definition %}active{% endif %}"
+        id="tab-needs-definition"
+        href="/entries?needs_definition=true{{ view_qs('&') }}">Needs Definition{% if undefined_count > 0 %}<span id="undefined-count-badge" data-count="{{ undefined_count }}"{% if search_query %} hidden{% endif %}> ({{ undefined_count }})</span>{% endif %}</a>
 </nav>
 
 <div id="results">
@@ -113,12 +119,15 @@ Glossbook
 
         const entriesOnlyInput = form.querySelector('input[name="entries_only"]');
         const showExampleInput = form.querySelector('input[name="show_example"]');
+        const needsDefinitionInput = form.querySelector('input[name="needs_definition"]');
         const countEl = document.getElementById("results-count");
         const clearLink = document.getElementById("clear-search-link");
+        const undefinedBadge = document.getElementById("undefined-count-badge");
         const tabs = {
             all: document.getElementById("tab-all"),
             entries_only: document.getElementById("tab-entries-only"),
             show_example: document.getElementById("tab-examples"),
+            needs_definition: document.getElementById("tab-needs-definition"),
         };
 
         let debounceTimer = null;
@@ -138,6 +147,7 @@ Glossbook
             if (query) url.searchParams.set("q", query);
             if (entriesOnlyInput) url.searchParams.set("entries_only", "true");
             if (showExampleInput) url.searchParams.set("show_example", "true");
+            if (needsDefinitionInput) url.searchParams.set("needs_definition", "true");
 
             fetchJson(url, {
                 headers: { "X-Requested-With": "XMLHttpRequest" },
@@ -156,6 +166,7 @@ Glossbook
                     data.count + (data.matching ? " matching entries" : " entries");
             }
             if (clearLink) clearLink.hidden = !data.matching;
+            if (undefinedBadge) undefinedBadge.hidden = data.matching;
 
             for (const tab of Object.values(tabs)) {
                 if (!tab) continue;
@@ -233,6 +244,25 @@ Glossbook
             }).then(handleProtectedResponse).then((Response) => {
                 if (Response.ok) {
                     selectedRow.parentNode.removeChild(selectedRow);
+                    const countEl = document.getElementById("results-count");
+                    if (countEl) {
+                        const match = countEl.textContent.match(/^(\d+)(\s+.*)$/);
+                        if (match) {
+                            countEl.textContent = Math.max(0, Number(match[1]) - 1) + match[2];
+                        }
+                    }
+                    if (document.querySelector('input[name="needs_definition"]')) {
+                        const badge = document.getElementById("undefined-count-badge");
+                        if (badge) {
+                            const nextUndef = Math.max(0, Number(badge.dataset.count || 0) - 1);
+                            badge.dataset.count = String(nextUndef);
+                            if (nextUndef > 0) {
+                                badge.textContent = " (" + nextUndef + ")";
+                            } else {
+                                badge.remove();
+                            }
+                        }
+                    }
                 }
             });
         }

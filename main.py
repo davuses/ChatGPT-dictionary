@@ -3,7 +3,7 @@ import logging
 import time
 import urllib.parse
 from contextlib import asynccontextmanager
-from dataclasses import replace
+from dataclasses import asdict, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -57,6 +57,7 @@ from database import (
     db_count_active_admins,
     db_count_entries,
     db_count_entries_visited_since,
+    db_count_undefined_entries,
     db_create_api_token,
     db_create_invite_token,
     db_create_password_reset_token,
@@ -104,6 +105,7 @@ from utils import (
     normalize_pronoun_casing,
     parse_entry_text,
     pick_random_question,
+    pick_review_session,
     render_safe_markdown,
     safe_path_note,
     validate_entry_fields,
@@ -791,26 +793,104 @@ def quiz_mark_seen(
     return {"recorded": recorded}
 
 
+REVIEW_DEFAULT_SIZE = 10
+REVIEW_EXCLUDE_HISTORY_SIZE = 40
+
+
+@protected_router.get("/review", response_class=HTMLResponse)
+def review_page(
+    request: Request,
+    size: int = Query(REVIEW_DEFAULT_SIZE, ge=1, le=25),
+    exclude: str = Query(""),
+    current_user: UserRecord = Depends(require_user),
+):
+    exclude_ids_ordered = [
+        int(x) for x in exclude.split(",") if x.strip().isdigit()
+    ]
+    exclude_ids_ordered = list(dict.fromkeys(exclude_ids_ordered))
+
+    cards, total_quizzable = pick_review_session(
+        current_user.id,
+        limit=size,
+        exclude_entry_ids=set(exclude_ids_ordered),
+    )
+    combined_exclude = list(
+        dict.fromkeys(exclude_ids_ordered + [c.entry_id for c in cards])
+    )
+    next_exclude = ",".join(
+        str(eid) for eid in combined_exclude[-REVIEW_EXCLUDE_HISTORY_SIZE:]
+    )
+
+    another_round_params: dict[str, str | int] = {}
+    if size != REVIEW_DEFAULT_SIZE:
+        another_round_params["size"] = size
+    if next_exclude:
+        another_round_params["exclude"] = next_exclude
+    another_round_url = "/review" + (
+        "?" + urllib.parse.urlencode(another_round_params)
+        if another_round_params
+        else ""
+    )
+
+    context = {
+        "cards_json": [asdict(card) for card in cards],
+        "card_count": len(cards),
+        "total_quizzable": total_quizzable,
+        "session_size": size,
+        "another_round_url": another_round_url,
+        "needs_markdown_css": True,
+    }
+    return templates.TemplateResponse(
+        request=request,
+        name="review.html.jinja",
+        context=context,
+        headers={"Cache-Control": "private, no-cache"},
+    )
+
+
 @protected_router.get("/entries", response_class=HTMLResponse)
 def entries_page(
     request: Request,
     show_example: bool = Query(False),
     entries_only: bool = Query(False),
+    needs_definition: bool = Query(False),
     q: str = Query(""),
     page: int = Query(1, ge=1),
     current_user: UserRecord = Depends(require_user),
 ):
+    if needs_definition:
+        entries_only = False
+        show_example = False
+    elif entries_only:
+        show_example = False
+
     entries, total_count = db_get_entries_page(
-        current_user.id, query=q, include_examples=show_example, page=page
+        current_user.id,
+        query=q,
+        include_examples=show_example,
+        needs_definition=needs_definition,
+        page=page,
     )
     total_pages = max(1, -(-total_count // ENTRIES_PAGE_SIZE))
     if page > total_pages:
         page = total_pages
         if total_count > 0:
             entries, total_count = db_get_entries_page(
-                current_user.id, query=q, include_examples=show_example, page=page
+                current_user.id,
+                query=q,
+                include_examples=show_example,
+                needs_definition=needs_definition,
+                page=page,
             )
     q_stripped = q.strip()
+    is_xhr = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    if is_xhr:
+        undefined_count = 0
+    elif needs_definition and not q_stripped:
+        undefined_count = total_count
+    else:
+        undefined_count = db_count_undefined_entries(current_user.id)
+
     review_bookmark_entry_id = get_review_bookmark(current_user.id)
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
@@ -838,6 +918,8 @@ def entries_page(
         "entry_displays": entry_displays,
         "entries_only": entries_only,
         "show_example": show_example,
+        "needs_definition": needs_definition,
+        "undefined_count": undefined_count,
         "review_bookmark_entry_id": review_bookmark_entry_id,
         "search_query": q,
         "page": page,
@@ -846,7 +928,7 @@ def entries_page(
         "has_next_page": page < total_pages,
     }
 
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+    if is_xhr:
         results_html = templates.env.get_template(
             "_entries_results.html.jinja"
         ).render(context)

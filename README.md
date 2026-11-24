@@ -10,13 +10,13 @@ A private, personal English vocabulary builder and active-recall web app, built 
 ## Features
 
 - **Entries & definitions** — add words/phrases, write your own Markdown-formatted definitions, and attach real-world context and usage examples
-- **Fill-in-the-blank quiz** — low-pressure active-recall cards right on the dashboard, pulling sentences from your own saved contexts and examples
+- **Fill-in-the-blank quiz & review sessions** — low-pressure active-recall cards on the dashboard plus a keyboard-driven `/review` session mode, pulling sentences from your own saved contexts and examples
 - **Live search** — instant search across words, contexts, and examples with match highlighting
 - **IPA transcription & audio** — automatic phonetic transcription via [phonemizer](https://github.com/bootphon/phonemizer) with pronunciation playback
 - **Thesaurus lookup** — pull synonyms and sense definitions from the Merriam-Webster Thesaurus API, cross-linked to words already in your dictionary
 - **Review bookmark** — mark your place in the entry list and jump back to it later
 - **Visit tracking** — each entry tracks visit count and last-visited time
-- **Multiple views** — browse all entries, entries-only, or entries with examples
+- **Multiple views** — browse all entries, entries-only, entries with examples, or the **Needs Definition** backlog for newly captured words
 - **Study notes** — browse and edit a folder of personal English study Markdown notes with a generated table of contents (admin-only)
 - **Invite-only multi-user** — generate one-time invite links and password reset links from `/admin`; each user gets a completely isolated dictionary, quiz, `/inbox`, and per-device Chrome extension API tokens under `/account`
 - **Markdown editing** — definitions, examples, and study notes are edited with [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) (sanitized with `nh3` on render), while entries use quick plain-text word and context fields

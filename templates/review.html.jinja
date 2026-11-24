@@ -1,0 +1,240 @@
+{% extends "base.html.jinja" %}
+{% from "_page_header.html.jinja" import page_header with context %}
+{% block title %}Review Session{% endblock title %}
+{% block body_class %}page-narrow{% endblock body_class %}
+
+{% block body %}
+{{ page_header(subtitle=total_quizzable ~ " quizzable " ~ ("entry" if total_quizzable == 1 else "entries"), show_inbox=True, show_account=True) }}
+
+<main class="review-page">
+    <div class="review-header-row">
+        <h1 class="review-title">Review Session</h1>
+        {% if card_count > 0 %}
+        <span class="review-counter" id="review-counter">Card 1 of {{ card_count }}</span>
+        {% endif %}
+    </div>
+
+    {% if card_count == 0 %}
+    <section class="card">
+        <p class="quiz-empty">No quizzable entries yet &mdash; add context sentences or usage examples to <a href="/entries">your entries</a> or <a href="/add_entry">add a new entry</a> first.</p>
+    </section>
+    {% else %}
+    <section class="card" id="review-card">
+        <div class="review-progress" aria-hidden="true">
+            <div class="review-progress-fill" id="review-progress-fill" style="width: {{ (100 / card_count) | round(2) }}%"></div>
+        </div>
+
+        <p class="quiz-sentence" id="review-sentence">{{ cards_json[0].blanked_sentence }}</p>
+
+        <div class="quiz-actions" id="review-prompt-actions">
+            <button type="button" class="button button-primary" id="review-reveal-btn">Show answer</button>
+            <button type="button" class="button button-ghost" id="review-skip-btn">Skip</button>
+        </div>
+
+        <div class="review-answer-panel" id="review-answer-panel" hidden>
+            <div class="review-answer-header">
+                <div>
+                    <strong class="review-headword" id="review-headword"></strong>
+                    <span class="ipa-text" id="review-ipa"></span>
+                </div>
+                <a class="button button-ghost" id="review-open-entry" href="#" target="_blank" rel="noopener">Open entry &nearr;</a>
+            </div>
+
+            <div class="markdown-body review-definition" id="review-definition" hidden></div>
+            <p class="review-no-definition" id="review-no-definition" hidden>
+                No definition saved yet &mdash; <a id="review-add-definition" href="#" target="_blank" rel="noopener">Add definition &nearr;</a>
+            </p>
+
+            <div class="quiz-actions">
+                <button type="button" class="button button-primary" id="review-next-btn">Next card</button>
+            </div>
+        </div>
+
+        <p class="review-shortcuts">
+            <kbd>Space</kbd> reveal / next &middot; <kbd>s</kbd> or <kbd>&rarr;</kbd> skip &middot; <kbd>o</kbd> open entry
+        </p>
+    </section>
+
+    <section class="card" id="review-summary" hidden>
+        <h2>Round complete</h2>
+        <p id="review-summary-stats"></p>
+        <div class="quiz-actions">
+            <a class="button button-primary" href="{{ another_round_url }}" id="review-another-btn">Another round</a>
+            <a class="button button-ghost" href="/">Back to dashboard</a>
+        </div>
+    </section>
+
+    <script type="application/json" id="review-deck-data">{{ cards_json | tojson }}</script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const dataEl = document.getElementById("review-deck-data");
+        const deck = dataEl ? JSON.parse(dataEl.textContent || "[]") : [];
+        if (!deck.length) return;
+
+        const counterEl = document.getElementById("review-counter");
+        const progressFillEl = document.getElementById("review-progress-fill");
+        const cardSectionEl = document.getElementById("review-card");
+        const sentenceEl = document.getElementById("review-sentence");
+        const promptActionsEl = document.getElementById("review-prompt-actions");
+        const revealBtn = document.getElementById("review-reveal-btn");
+        const skipBtn = document.getElementById("review-skip-btn");
+        const answerPanelEl = document.getElementById("review-answer-panel");
+        const headwordEl = document.getElementById("review-headword");
+        const ipaEl = document.getElementById("review-ipa");
+        const openEntryEl = document.getElementById("review-open-entry");
+        const definitionEl = document.getElementById("review-definition");
+        const noDefinitionEl = document.getElementById("review-no-definition");
+        const addDefinitionEl = document.getElementById("review-add-definition");
+        const nextBtn = document.getElementById("review-next-btn");
+        const summarySectionEl = document.getElementById("review-summary");
+        const summaryStatsEl = document.getElementById("review-summary-stats");
+        const anotherBtn = document.getElementById("review-another-btn");
+
+        let index = 0;
+        let isRevealed = false;
+        let reviewedCount = 0;
+        let skippedCount = 0;
+        const seenIds = new Set();
+
+        function renderFilledSentence(card) {
+            sentenceEl.textContent = "";
+            const parts = card.sentence_parts || [];
+            const matches = card.sentence_matches || [];
+            if (!parts.length) {
+                sentenceEl.textContent = card.blanked_sentence;
+                return;
+            }
+            for (let i = 0; i < matches.length; i++) {
+                sentenceEl.appendChild(document.createTextNode(parts[i] || ""));
+                const strong = document.createElement("strong");
+                strong.className = "quiz-filled-word";
+                strong.textContent = matches[i];
+                sentenceEl.appendChild(strong);
+            }
+            sentenceEl.appendChild(document.createTextNode(parts[parts.length - 1] || ""));
+        }
+
+        function showCard(nextIndex) {
+            index = nextIndex;
+            isRevealed = false;
+            const card = deck[index];
+            counterEl.textContent = "Card " + (index + 1) + " of " + deck.length;
+            progressFillEl.style.width = (((index + 1) / deck.length) * 100).toFixed(2) + "%";
+            sentenceEl.textContent = card.blanked_sentence;
+            promptActionsEl.hidden = false;
+            answerPanelEl.hidden = true;
+        }
+
+        function revealCurrentCard() {
+            if (isRevealed || index >= deck.length) return;
+            isRevealed = true;
+            const card = deck[index];
+            renderFilledSentence(card);
+            headwordEl.textContent = card.headword;
+            ipaEl.textContent = card.ipa ? "/" + card.ipa + "/" : "";
+            openEntryEl.href = "/entry/" + encodeURIComponent(card.entry_id);
+
+            if (card.definition_html) {
+                definitionEl.innerHTML = card.definition_html;
+                definitionEl.hidden = false;
+                noDefinitionEl.hidden = true;
+            } else {
+                definitionEl.innerHTML = "";
+                definitionEl.hidden = true;
+                addDefinitionEl.href = "/add_definition?entry_id=" + encodeURIComponent(card.entry_id);
+                noDefinitionEl.hidden = false;
+            }
+
+            nextBtn.textContent = index === deck.length - 1 ? "Finish round" : "Next card";
+            promptActionsEl.hidden = true;
+            answerPanelEl.hidden = false;
+
+            if (!seenIds.has(card.entry_id)) {
+                seenIds.add(card.entry_id);
+                reviewedCount += 1;
+                fetch("/quiz/" + encodeURIComponent(card.entry_id) + "/seen", {
+                    method: "POST",
+                    headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
+                })
+                    .then(handleProtectedResponse)
+                    .catch((err) => console.error(err));
+            }
+        }
+
+        function advanceCard() {
+            if (index + 1 < deck.length) {
+                showCard(index + 1);
+            } else {
+                index = deck.length;
+                isRevealed = false;
+                cardSectionEl.hidden = true;
+                counterEl.textContent = "Complete";
+                const skipSuffix = skippedCount > 0 ? " (" + skippedCount + " skipped)" : "";
+                summaryStatsEl.textContent =
+                    "Reviewed " +
+                    reviewedCount +
+                    " of " +
+                    deck.length +
+                    " " +
+                    (deck.length === 1 ? "card" : "cards") +
+                    skipSuffix +
+                    ".";
+                summarySectionEl.hidden = false;
+            }
+        }
+
+        function skipCurrentCard() {
+            if (isRevealed || index >= deck.length) return;
+            skippedCount += 1;
+            advanceCard();
+        }
+
+        revealBtn.addEventListener("click", revealCurrentCard);
+        skipBtn.addEventListener("click", skipCurrentCard);
+        nextBtn.addEventListener("click", advanceCard);
+
+        document.addEventListener("keydown", function (event) {
+            if (event.repeat || shouldIgnoreShortcut(event)) return;
+            if (
+                event.target instanceof Element &&
+                event.target.closest("a, .page-header button, .page-header form")
+            ) {
+                return;
+            }
+
+            if (index >= deck.length) {
+                if ((event.key === " " || event.key === "Enter") && anotherBtn) {
+                    event.preventDefault();
+                    window.location.href = anotherBtn.href;
+                }
+                return;
+            }
+
+            if (event.key === " " || event.key === "Enter") {
+                event.preventDefault();
+                if (!isRevealed) {
+                    revealCurrentCard();
+                } else {
+                    advanceCard();
+                }
+            } else if (event.key === "ArrowRight") {
+                event.preventDefault();
+                if (!isRevealed) {
+                    skipCurrentCard();
+                } else {
+                    advanceCard();
+                }
+            } else if (event.key === "s" && !isRevealed) {
+                event.preventDefault();
+                skipCurrentCard();
+            } else if (event.key === "o") {
+                event.preventDefault();
+                const card = deck[index];
+                window.open("/entry/" + encodeURIComponent(card.entry_id), "_blank", "noopener");
+            }
+        });
+    });
+    </script>
+    {% endif %}
+</main>
+{% endblock body %}

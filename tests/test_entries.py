@@ -210,3 +210,82 @@ async def test_edit_entry_splits_fields_handles_duplicates_and_404s(
         data={"example_text": "x", "csrf_token": csrf_token},
     )
     assert missing_ex.status_code == 404
+
+
+async def test_needs_definition_filter_tab_search_and_index(client, admin_user):
+    with database.engine.connect() as conn:
+        index_names = {
+            row[1] for row in conn.exec_driver_sql("PRAGMA index_list('answer')").fetchall()
+        }
+    assert "ix_answer_question_id" in index_names
+
+    defined_id = database.db_add_entry(
+        admin_user.id,
+        "Her candor disarmed the room. - candor",
+        definition_text="Open, honest expression.",
+    )
+    undef_a = database.db_add_entry(
+        admin_user.id,
+        "We got a lot of mileage out of that model. - mileage",
+    )
+    undef_b = database.db_add_entry(
+        admin_user.id,
+        "Don't skimp on safety gear. - skimp",
+    )
+
+    await _login(client)
+
+    all_page = await client.get("/entries")
+    assert all_page.status_code == 200
+    assert "candor" in all_page.text
+    assert "mileage" in all_page.text
+    assert "skimp" in all_page.text
+    assert 'id="undefined-count-badge" data-count="2"> (2)</span>' in all_page.text
+
+    undef_page = await client.get("/entries?needs_definition=true")
+    assert undef_page.status_code == 200
+    assert "<title>Needs Definition</title>" in undef_page.text
+    assert "Entries Needing Definitions" in undef_page.text
+    assert "mileage" in undef_page.text
+    assert "skimp" in undef_page.text
+    assert "candor" not in undef_page.text
+
+    # Conflicting view flags normalize cleanly to Needs Definition only
+    conflict = await client.get(
+        "/entries?needs_definition=true&entries_only=true&show_example=true"
+    )
+    assert conflict.status_code == 200
+    assert conflict.text.count("view-tab active") == 1
+    assert "<title>Needs Definition</title>" in conflict.text
+
+    # Search inside Needs Definition hides backlog badge and filters undefined rows
+    searched = await client.get("/entries?needs_definition=true&q=skimp")
+    assert searched.status_code == 200
+    assert "<mark>skimp</mark>" in searched.text
+    assert "mileage" not in searched.text
+    assert 'id="undefined-count-badge" data-count="2" hidden>' in searched.text
+
+    xhr = await client.get(
+        "/entries?needs_definition=true&q=mileage",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert xhr.status_code == 200
+    payload = xhr.json()
+    assert payload["count"] == 1
+    assert payload["matching"] is True
+    assert "<mark>mileage</mark>" in payload["results_html"]
+    assert "skimp" not in payload["results_html"]
+
+    # Defining remaining entries yields the dedicated empty-queue message
+    database.db_add_definition(admin_user.id, undef_a, "Benefit or usefulness.")
+    database.db_add_definition(admin_user.id, undef_b, "Spend too little.")
+    assert defined_id > 0
+
+    empty_queue = await client.get("/entries?needs_definition=true")
+    assert empty_queue.status_code == 200
+    assert "All entries have definitions." in empty_queue.text
+    assert 'id="undefined-count-badge"' not in empty_queue.text
+
+    empty_search = await client.get("/entries?needs_definition=true&q=nonexistent")
+    assert empty_search.status_code == 200
+    assert "No matching entries for" in empty_search.text
