@@ -789,11 +789,54 @@ def safe_path_note(subpath: str) -> Path:
     return final_path
 
 
+_MD_FENCE_RE = re.compile(r"^\s*```[^\n]*\n?", re.MULTILINE)
+_MD_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\([^)]+\)")
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+_MD_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+", re.MULTILINE)
+_MD_BLOCKQUOTE_RE = re.compile(r"^\s*(?:>\s*)+", re.MULTILINE)
+_MD_HR_RE = re.compile(r"^\s*(?:[-*_]\s*){3,}$", re.MULTILINE)
+_MD_BULLET_RE = re.compile(r"^\s*[-*+]\s+", re.MULTILINE)
+_MD_INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+_MD_BOLD_ITALIC_RE = re.compile(r"(\*\*\*|___)(.+?)\1")
+_MD_BOLD_RE = re.compile(r"(\*\*|__)(.+?)\1")
+_MD_STRIKE_RE = re.compile(r"~~(.+?)~~")
+_MD_ITALIC_STAR_RE = re.compile(r"(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)")
+_MD_ITALIC_UNDER_RE = re.compile(r"(?<!\w)_(?!\s)([^_]+?)(?<!\s)_(?!\w)")
+_MD_BLANK_LINES_RE = re.compile(r"\n{3,}")
+
+
+def strip_markdown_to_plain(text: str) -> str:
+    """Convert Markdown definition text into clean, scannable plain text
+    for table previews without per-row HTML parsing overhead."""
+    if not text:
+        return ""
+    cleaned = text.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = _MD_FENCE_RE.sub("", cleaned)
+    cleaned = _MD_IMAGE_RE.sub(r"\1", cleaned)
+    cleaned = _MD_LINK_RE.sub(r"\1", cleaned)
+    cleaned = _MD_HR_RE.sub("", cleaned)
+    cleaned = _MD_BLOCKQUOTE_RE.sub("", cleaned)
+    cleaned = _MD_HEADING_RE.sub("", cleaned)
+    cleaned = _MD_BULLET_RE.sub("• ", cleaned)
+    cleaned = _MD_INLINE_CODE_RE.sub(r"\1", cleaned)
+    cleaned = _MD_BOLD_ITALIC_RE.sub(r"\2", cleaned)
+    cleaned = _MD_BOLD_RE.sub(r"\2", cleaned)
+    cleaned = _MD_STRIKE_RE.sub(r"\1", cleaned)
+    cleaned = _MD_ITALIC_STAR_RE.sub(r"\1", cleaned)
+    cleaned = _MD_ITALIC_UNDER_RE.sub(r"\1", cleaned)
+    lines = [line.strip() for line in cleaned.split("\n")]
+    cleaned = "\n".join(lines)
+    cleaned = _MD_BLANK_LINES_RE.sub("\n\n", cleaned)
+    return cleaned.strip()
+
+
 @dataclass
 class EntryDisplay:
     entry: Entry | EntrySummary
     text: str
     context: str
+    definition: str = ""
+    definition_is_long: bool = False
 
 
 def clear_thesaurus_cache() -> None:

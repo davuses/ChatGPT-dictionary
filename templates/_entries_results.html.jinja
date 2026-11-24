@@ -13,11 +13,14 @@
     {% if search_query %}{{ t('entries.empty_search', q=search_query) }}{% elif needs_definition %}{{ t('entries.empty_needs_def') }}{% else %}{{ t('entries.empty_all') }}{% endif %}
 </p>
 {% else %}
-{% set table_variant = "only" if entries_only else ("examples" if show_example else "default") %}
+{% set table_variant = "only" if entries_only else ("definitions" if show_definition else ("examples" if show_example else "default")) %}
 <table class="entries-table entries-table--{{ table_variant }}">
     {% if entries_only %}
     <caption class="sr-only">{{ t('entries.caption_only') }}</caption>
     {% include "entries_only_table.html.jinja" %}
+    {% elif show_definition %}
+    <caption class="sr-only">{{ t('entries.caption_definitions') }}</caption>
+    {% include "entries_with_definitions.html.jinja" %}
     {% elif show_example %}
     <caption class="sr-only">{{ t('entries.caption_examples') }}</caption>
     {% include "entries_with_examples.html.jinja" %}
@@ -35,7 +38,7 @@
 {% if total_pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
     {% set base_qs = view_qs('&') %}
-    {% set mode_prefix = "entries_only=true&" if entries_only else ("show_example=true&" if show_example else ("needs_definition=true&" if needs_definition else "")) %}
+    {% set mode_prefix = "entries_only=true&" if entries_only else ("show_definition=true&" if show_definition else ("show_example=true&" if show_example else ("needs_definition=true&" if needs_definition else ""))) %}
     {% if has_prev_page %}
     <a class="button button-ghost" href="/entries?{{ mode_prefix }}page=1{{ base_qs }}">&laquo; {{ t('entries.page_first') }}</a>
     <a class="button button-ghost" href="/entries?{{ mode_prefix }}page={{ page - 1 }}{{ base_qs }}">&larr; {{ t('entries.page_prev') }}</a>

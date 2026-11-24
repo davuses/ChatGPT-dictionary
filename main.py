@@ -72,6 +72,7 @@ from database import (
     db_get_entry_by_id,
     db_get_entry_by_text,
     db_get_entry_page_number,
+    db_get_primary_definitions_by_entry_ids,
     db_get_user_by_id,
     db_get_user_with_password_by_username,
     db_get_valid_invite_token,
@@ -128,6 +129,7 @@ from utils import (
     render_safe_markdown,
     safe_path_note,
     sanitize_export_slug,
+    strip_markdown_to_plain,
     validate_entry_fields,
 )
 
@@ -945,6 +947,7 @@ def review_page(
 def entries_page(
     request: Request,
     show_example: bool = Query(False),
+    show_definition: bool = Query(False),
     entries_only: bool = Query(False),
     needs_definition: bool = Query(False),
     q: str = Query(""),
@@ -953,8 +956,12 @@ def entries_page(
 ):
     if needs_definition:
         entries_only = False
+        show_definition = False
         show_example = False
     elif entries_only:
+        show_definition = False
+        show_example = False
+    elif show_definition:
         show_example = False
 
     entries, total_count = db_get_entries_page(
@@ -984,6 +991,14 @@ def entries_page(
     else:
         undefined_count = db_count_undefined_entries(current_user.id)
 
+    definitions_by_id = (
+        db_get_primary_definitions_by_entry_ids(
+            current_user.id, [entry.id for entry in entries]
+        )
+        if show_definition and entries
+        else {}
+    )
+
     review_bookmark_entry_id = get_review_bookmark(current_user.id)
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
@@ -992,6 +1007,21 @@ def entries_page(
 
         if show_example and entry.example:
             entry = replace(entry, example=normalize_pronoun_casing(entry.example))
+
+        definition_markup = ""
+        definition_is_long = False
+        if show_definition:
+            raw_def = definitions_by_id.get(entry.id, "")
+            plain_def = (
+                normalize_pronoun_casing(strip_markdown_to_plain(raw_def))
+                if raw_def
+                else ""
+            )
+            if plain_def:
+                definition_is_long = (
+                    len(plain_def) > 150 or plain_def.count("\n") >= 3
+                )
+                definition_markup = highlight_matches(plain_def, q_stripped)
 
         display_text = highlight_matches(display_text, q_stripped)
         context_text = highlight_matches(context_text, q_stripped)
@@ -1003,6 +1033,8 @@ def entries_page(
                 entry=entry,
                 text=display_text,
                 context=context_text,
+                definition=definition_markup,
+                definition_is_long=definition_is_long,
             )
         )
 
@@ -1011,6 +1043,7 @@ def entries_page(
         "entry_displays": entry_displays,
         "entries_only": entries_only,
         "show_example": show_example,
+        "show_definition": show_definition,
         "needs_definition": needs_definition,
         "undefined_count": undefined_count,
         "review_bookmark_entry_id": review_bookmark_entry_id,

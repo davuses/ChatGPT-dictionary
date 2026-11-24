@@ -1,0 +1,30 @@
+<colgroup>
+    <col class="entry-col">
+    <col class="context-col">
+    <col class="definition-col">
+</colgroup>
+<thead>
+    <tr>
+        <th class="entry-col">{{ t('entries.col_entry') }}</th>
+        <th class="context-col">{{ t('entries.col_context') }}</th>
+        <th class="definition-col">{{ t('entries.col_definition') }}</th>
+    </tr>
+</thead>
+<tbody>
+{% for display in entry_displays %}
+<tr id="{{ display.entry.id }}">
+    <td class="entry-col"><a href="/entry/{{ display.entry.id }}">{{ display.text }}</a></td>
+    <td class="context-col">{{ display.context }}</td>
+    <td class="definition-col">
+        {% if display.definition %}
+        <div class="definition-preview{% if display.definition_is_long %} is-clamped is-expandable{% endif %}">{{ display.definition }}</div>
+        {% if display.definition_is_long %}
+        <button type="button" class="definition-toggle" aria-expanded="false">{{ t('entries.show_more') }}</button>
+        {% endif %}
+        {% else %}
+        <a class="definition-empty-link" href="/add_definition?entry_id={{ display.entry.id }}">{{ t('entries.add_def_inline') }}</a>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+</tbody>

@@ -3,6 +3,8 @@
 {% block title -%}
 {%- if entries_only -%}
 {{ t('entries.title_only') }}
+{%- elif show_definition -%}
+{{ t('entries.title_definitions') }}
 {%- elif show_example -%}
 {{ t('entries.title_examples') }}
 {%- elif needs_definition -%}
@@ -21,6 +23,7 @@
 
 <form class="search-form" role="search" action="/entries" method="get">
     {% if entries_only %}<input type="hidden" name="entries_only" value="true">{% endif %}
+    {% if show_definition %}<input type="hidden" name="show_definition" value="true">{% endif %}
     {% if show_example %}<input type="hidden" name="show_example" value="true">{% endif %}
     {% if needs_definition %}<input type="hidden" name="needs_definition" value="true">{% endif %}
     <input type="search"
@@ -29,11 +32,11 @@
         placeholder="{{ t('entries.search_placeholder') }}"
         aria-label="{{ t('dash.search_aria') }}">
     <button class="button button-primary" type="submit">{{ t('dash.search_btn') }}</button>
-    <a class="button button-ghost" id="clear-search-link" href="/entries{% if entries_only %}?entries_only=true{% elif show_example %}?show_example=true{% elif needs_definition %}?needs_definition=true{% endif %}"{% if not search_query %} hidden{% endif %}>{{ t('entries.clear') }}</a>
+    <a class="button button-ghost" id="clear-search-link" href="/entries{% if entries_only %}?entries_only=true{% elif show_definition %}?show_definition=true{% elif show_example %}?show_example=true{% elif needs_definition %}?needs_definition=true{% endif %}"{% if not search_query %} hidden{% endif %}>{{ t('entries.clear') }}</a>
 </form>
 
 <nav class="view-tabs" aria-label="{{ t('entries.views_aria') }}">
-    <a class="view-tab {% if not entries_only and not show_example and not needs_definition %}active{% endif %}"
+    <a class="view-tab {% if not entries_only and not show_definition and not show_example and not needs_definition %}active{% endif %}"
         id="tab-all"
         href="/entries{{ view_qs('?') }}">{{ t('entries.tab_all') }}</a>
     <a class="view-tab {% if entries_only %}active{% endif %}"
@@ -42,6 +45,9 @@
     <a class="view-tab {% if show_example %}active{% endif %}"
         id="tab-examples"
         href="/entries?show_example=true{{ view_qs('&') }}">{{ t('entries.tab_examples') }}</a>
+    <a class="view-tab {% if show_definition %}active{% endif %}"
+        id="tab-definitions"
+        href="/entries?show_definition=true{{ view_qs('&') }}">{{ t('entries.tab_definitions') }}</a>
     <a class="view-tab {% if needs_definition %}active{% endif %}"
         id="tab-needs-definition"
         href="/entries?needs_definition=true{{ view_qs('&') }}">{{ t('entries.tab_needs_def') }}{% if undefined_count > 0 %}<span id="undefined-count-badge" data-count="{{ undefined_count }}"{% if search_query %} hidden{% endif %}> ({{ undefined_count }})</span>{% endif %}</a>
@@ -68,7 +74,35 @@
         const results = document.getElementById("results");
         if (!results) return;
 
+        function toggleDefinitionCell(cell) {
+            const preview = cell.querySelector(".definition-preview.is-expandable");
+            if (!preview) return;
+            const nowClamped = preview.classList.toggle("is-clamped");
+            const btn = cell.querySelector(".definition-toggle");
+            if (btn) {
+                btn.setAttribute("aria-expanded", String(!nowClamped));
+                btn.textContent = nowClamped
+                    ? uiText("show_more", null, "Show more")
+                    : uiText("show_less", null, "Show less");
+            }
+        }
+
         results.addEventListener("click", function (event) {
+            const toggleBtn = event.target.closest(".definition-toggle");
+            if (toggleBtn) {
+                event.stopPropagation();
+                const cell = toggleBtn.closest(".definition-col");
+                if (cell) toggleDefinitionCell(cell);
+                return;
+            }
+
+            const preview = event.target.closest(".definition-preview.is-expandable");
+            if (preview && !(window.getSelection && window.getSelection().toString())) {
+                const cell = preview.closest(".definition-col");
+                if (cell) toggleDefinitionCell(cell);
+                return;
+            }
+
             const row = event.target.closest("tr[id]");
             if (!row) return;
 
@@ -118,6 +152,7 @@
         if (!form || !input) return;
 
         const entriesOnlyInput = form.querySelector('input[name="entries_only"]');
+        const showDefinitionInput = form.querySelector('input[name="show_definition"]');
         const showExampleInput = form.querySelector('input[name="show_example"]');
         const needsDefinitionInput = form.querySelector('input[name="needs_definition"]');
         const countEl = document.getElementById("results-count");
@@ -127,6 +162,7 @@
             all: document.getElementById("tab-all"),
             entries_only: document.getElementById("tab-entries-only"),
             show_example: document.getElementById("tab-examples"),
+            show_definition: document.getElementById("tab-definitions"),
             needs_definition: document.getElementById("tab-needs-definition"),
         };
 
@@ -146,6 +182,7 @@
             const query = input.value.trim();
             if (query) url.searchParams.set("q", query);
             if (entriesOnlyInput) url.searchParams.set("entries_only", "true");
+            if (showDefinitionInput) url.searchParams.set("show_definition", "true");
             if (showExampleInput) url.searchParams.set("show_example", "true");
             if (needsDefinitionInput) url.searchParams.set("needs_definition", "true");
 

@@ -307,6 +307,56 @@ textarea {
   width: 42%;
 }
 
+.entries-table--definitions col.entry-col {
+  width: 20%;
+}
+
+.entries-table--definitions col.context-col {
+  width: 34%;
+}
+
+.entries-table--definitions col.definition-col {
+  width: 46%;
+}
+
+.definition-preview {
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.definition-preview.is-expandable {
+  cursor: pointer;
+}
+
+.definition-preview.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+
+.definition-toggle {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 4px;
+  padding: 0;
+}
+
+.definition-toggle:hover {
+  color: var(--accent-dark);
+  text-decoration: underline;
+}
+
+.definition-empty-link {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .entries-table .entry-col a {
   font-weight: 600;
 }
@@ -1075,6 +1125,18 @@ input[type="submit"]:hover {
 
   .entries-table--examples col.example-col {
     width: 38%;
+  }
+
+  .entries-table--definitions col.entry-col {
+    width: 26%;
+  }
+
+  .entries-table--definitions col.context-col {
+    width: 32%;
+  }
+
+  .entries-table--definitions col.definition-col {
+    width: 42%;
   }
 
   .back-to-top {

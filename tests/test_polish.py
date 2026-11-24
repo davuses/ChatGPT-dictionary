@@ -438,4 +438,74 @@ async def test_static_assets_include_content_hash_for_cache_busting(client):
     assert f'src="{script_url}"' in login_page.text
 
 
+def test_strip_markdown_to_plain():
+    raw = (
+        "### Meaning\r\n"
+        "> **To skimp** means to spend *too little* [money](https://example.com).\r\n\r\n"
+        "- Avoid `poor` ~~quality~~\r\n"
+        "- Be overly frugal\r\n"
+    )
+    plain = utils.strip_markdown_to_plain(raw)
+    assert "**" not in plain
+    assert "###" not in plain
+    assert "https://example.com" not in plain
+    assert "To skimp means to spend too little money." in plain
+    assert "• Avoid poor quality" in plain
+    assert "• Be overly frugal" in plain
+
+
+async def test_definitions_tab_renders_clamped_plain_definitions_and_xhr(
+    client, admin_user
+):
+    short_id = database.db_add_entry(
+        admin_user.id,
+        "She remained steadfast - steadfast",
+        "Firm and unwavering.",
+    )
+    long_def = (
+        "**To skimp** means to spend too little money, time, or effort on something, "
+        "often in a way that results in poor quality or inadequate coverage. "
+        "It suggests being overly frugal or neglecting necessary details. <script>alert(1)</script>"
+    )
+    long_id = database.db_add_entry(
+        admin_user.id,
+        "Never skimp on brakes - skimp",
+        long_def,
+    )
+    empty_id = database.db_add_entry(
+        admin_user.id,
+        "A brand new idiom - brand new",
+        "",
+    )
+    utils.invalidate_words_cache(admin_user.id)
+
+    await _login(client)
+
+    resp = await client.get("/entries?show_definition=true")
+    assert resp.status_code == 200
+    assert "entries-table--definitions" in resp.text
+    assert 'id="tab-definitions"' in resp.text
+    assert "Firm and unwavering." in resp.text
+    assert "To skimp means to spend too little money" in resp.text
+    assert "**To skimp**" not in resp.text
+    assert "<script>alert(1)</script>" not in resp.text
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in resp.text
+    assert 'class="definition-toggle"' in resp.text
+    assert f'href="/add_definition?entry_id={empty_id}"' in resp.text
+    assert f'id="{short_id}"' in resp.text
+    assert f'id="{long_id}"' in resp.text
+
+    # XHR live search preserves definitions mode and highlights matching text
+    xhr = await client.get(
+        "/entries?show_definition=true&q=skimp",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert xhr.status_code == 200
+    payload = xhr.json()
+    assert payload["count"] == 1
+    assert "entries-table--definitions" in payload["results_html"]
+    assert "<mark>skimp</mark>" in payload["results_html"]
+
+
+
 
