@@ -112,6 +112,52 @@ class PageNoteRecord:
     items: list[CaptureItemRecord]
 
 
+@dataclass(frozen=True)
+class ImportedEntry:
+    old_id: int | None
+    text: str
+    definitions: tuple[str, ...]
+    example: str | None
+    visit_count: int
+    last_visit: int | None
+
+
+@dataclass(frozen=True)
+class ImportedCaptureItem:
+    word: str
+    context: str
+    definition_text: str
+    timestamp_seconds: int | None
+    promoted_entry_id: int | None
+    created_at: int | None
+
+
+@dataclass(frozen=True)
+class ImportedPageNote:
+    url: str
+    title: str
+    notes_md: str
+    created_at: int | None
+    updated_at: int | None
+    items: tuple[ImportedCaptureItem, ...]
+
+
+@dataclass(frozen=True)
+class ParsedUserImport:
+    entries: tuple[ImportedEntry, ...]
+    page_notes: tuple[ImportedPageNote, ...]
+    review_bookmark_entry_id: int | None
+
+
+@dataclass(frozen=True)
+class ImportSummary:
+    entries_added: int
+    entries_skipped: int
+    notes_added: int
+    notes_skipped: int
+    items_added: int
+
+
 def hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
@@ -1498,6 +1544,151 @@ def db_get_primary_definitions_by_entry_ids(
             entry.id: (entry.definitions[0].text if entry.definitions else "")
             for entry in entries
         }
+
+
+def db_import_user_data(
+    user_id: int,
+    parsed: ParsedUserImport,
+    *,
+    include_inbox: bool = True,
+) -> ImportSummary:
+    """Atomically merge a validated Glossbook JSON backup into `user_id`'s
+    isolated dictionary (non-destructive: skips existing entries/page notes)."""
+    now = int(time.time())
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        existing_rows = (
+            session.query(Entry.id, Entry.text, Entry.is_hidden)
+            .filter(Entry.user_id == user_id)
+            .all()
+        )
+        existing_by_text: dict[str, tuple[int, bool]] = {}
+        for row in existing_rows:
+            pair = (row.id, bool(row.is_hidden))
+            existing_by_text[row.text] = pair
+            collapsed = " ".join(row.text.split())
+            existing_by_text.setdefault(collapsed, pair)
+
+        id_map: dict[int, int] = {}
+        entries_to_insert: list[ImportedEntry] = []
+        seen_in_file: set[str] = set()
+        duplicate_old_id_to_text: list[tuple[int, str]] = []
+        entries_skipped = 0
+
+        # Deduplicate forward (first occurrence in file wins), then insert
+        # oldest-first so newest-first ordering on /entries is preserved.
+        for item in parsed.entries:
+            existing = existing_by_text.get(item.text)
+            if existing is not None:
+                entries_skipped += 1
+                existing_id, is_hidden = existing
+                if item.old_id is not None and not is_hidden:
+                    id_map[item.old_id] = existing_id
+                continue
+
+            if item.text in seen_in_file:
+                entries_skipped += 1
+                if item.old_id is not None:
+                    duplicate_old_id_to_text.append((item.old_id, item.text))
+                continue
+
+            seen_in_file.add(item.text)
+            entries_to_insert.append(item)
+
+        staged_by_text: dict[str, Entry] = {}
+        pending_id_bindings: list[tuple[int, Entry]] = []
+        for item in reversed(entries_to_insert):
+            entry = Entry(
+                user_id=user_id,
+                text=item.text,
+                example=item.example,
+                visit_count=item.visit_count,
+                last_visit=item.last_visit,
+            )
+            for def_text in item.definitions:
+                entry.definitions.append(Definition(text=def_text))
+            session.add(entry)
+            staged_by_text[item.text] = entry
+            if item.old_id is not None:
+                pending_id_bindings.append((item.old_id, entry))
+
+        entries_added = len(entries_to_insert)
+        if entries_added > 0:
+            session.flush()
+            for old_id, entry in pending_id_bindings:
+                id_map[old_id] = entry.id
+            for dup_old_id, dup_text in duplicate_old_id_to_text:
+                staged_entry = staged_by_text.get(dup_text)
+                if staged_entry is not None:
+                    id_map[dup_old_id] = staged_entry.id
+
+        if (
+            user.last_review_question_id is None
+            and parsed.review_bookmark_entry_id is not None
+            and parsed.review_bookmark_entry_id in id_map
+        ):
+            user.last_review_question_id = id_map[parsed.review_bookmark_entry_id]
+
+        notes_added = 0
+        notes_skipped = 0
+        items_added = 0
+        if include_inbox and parsed.page_notes:
+            existing_note_urls = {
+                row[0]
+                for row in session.query(PageNote.url)
+                .filter(PageNote.user_id == user_id)
+                .all()
+            }
+            notes_to_insert: list[ImportedPageNote] = []
+            for note_item in parsed.page_notes:
+                if note_item.url in existing_note_urls:
+                    notes_skipped += 1
+                    continue
+                existing_note_urls.add(note_item.url)
+                notes_to_insert.append(note_item)
+
+            for note_item in reversed(notes_to_insert):
+                created_at = note_item.created_at if note_item.created_at is not None else now
+                updated_at = note_item.updated_at if note_item.updated_at is not None else created_at
+                page_note = PageNote(
+                    user_id=user_id,
+                    url=note_item.url,
+                    title=note_item.title,
+                    notes_md=note_item.notes_md,
+                    created_at=created_at,
+                    updated_at=updated_at,
+                )
+                for cap in note_item.items:
+                    remapped_entry_id = (
+                        id_map.get(cap.promoted_entry_id)
+                        if cap.promoted_entry_id is not None
+                        else None
+                    )
+                    page_note.items.append(
+                        PageCaptureItem(
+                            word=cap.word,
+                            context=cap.context,
+                            definition_text=cap.definition_text,
+                            timestamp_seconds=cap.timestamp_seconds,
+                            promoted_entry_id=remapped_entry_id,
+                            created_at=cap.created_at if cap.created_at is not None else created_at,
+                        )
+                    )
+                    items_added += 1
+                session.add(page_note)
+                notes_added += 1
+
+        session.commit()
+        return ImportSummary(
+            entries_added=entries_added,
+            entries_skipped=entries_skipped,
+            notes_added=notes_added,
+            notes_skipped=notes_skipped,
+            items_added=items_added,
+        )
 
 
 # ---------------------------------------------------------------------------

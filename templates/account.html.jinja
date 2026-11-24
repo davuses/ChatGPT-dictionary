@@ -8,12 +8,30 @@
 
 <main class="account-page">
     <section class="card">
-        <h2>Export Dictionary</h2>
+        <h2>Export &amp; Import Dictionary</h2>
         <p class="page-subtitle">Download an offline copy of your {{ entry_count }} {{ "entry" if entry_count == 1 else "entries" }} (JSON includes <code>/inbox</code> page notes and visit stats; Markdown formats a clean study notebook).</p>
         <div class="form-actions">
             <a class="button button-primary" href="/account/export.json">Download JSON</a>
             <a class="button button-ghost" href="/account/export.md">Download Markdown</a>
         </div>
+
+        <hr class="account-divider">
+
+        <h3 class="account-subheading">Import Glossbook JSON</h3>
+        <p class="page-subtitle">Merge a Glossbook <code>.json</code> export into your account. Existing entries and page notes are kept untouched and duplicates are skipped.</p>
+        {% if import_notice %}<p class="form-notice" role="status">{{ import_notice }}</p>{% endif %}
+        {% if import_error %}<p class="form-error" role="alert">{{ import_error }}</p>{% endif %}
+        <form class="import-form" method="post" action="/account/import" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="file" name="file" accept=".json,application/json" required>
+            <label class="import-checkbox">
+                <input type="checkbox" name="include_inbox" value="true" checked>
+                <span>Also import <code>/inbox</code> page notes</span>
+            </label>
+            <div class="form-actions">
+                <button class="button button-ghost" type="submit">Import JSON</button>
+            </div>
+        </form>
     </section>
 
     <section class="card" id="extension">

@@ -18,7 +18,7 @@ A private, personal English vocabulary builder and active-recall web app, built 
 - **Visit tracking** — each entry tracks visit count and last-visited time
 - **Multiple views** — browse all entries, entries-only, entries with examples, or the **Needs Definition** backlog for newly captured words
 - **Study notes** — browse and edit a folder of personal English study Markdown notes with a generated table of contents (admin-only)
-- **Invite-only multi-user** — generate one-time invite links and password reset links from `/admin`; each user gets a completely isolated dictionary, quiz, `/inbox`, 1-click JSON/Markdown export, and per-device Chrome extension API tokens under `/account`
+- **Invite-only multi-user** — generate one-time invite links and password reset links from `/admin`; each user gets a completely isolated dictionary, quiz, `/inbox`, 1-click JSON/Markdown export & JSON import, and per-device Chrome extension API tokens under `/account`
 - **Markdown editing** — definitions, examples, and study notes are edited with [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) (sanitized with `nh3` on render), while entries use quick plain-text word and context fields
 
 ## Tech stack

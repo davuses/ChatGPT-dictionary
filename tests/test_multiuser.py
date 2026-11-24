@@ -709,3 +709,191 @@ async def test_extension_onboarding_dismisses_after_token_created(admin_user):
         assert 'href="/inbox"' in entries_page.text
         assert 'href="/admin"' not in entries_page.text
         assert 'href="/notes/"' not in entries_page.text
+
+
+async def test_account_json_export_import_roundtrip_and_security(admin_user):
+    import json
+
+    alice = database.db_create_user("alice", auth.hash_password("alice-password-10"))
+    bob = database.db_create_user("bob", auth.hash_password("bob-password-10"))
+
+    # Admin entry ID that Bob must never be able to link via crafted promoted_entry_id
+    admin_eid = database.db_add_entry(admin_user.id, "Admin secret - arcane")
+
+    # Seed Alice with ordered entries (oldest first: mileage, then laconic with last_visit=None)
+    with database.Session(database.engine) as s:
+        e_mileage = database.Entry(
+            user_id=alice.id,
+            text="We got a lot of mileage out of that model. - mileage",
+            example="> How much mileage can you get?",
+            visit_count=4,
+            last_visit=1_795_400_000,
+        )
+        e_mileage.definitions.append(database.Definition(text="Practical value."))
+        e_mileage.definitions.append(database.Definition(text="Secondary sense."))
+        s.add(e_mileage)
+        s.flush()
+        a_mileage_id = e_mileage.id
+
+        e_laconic = database.Entry(
+            user_id=alice.id,
+            text="laconic",
+            visit_count=0,
+            last_visit=None,
+        )
+        s.add(e_laconic)
+        s.commit()
+
+    database.db_set_review_bookmark(alice.id, a_mileage_id)
+    database.db_upsert_page_note(
+        alice.id,
+        "https://www.youtube.com/watch?v=VeHFu956WKE",
+        "Talk",
+        "Scratchpad line",
+    )
+    _, promoted_item = database.db_add_capture_item(
+        alice.id,
+        normalized_url="https://www.youtube.com/watch?v=VeHFu956WKE",
+        title="Talk",
+        word="mileage",
+        context="We got a lot of mileage out of that model.",
+        definition_text="",
+        timestamp_seconds=95,
+    )
+    with database.Session(database.engine) as s:
+        row = s.get(database.PageCaptureItem, promoted_item.id)
+        row.promoted_entry_id = a_mileage_id
+        s.commit()
+
+    async with _new_client() as alice_c:
+        await _login_as(alice_c, "alice", "alice-password-10")
+        exported_resp = await alice_c.get("/account/export.json")
+        assert exported_resp.status_code == 200
+        exported_bytes = exported_resp.content
+        exported_data = json.loads(exported_bytes)
+
+    # Unauthenticated import is rejected before body parsing
+    async with _new_client() as anon_c:
+        unauth = await anon_c.post("/account/import")
+        assert unauth.status_code == 401
+
+    async with _new_client() as bob_c:
+        await _login_as(bob_c, "bob", "bob-password-10")
+        acct_page = await bob_c.get("/account")
+        csrf = _csrf_from_html(acct_page.text)
+
+        # Missing CSRF returns styled 403 HTML (not JSON)
+        no_csrf = await bob_c.post(
+            "/account/import",
+            files={"file": ("backup.json", exported_bytes, "application/json")},
+            data={"include_inbox": "true"},
+        )
+        assert no_csrf.status_code == 403
+        assert "text/html" in no_csrf.headers["content-type"]
+
+        # Import Alice's exact export into Bob's clean account
+        imp = await bob_c.post(
+            "/account/import",
+            files={"file": ("backup.json", exported_bytes, "application/json")},
+            data={"csrf_token": csrf, "include_inbox": "true"},
+        )
+        assert imp.status_code == 200
+        assert "Imported 2 entries" in imp.text
+        assert "1 inbox page added" in imp.text
+
+        # Re-export Bob and verify exact alignment + ID remapping
+        bob_export = json.loads((await bob_c.get("/account/export.json")).text)
+        assert bob_export["entry_count"] == 2
+        assert [e["word"] for e in bob_export["entries"]] == ["laconic", "mileage"]
+        bob_laconic, bob_mileage = bob_export["entries"]
+        assert bob_laconic["last_visit"] is None
+        assert bob_mileage["definitions"] == ["Practical value.", "Secondary sense."]
+        assert bob_mileage["example"] == "> How much mileage can you get?"
+        assert bob_mileage["visit_count"] == 4
+        assert bob_mileage["last_visit"] == 1_795_400_000
+        assert bob_mileage["id"] != a_mileage_id
+        assert bob_export["review_bookmark_entry_id"] == bob_mileage["id"]
+        assert len(bob_export["inbox_page_notes"]) == 1
+        assert bob_export["inbox_page_notes"][0]["notes_md"] == "Scratchpad line"
+        assert (
+            bob_export["inbox_page_notes"][0]["items"][0]["promoted_entry_id"]
+            == bob_mileage["id"]
+        )
+
+        # Second import of the same file is completely idempotent
+        imp_again = await bob_c.post(
+            "/account/import",
+            files={"file": ("backup.json", exported_bytes, "application/json")},
+            data={"csrf_token": csrf, "include_inbox": "true"},
+        )
+        assert imp_again.status_code == 200
+        assert "Imported 0 entries; 2 duplicate entries skipped; 1 existing page skipped." in imp_again.text
+
+        # Intra-file duplicates (entries + equivalent YouTube URLs) and crafted foreign promoted_entry_id
+        crafted = {
+            "app": "Glossbook",
+            "schema_version": 1,
+            "entries": [
+                {"word": "candor", "context": "Her candor helped.", "definitions": ["Frankness."]},
+                {"word": "candor", "context": "Her candor helped.", "definitions": ["Duplicate in file."]},
+            ],
+            "inbox_page_notes": [
+                {
+                    "url": "https://youtu.be/dQw4w9WgXcQ",
+                    "title": "Clip",
+                    "notes_md": "First",
+                    "items": [{"word": "candor", "promoted_entry_id": admin_eid}],
+                },
+                {
+                    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    "title": "Clip dup",
+                    "notes_md": "Second",
+                    "items": [],
+                },
+            ],
+        }
+        imp_crafted = await bob_c.post(
+            "/account/import",
+            files={"file": ("crafted.json", json.dumps(crafted).encode(), "application/json")},
+            data={"csrf_token": csrf, "include_inbox": "true"},
+        )
+        assert imp_crafted.status_code == 200
+        assert "Imported 1 entry; 1 duplicate entry skipped" in imp_crafted.text
+        bob_notes = database.db_list_page_notes(bob.id, limit=None)
+        clip_note = next(n for n in bob_notes if "dQw4w9WgXcQ" in n.url)
+        assert clip_note.items[0].promoted_entry_id is None
+
+        # Empty backup imports cleanly
+        imp_empty = await bob_c.post(
+            "/account/import",
+            files={"file": ("empty.json", b'{"app":"Glossbook","schema_version":1,"entries":[]}', "application/json")},
+            data={"csrf_token": csrf},
+        )
+        assert imp_empty.status_code == 200
+        assert "Imported 0 entries." in imp_empty.text
+
+        # Validation rejects bool-as-int, int overflow, javascript: URL, and empty headword
+        for bad_payload in (
+            {"app": "Glossbook", "entries": [{"word": "ok", "visit_count": True}]},
+            {"app": "Glossbook", "entries": [{"word": "ok", "visit_count": 10**30}]},
+            {"app": "Glossbook", "entries": [{"text": "context only - "}]},
+            {
+                "app": "Glossbook",
+                "entries": [],
+                "inbox_page_notes": [{"url": "javascript:alert(1)", "items": []}],
+            },
+        ):
+            bad_resp = await bob_c.post(
+                "/account/import",
+                files={"file": ("bad.json", json.dumps(bad_payload).encode(), "application/json")},
+                data={"csrf_token": csrf},
+            )
+            assert bad_resp.status_code == 400
+
+        # Oversized Content-Length rejected cleanly with 413
+        too_big = await bob_c.post(
+            "/account/import",
+            headers={"Content-Length": str(main.MAX_IMPORT_BYTES + 100_000)},
+            content=b"x",
+        )
+        assert too_big.status_code == 413

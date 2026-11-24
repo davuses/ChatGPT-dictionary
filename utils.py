@@ -24,7 +24,11 @@ from phonemizer import phonemize
 from database import (
     Entry,
     EntrySummary,
+    ImportedCaptureItem,
+    ImportedEntry,
+    ImportedPageNote,
     PageNoteRecord,
+    ParsedUserImport,
     SCHEMA_VERSION,
     db_get_all_entries,
     db_get_entry_visit_stats,
@@ -967,3 +971,274 @@ def build_user_export_markdown(
             lines.extend(["", "### Example", "", clean_example])
 
     return "\n".join(lines) + "\n"
+
+
+MAX_IMPORT_ENTRIES = 50_000
+MAX_IMPORT_PAGE_NOTES = 5_000
+MAX_IMPORT_ITEMS_PER_NOTE = 2_000
+_SQLITE_MAX_INT = 1 << 62
+
+
+def _parse_strict_int(
+    value: object,
+    field_name: str,
+    *,
+    min_value: int = 0,
+    allow_none: bool = False,
+) -> int | None:
+    if value is None:
+        if allow_none:
+            return None
+        raise ValueError(f"{field_name} must be an integer.")
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be an integer.")
+    if value < min_value or value > _SQLITE_MAX_INT:
+        raise ValueError(f"{field_name} is out of valid range.")
+    return value
+
+
+def parse_user_import_json(raw_bytes: bytes) -> ParsedUserImport:
+    """Validate and parse a Glossbook JSON export into typed import records."""
+    try:
+        decoded = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Import file must be valid UTF-8 JSON.") from exc
+
+    try:
+        data = json.loads(decoded)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON file: {exc.msg}.") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError("Import file must contain a JSON object.")
+
+    app_name = data.get("app")
+    if app_name is not None and app_name != "Glossbook":
+        raise ValueError("Unsupported backup format (expected app='Glossbook').")
+
+    schema_version = data.get("schema_version")
+    if schema_version is not None:
+        parsed_ver = _parse_strict_int(schema_version, "schema_version", min_value=1)
+        if parsed_ver is None or parsed_ver > SCHEMA_VERSION:
+            raise ValueError(
+                f"Unsupported schema_version {parsed_ver} (max supported: {SCHEMA_VERSION})."
+            )
+
+    raw_entries = data.get("entries")
+    if not isinstance(raw_entries, list):
+        raise ValueError("Import JSON must include an 'entries' list.")
+    if len(raw_entries) > MAX_IMPORT_ENTRIES:
+        raise ValueError(f"Too many entries in import file (max {MAX_IMPORT_ENTRIES}).")
+
+    entries: list[ImportedEntry] = []
+    for idx, raw in enumerate(raw_entries, start=1):
+        if not isinstance(raw, dict):
+            raise ValueError(f"Entry #{idx} must be a JSON object.")
+
+        raw_text = raw.get("text")
+        if raw_text is not None and not isinstance(raw_text, str):
+            raise ValueError(f"Entry #{idx}: 'text' must be a string.")
+
+        if isinstance(raw_text, str) and raw_text.strip():
+            ctx, word = parse_entry_text(raw_text)
+        else:
+            raw_word = raw.get("word")
+            raw_context = raw.get("context", "")
+            if not isinstance(raw_word, str):
+                raise ValueError(f"Entry #{idx}: 'word' is required.")
+            if raw_context is None:
+                raw_context = ""
+            if not isinstance(raw_context, str):
+                raise ValueError(f"Entry #{idx}: 'context' must be a string.")
+            word, ctx = raw_word, raw_context
+
+        canonical_text, err = validate_entry_fields(word, ctx)
+        if err or not canonical_text:
+            raise ValueError(f"Entry #{idx}: {err or 'Invalid entry text.'}")
+
+        raw_defs = raw.get("definitions", [])
+        if raw_defs is None:
+            raw_defs = []
+        if not isinstance(raw_defs, list):
+            raise ValueError(f"Entry #{idx}: 'definitions' must be a list of strings.")
+        clean_defs: list[str] = []
+        for d in raw_defs:
+            if not isinstance(d, str):
+                raise ValueError(f"Entry #{idx}: every definition must be a string.")
+            stripped = d.strip()
+            if stripped:
+                clean_defs.append(stripped)
+
+        raw_example = raw.get("example")
+        if raw_example is not None and not isinstance(raw_example, str):
+            raise ValueError(f"Entry #{idx}: 'example' must be a string or null.")
+        clean_example = raw_example.strip() if isinstance(raw_example, str) else None
+        if clean_example == "":
+            clean_example = None
+
+        visit_count = (
+            _parse_strict_int(
+                raw.get("visit_count", 0),
+                f"Entry #{idx}.visit_count",
+                min_value=0,
+            )
+            or 0
+        )
+        last_visit = _parse_strict_int(
+            raw.get("last_visit"),
+            f"Entry #{idx}.last_visit",
+            min_value=0,
+            allow_none=True,
+        )
+        old_id = _parse_strict_int(
+            raw.get("id"),
+            f"Entry #{idx}.id",
+            min_value=1,
+            allow_none=True,
+        )
+
+        entries.append(
+            ImportedEntry(
+                old_id=old_id,
+                text=canonical_text,
+                definitions=tuple(clean_defs),
+                example=clean_example,
+                visit_count=visit_count,
+                last_visit=last_visit,
+            )
+        )
+
+    bookmark_id = _parse_strict_int(
+        data.get("review_bookmark_entry_id"),
+        "review_bookmark_entry_id",
+        min_value=1,
+        allow_none=True,
+    )
+
+    raw_notes = data.get("inbox_page_notes", [])
+    if raw_notes is None:
+        raw_notes = []
+    if not isinstance(raw_notes, list):
+        raise ValueError("'inbox_page_notes' must be a list.")
+    if len(raw_notes) > MAX_IMPORT_PAGE_NOTES:
+        raise ValueError(
+            f"Too many inbox page notes in import file (max {MAX_IMPORT_PAGE_NOTES})."
+        )
+
+    page_notes: list[ImportedPageNote] = []
+    for n_idx, raw_note in enumerate(raw_notes, start=1):
+        if not isinstance(raw_note, dict):
+            raise ValueError(f"Inbox page note #{n_idx} must be a JSON object.")
+        raw_url = raw_note.get("url")
+        if not isinstance(raw_url, str) or not raw_url.strip():
+            raise ValueError(f"Inbox page note #{n_idx}: 'url' must be a non-empty string.")
+        try:
+            canonical_url = normalize_page_url(raw_url)
+        except ValueError as exc:
+            raise ValueError(f"Inbox page note #{n_idx}: {exc}") from exc
+
+        title = raw_note.get("title", "")
+        if title is None:
+            title = ""
+        if not isinstance(title, str):
+            raise ValueError(f"Inbox page note #{n_idx}: 'title' must be a string.")
+
+        notes_md = raw_note.get("notes_md", "")
+        if notes_md is None:
+            notes_md = ""
+        if not isinstance(notes_md, str):
+            raise ValueError(f"Inbox page note #{n_idx}: 'notes_md' must be a string.")
+
+        note_created = _parse_strict_int(
+            raw_note.get("created_at"),
+            f"Inbox page note #{n_idx}.created_at",
+            min_value=0,
+            allow_none=True,
+        )
+        note_updated = _parse_strict_int(
+            raw_note.get("updated_at"),
+            f"Inbox page note #{n_idx}.updated_at",
+            min_value=0,
+            allow_none=True,
+        )
+
+        raw_items = raw_note.get("items", [])
+        if raw_items is None:
+            raw_items = []
+        if not isinstance(raw_items, list):
+            raise ValueError(f"Inbox page note #{n_idx}: 'items' must be a list.")
+        if len(raw_items) > MAX_IMPORT_ITEMS_PER_NOTE:
+            raise ValueError(
+                f"Inbox page note #{n_idx}: too many items (max {MAX_IMPORT_ITEMS_PER_NOTE})."
+            )
+
+        parsed_items: list[ImportedCaptureItem] = []
+        for i_idx, raw_item in enumerate(raw_items, start=1):
+            if not isinstance(raw_item, dict):
+                raise ValueError(
+                    f"Inbox page note #{n_idx}, item #{i_idx} must be a JSON object."
+                )
+            item_word = raw_item.get("word")
+            if not isinstance(item_word, str) or not " ".join(item_word.split()):
+                raise ValueError(
+                    f"Inbox page note #{n_idx}, item #{i_idx}: 'word' must be a non-empty string."
+                )
+            item_ctx = raw_item.get("context", "")
+            if item_ctx is None:
+                item_ctx = ""
+            if not isinstance(item_ctx, str):
+                raise ValueError(
+                    f"Inbox page note #{n_idx}, item #{i_idx}: 'context' must be a string."
+                )
+            item_def = raw_item.get("definition_text", "")
+            if item_def is None:
+                item_def = ""
+            if not isinstance(item_def, str):
+                raise ValueError(
+                    f"Inbox page note #{n_idx}, item #{i_idx}: 'definition_text' must be a string."
+                )
+            ts_sec = _parse_strict_int(
+                raw_item.get("timestamp_seconds"),
+                f"Inbox page note #{n_idx}, item #{i_idx}.timestamp_seconds",
+                min_value=0,
+                allow_none=True,
+            )
+            prom_id = _parse_strict_int(
+                raw_item.get("promoted_entry_id"),
+                f"Inbox page note #{n_idx}, item #{i_idx}.promoted_entry_id",
+                min_value=1,
+                allow_none=True,
+            )
+            item_created = _parse_strict_int(
+                raw_item.get("created_at"),
+                f"Inbox page note #{n_idx}, item #{i_idx}.created_at",
+                min_value=0,
+                allow_none=True,
+            )
+            parsed_items.append(
+                ImportedCaptureItem(
+                    word=" ".join(item_word.split()),
+                    context=" ".join(item_ctx.split()),
+                    definition_text=item_def,
+                    timestamp_seconds=ts_sec,
+                    promoted_entry_id=prom_id,
+                    created_at=item_created,
+                )
+            )
+
+        page_notes.append(
+            ImportedPageNote(
+                url=canonical_url,
+                title=title.strip(),
+                notes_md=notes_md,
+                created_at=note_created,
+                updated_at=note_updated,
+                items=tuple(parsed_items),
+            )
+        )
+
+    return ParsedUserImport(
+        entries=tuple(entries),
+        page_notes=tuple(page_notes),
+        review_bookmark_entry_id=bookmark_id,
+    )

@@ -76,6 +76,7 @@ from database import (
     db_get_user_with_password_by_username,
     db_get_valid_invite_token,
     db_get_valid_password_reset_token,
+    db_import_user_data,
     db_list_api_tokens,
     db_list_invite_tokens,
     db_list_page_notes,
@@ -111,6 +112,7 @@ from utils import (
     invalidate_words_cache,
     normalize_pronoun_casing,
     parse_entry_text,
+    parse_user_import_json,
     pick_random_question,
     pick_review_session,
     render_safe_markdown,
@@ -1393,6 +1395,8 @@ def _render_account(
     *,
     password_error: str | None = None,
     password_notice: str | None = None,
+    import_error: str | None = None,
+    import_notice: str | None = None,
     new_token: str | None = None,
     new_token_label: str | None = None,
     status_code: int = 200,
@@ -1406,12 +1410,18 @@ def _render_account(
             "server_url": str(request.base_url).rstrip("/"),
             "password_error": password_error,
             "password_notice": password_notice,
+            "import_error": import_error,
+            "import_notice": import_notice,
             "new_token": new_token,
             "new_token_label": new_token_label,
         },
         status_code=status_code,
         headers={"Cache-Control": "no-store"},
     )
+
+
+MAX_IMPORT_BYTES = 20 * 1024 * 1024
+_MAX_MULTIPART_OVERHEAD_BYTES = 64 * 1024
 
 
 def _export_user_dictionary(
@@ -1470,6 +1480,110 @@ def export_account_markdown(
     current_user: UserRecord = Depends(require_user),
 ):
     return _export_user_dictionary(request, current_user, "md")
+
+
+@protected_router.post("/account/import", response_class=HTMLResponse)
+async def import_account_json(
+    request: Request,
+    current_user: UserRecord = Depends(require_user),
+):
+    max_body = MAX_IMPORT_BYTES + _MAX_MULTIPART_OVERHEAD_BYTES
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit() and int(content_length) > max_body:
+        return _render_account(
+            request,
+            current_user,
+            import_error="Import file is too large (max 20 MB).",
+            status_code=413,
+        )
+
+    body_chunks = bytearray()
+    async for chunk in request.stream():
+        body_chunks.extend(chunk)
+        if len(body_chunks) > max_body:
+            return _render_account(
+                request,
+                current_user,
+                import_error="Import file is too large (max 20 MB).",
+                status_code=413,
+            )
+
+    request._body = bytes(body_chunks)
+    form = await request.form()
+    csrf_value = form.get("csrf_token")
+    verify_csrf_value(request, csrf_value if isinstance(csrf_value, str) else None)
+
+    uploaded = form.get("file")
+    if uploaded is None or not hasattr(uploaded, "read"):
+        return _render_account(
+            request,
+            current_user,
+            import_error="Choose a Glossbook .json file to import.",
+            status_code=400,
+        )
+
+    raw_bytes = await uploaded.read(MAX_IMPORT_BYTES + 1)
+    if len(raw_bytes) > MAX_IMPORT_BYTES:
+        return _render_account(
+            request,
+            current_user,
+            import_error="Import file is too large (max 20 MB).",
+            status_code=413,
+        )
+    if not raw_bytes:
+        return _render_account(
+            request,
+            current_user,
+            import_error="The selected file is empty.",
+            status_code=400,
+        )
+
+    try:
+        parsed = parse_user_import_json(raw_bytes)
+    except ValueError as exc:
+        return _render_account(
+            request,
+            current_user,
+            import_error=str(exc),
+            status_code=400,
+        )
+
+    include_inbox = bool(form.get("include_inbox"))
+    summary = db_import_user_data(
+        current_user.id, parsed, include_inbox=include_inbox
+    )
+    if summary.entries_added > 0:
+        invalidate_words_cache(current_user.id)
+        invalidate_quiz_pool_cache(current_user.id)
+
+    parts = [
+        f"Imported {summary.entries_added} "
+        f"{'entry' if summary.entries_added == 1 else 'entries'}"
+    ]
+    if summary.entries_skipped > 0:
+        parts.append(
+            f"{summary.entries_skipped} duplicate "
+            f"{'entry' if summary.entries_skipped == 1 else 'entries'} skipped"
+        )
+    if include_inbox and (summary.notes_added > 0 or summary.notes_skipped > 0):
+        note_bits = []
+        if summary.notes_added > 0:
+            note_bits.append(
+                f"{summary.notes_added} inbox "
+                f"{'page' if summary.notes_added == 1 else 'pages'} added"
+            )
+        if summary.notes_skipped > 0:
+            note_bits.append(
+                f"{summary.notes_skipped} existing "
+                f"{'page' if summary.notes_skipped == 1 else 'pages'} skipped"
+            )
+        parts.append(", ".join(note_bits))
+
+    return _render_account(
+        request,
+        current_user,
+        import_notice="; ".join(parts) + ".",
+    )
 
 
 @protected_router.get("/account", response_class=HTMLResponse)
