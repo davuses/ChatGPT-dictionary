@@ -6,10 +6,23 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
     {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}">{% endif %}
+    <meta name="theme-color" content="#f8f9fa" id="theme-color-meta">
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem("glossbook_theme");
+                if (saved === "light" || saved === "dark") {
+                    document.documentElement.setAttribute("data-theme", saved);
+                }
+                var isDark = saved === "dark" || (!saved && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                var meta = document.getElementById("theme-color-meta");
+                if (meta) meta.setAttribute("content", isDark ? "#0f171c" : "#f8f9fa");
+            } catch (_) {}
+        })();
+    </script>
     <link rel="stylesheet"
         href="{{ static_url('style.css') }}" />
     <script src="{{ static_url('script.js') }}" defer></script>
-    <meta name="theme-color" content="#1f6f8b">
     <link rel="icon"
         type="image/svg+xml"
         href="{{ static_url('favicon.svg') }}">
@@ -20,14 +33,6 @@
         href="{{ static_url('apple-touch-icon.png') }}">
     <link rel="manifest"
         href="{{ static_url('manifest.json') }}">
-    {% if needs_editor or needs_markdown_css %}
-    <link rel="stylesheet"
-        href="{{ static_url('markdown-pc.css') }}"
-        media="screen and (min-width: 600px)" />
-    <link rel="stylesheet"
-        href="{{ static_url('markdown-mobile.css') }}"
-        media="screen and (max-width: 599px)" />
-    {% endif %}
     {% if needs_editor %}
     <link rel="stylesheet"
         href="{{ static_url('font-awesome.min.css') }}">
@@ -40,10 +45,31 @@
 
 {% set _body_class %}{% block body_class %}{% endblock body_class %}{% endset %}
 <body{% if _body_class.strip() %} class="{{ _body_class.strip() }}"{% endif %}>
+    <svg class="svg-sprite" aria-hidden="true" hidden>
+        <symbol id="icon-audio-play" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <polygon points="10,8 16.5,12 10,16" fill="currentColor" />
+        </symbol>
+        <symbol id="icon-audio-pause" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <rect x="9" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
+            <rect x="12.6" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
+        </symbol>
+    </svg>
     <script type="application/json" id="i18n-data">{{ js_i18n | default({}) | tojson }}</script>
     {% block body%}
 
     {% endblock body %}
-
+    <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+    <dialog id="confirm-dialog" class="app-dialog">
+        <div class="app-dialog-body">
+            <h2 class="app-dialog-title" id="confirm-dialog-title"></h2>
+            <p class="app-dialog-message" id="confirm-dialog-message"></p>
+            <div class="app-dialog-actions">
+                <button type="button" class="button button-ghost" id="confirm-dialog-cancel"></button>
+                <button type="button" class="button button-primary" id="confirm-dialog-ok"></button>
+            </div>
+        </div>
+    </dialog>
 </body>
 </html>

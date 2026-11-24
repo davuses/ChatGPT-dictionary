@@ -65,6 +65,7 @@
         </form>
 
         {% if api_tokens %}
+        <div class="table-scroll">
         <table class="data-table admin-table">
             <thead>
                 <tr>
@@ -81,7 +82,7 @@
                     <td>{{ how_long_ago(token.created_at) }}</td>
                     <td>{{ how_long_ago(token.last_used_at) }}</td>
                     <td>
-                        <form class="inline-form" method="post" action="/account/tokens/{{ token.id }}/revoke" onsubmit="return confirm(uiText('confirm_revoke_token', null, 'Revoke this API token? Any extension using it will stop syncing.'));">
+                        <form class="inline-form" method="post" action="/account/tokens/{{ token.id }}/revoke" data-confirm-key="confirm_revoke_token" data-confirm-danger="true">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button class="button button-danger" type="submit">{{ t('account.revoke') }}</button>
                         </form>
@@ -90,6 +91,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p class="page-subtitle">{{ t('account.no_tokens') }}</p>
         {% endif %}

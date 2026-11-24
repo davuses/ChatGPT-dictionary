@@ -265,7 +265,7 @@ async def test_review_session_route_sanitization_isolation_and_readonly(
     resp = await client.get(f"/review?size=2&exclude={e3}")
     assert resp.status_code == 200
     assert resp.headers.get("cache-control") == "private, no-cache"
-    assert "markdown-pc.css" in resp.text
+    assert "style.css" in resp.text
     assert database.db_get_entry_visit_stats(admin_user.id) == before_stats
 
     deck_match = re.search(

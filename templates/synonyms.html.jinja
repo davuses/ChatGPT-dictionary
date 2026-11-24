@@ -6,9 +6,11 @@
 {% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">{{ t('nav.entry') }}</a>{% endset %}
 {{ page_header(extra_nav=entry_link) }}
 
+<main class="page-content">
 <h1 class="word-title">{{ t('syn.heading') }} <a href="/entry/{{ entry_id }}">{{ word }}</a></h1>
 
 {% if senses %}
+<div class="table-scroll">
 <table class="synonyms-table data-table">
     <thead>
         <tr>
@@ -35,9 +37,9 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
 <p class="content-section">{{ t('syn.empty') }}</p>
 {% endif %}
-
-
+</main>
 {% endblock body %}

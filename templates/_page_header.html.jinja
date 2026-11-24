@@ -11,6 +11,7 @@
 #}
 {% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", subtitle_id=None, show_add=False) %}
 <header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
+  <div class="page-header-inner">
     <div class="page-header-brand">
         {% if brand_as_h1 %}
         <h1><a href="/">Glossbook</a></h1>
@@ -21,8 +22,9 @@
     </div>
     {% if is_authenticated %}
     <nav class="page-nav" aria-label="{{ t('nav.main_aria') }}">
+        <a class="nav-link{% if active == 'review' %} active{% endif %}" href="/review"{% if active == 'review' %} aria-current="page"{% endif %}>{{ t('nav.review') }}</a>
         <a class="nav-link{% if active == 'browse' %} active{% endif %}" href="/entries"{% if active == 'browse' %} aria-current="page"{% endif %}>{{ t('nav.words') }}</a>
-        <a class="nav-link{% if active == 'inbox' %} active{% endif %}" href="/inbox"{% if active == 'inbox' %} aria-current="page"{% endif %}>{{ t('nav.inbox') }}</a>
+        <a class="nav-link{% if active == 'inbox' %} active{% endif %}" href="/inbox"{% if active == 'inbox' %} aria-current="page"{% endif %}>{{ t('nav.inbox') }}{% if inbox_pending_count %}<span class="nav-badge" id="nav-inbox-badge">{{ inbox_pending_count }}</span>{% endif %}</a>
         {% if is_admin %}
         <a class="nav-link{% if active == 'notes' %} active{% endif %}" href="/notes/"{% if active == 'notes' %} aria-current="page"{% endif %}>{{ t('nav.notes') }}</a>
         {% endif %}
@@ -40,6 +42,7 @@
                 {% if is_admin %}
                 <a class="nav-menu-item{% if active == 'admin' %} active{% endif %}" href="/admin"{% if active == 'admin' %} aria-current="page"{% endif %}>{{ t('nav.admin') }}</a>
                 {% endif %}
+                <button class="nav-menu-item theme-toggle-btn" type="button" aria-label="{{ t('nav.theme_aria') }}">{{ t('nav.theme_auto') }}</button>
                 <form class="nav-menu-form" method="post" action="/language">
                     <input type="hidden" name="lang" value="{{ other_lang }}">
                     <input type="hidden" name="next_path" value="{{ current_next_path }}">
@@ -55,6 +58,7 @@
     </nav>
     {% else %}
     <nav class="page-nav" aria-label="{{ t('nav.main_aria') }}">
+        <button class="button button-ghost theme-toggle-btn" type="button" aria-label="{{ t('nav.theme_aria') }}">{{ t('nav.theme_auto') }}</button>
         <form class="inline-form" method="post" action="/language">
             <input type="hidden" name="lang" value="{{ other_lang }}">
             <input type="hidden" name="next_path" value="{{ current_next_path }}">
@@ -62,5 +66,6 @@
         </form>
     </nav>
     {% endif %}
+  </div>
 </header>
 {% endmacro %}

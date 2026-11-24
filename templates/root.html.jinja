@@ -9,6 +9,7 @@
 {% set dash_subtitle %}<a class="subtitle-link" href="/entries">{{ t('dash.entries_one' if entries_count == 1 else 'dash.entries_many', n=entries_count) }}</a> &middot; {{ t('dash.visited_7d', n=visited_last_7_days) }}{% endset %}
 {{ page_header(subtitle=dash_subtitle, brand_as_h1=True, show_add=True) }}
 
+<main class="page-content">
 <form class="search-form dashboard-search" role="search" action="/entries" method="get">
     <input type="search"
         name="q"
@@ -41,5 +42,6 @@
 {% if review_bookmark_entry_id %}
 <p class="dashboard-secondary-action">{{ t('dash.resume_prefix') }} &mdash; <a href="/resume_review">{{ t('dash.resume_link') }}</a></p>
 {% endif %}
+</main>
 
 {% endblock body %}

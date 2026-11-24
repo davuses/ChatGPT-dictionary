@@ -21,6 +21,7 @@
 {% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>{{ t('dash.resume_link') }}</a>{% endset %}
 {{ page_header(subtitle=t('entries.count_matching' if search_query else 'entries.count_plain', n=entries_count), active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
 
+<main class="page-content">
 <form class="search-form" role="search" action="/entries" method="get">
     {% if entries_only %}<input type="hidden" name="entries_only" value="true">{% endif %}
     {% if show_definition %}<input type="hidden" name="show_definition" value="true">{% endif %}
@@ -56,6 +57,7 @@
 <div id="results">
     {% include "_entries_results.html.jinja" %}
 </div>
+</main>
 
 <button type="button" class="back-to-top" id="back-to-top" aria-label="{{ t('entries.back_to_top') }}" hidden>&uarr;</button>
 <script>

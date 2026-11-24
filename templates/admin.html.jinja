@@ -42,6 +42,7 @@
         </form>
 
         {% if invites %}
+        <div class="table-scroll">
         <table class="data-table admin-table">
             <thead>
                 <tr>
@@ -79,6 +80,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p class="page-subtitle">{{ t('admin.no_invites') }}</p>
         {% endif %}
@@ -86,6 +88,7 @@
 
     <section class="card">
         <h2>{{ t('admin.users_title', n=users | length) }}</h2>
+        <div class="table-scroll">
         <table class="data-table admin-table">
             <thead>
                 <tr>
@@ -131,6 +134,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </section>
 </main>
 

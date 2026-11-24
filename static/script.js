@@ -20,14 +20,121 @@ function uiText(key, vars = {}, fallback = "") {
   let template = Object.prototype.hasOwnProperty.call(map, key)
     ? map[key]
     : fallback || key;
-  for (const [k, v] of Object.entries(vars)) {
-    template = template.replaceAll("{" + k + "}", String(v));
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      template = template.replaceAll("{" + k + "}", String(v));
+    }
   }
   return template;
 }
 
+function getThemePreference() {
+  try {
+    const saved = localStorage.getItem("glossbook_theme");
+    return saved === "light" || saved === "dark" ? saved : "auto";
+  } catch (_) {
+    return "auto";
+  }
+}
+
+function applyThemePreference(pref) {
+  const normalized = pref === "light" || pref === "dark" ? pref : "auto";
+  try {
+    if (normalized === "auto") {
+      localStorage.removeItem("glossbook_theme");
+    } else {
+      localStorage.setItem("glossbook_theme", normalized);
+    }
+  } catch (_) {}
+
+  if (normalized === "auto") {
+    document.documentElement.removeAttribute("data-theme");
+  } else {
+    document.documentElement.setAttribute("data-theme", normalized);
+  }
+
+  const isDark =
+    normalized === "dark" ||
+    (normalized === "auto" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const meta = document.getElementById("theme-color-meta");
+  if (meta) meta.setAttribute("content", isDark ? "#0f171c" : "#f8f9fa");
+
+  const labelKey =
+    normalized === "dark"
+      ? "theme_dark"
+      : normalized === "light"
+      ? "theme_light"
+      : "theme_auto";
+  const fallback =
+    normalized === "dark"
+      ? "Theme: Dark"
+      : normalized === "light"
+      ? "Theme: Light"
+      : "Theme: Auto";
+  const label = uiText(labelKey, null, fallback);
+  document.querySelectorAll(".theme-toggle-btn").forEach((btn) => {
+    btn.textContent = label;
+  });
+}
+
+function showToast(message, { type = "info", duration = 2600 } = {}) {
+  const region = document.getElementById("toast-region");
+  if (!region || !message) return;
+  const el = document.createElement("div");
+  el.className = "toast" + (type === "error" ? " toast--error" : "");
+  el.textContent = message;
+  region.appendChild(el);
+  setTimeout(() => {
+    el.remove();
+  }, duration);
+}
+
+function confirmDialog(message, { danger = false, title, okText, cancelText } = {}) {
+  const dialog = document.getElementById("confirm-dialog");
+  if (!dialog || typeof dialog.showModal !== "function") {
+    return Promise.resolve(window.confirm(message));
+  }
+  const titleEl = document.getElementById("confirm-dialog-title");
+  const msgEl = document.getElementById("confirm-dialog-message");
+  const okBtn = document.getElementById("confirm-dialog-ok");
+  const cancelBtn = document.getElementById("confirm-dialog-cancel");
+
+  titleEl.textContent = title || uiText("confirm_title", null, "Please confirm");
+  msgEl.textContent = message;
+  okBtn.textContent = okText || uiText("confirm_ok", null, "Confirm");
+  cancelBtn.textContent = cancelText || uiText("confirm_cancel", null, "Cancel");
+  okBtn.classList.toggle("button-danger", Boolean(danger));
+  okBtn.classList.toggle("button-primary", !danger);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    function finish(result) {
+      if (settled) return;
+      settled = true;
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      dialog.removeEventListener("cancel", onCancel);
+      if (dialog.open) dialog.close();
+      resolve(result);
+    }
+    function onOk() {
+      finish(true);
+    }
+    function onCancel() {
+      finish(false);
+    }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    dialog.addEventListener("cancel", onCancel);
+    dialog.showModal();
+  });
+}
+
 function shouldIgnoreShortcut(event, { allowAlt = false } = {}) {
   if (event.defaultPrevented || event.isComposing) return true;
+  if (document.querySelector("dialog[open]")) return true;
   if (event.ctrlKey || event.metaKey || (!allowAlt && event.altKey)) {
     return true;
   }
@@ -36,7 +143,7 @@ function shouldIgnoreShortcut(event, { allowAlt = false } = {}) {
     if (
       target.matches("input, textarea, select") ||
       target.isContentEditable ||
-      target.closest(".CodeMirror")
+      target.closest(".CodeMirror, .cm-editor")
     ) {
       return true;
     }
@@ -74,16 +181,22 @@ function fetchJson(url, options = {}) {
 }
 
 function deleteEntry(entryId) {
-  if (confirm(uiText("confirm_delete_entry", {}, "Are you sure you want to delete this entry?"))) {
+  confirmDialog(
+    uiText("confirm_delete_entry", {}, "Are you sure you want to delete this entry?"),
+    { danger: true }
+  ).then((confirmed) => {
+    if (!confirmed) return;
     fetch("/delete_entry/" + entryId, {
       method: "DELETE",
       headers: csrfHeaders(),
-    }).then(handleProtectedResponse).then((Response) => {
-      if (Response.ok) {
-        window.location.href = "/entries";
-      }
-    });
-  }
+    })
+      .then(handleProtectedResponse)
+      .then((Response) => {
+        if (Response.ok) {
+          window.location.href = "/entries";
+        }
+      });
+  });
 }
 
 function toggleQuizAnswer(button) {
@@ -185,11 +298,9 @@ function buildPronunciationUrls(word) {
   if (!clean) return [];
   const urls = [];
   if (!/\s/.test(clean)) {
-    urls.push(
-      "https://ssl.gstatic.com/dictionary/static/sounds/oxford/" +
-        encodeURIComponent(clean.toLowerCase()) +
-        "--_us_1.mp3"
-    );
+    const slug = encodeURIComponent(clean.toLowerCase());
+    urls.push("https://ssl.gstatic.com/dictionary/static/sounds/oxford/" + slug + "--_us_1.mp3");
+    urls.push("https://ssl.gstatic.com/dictionary/static/sounds/oxford/x" + slug + "--_us_1.mp3");
   }
   urls.push(
     "https://www.google.com/speech-api/v1/synthesize?text=" +
@@ -298,6 +409,29 @@ document.addEventListener("keydown", function (event) {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
+  applyThemePreference(getThemePreference());
+  document.querySelectorAll(".theme-toggle-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const current = getThemePreference();
+      const next = current === "auto" ? "light" : current === "light" ? "dark" : "auto";
+      applyThemePreference(next);
+    });
+  });
+
+  document.addEventListener("submit", function (event) {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    const msg = form.dataset.confirm || (form.dataset.confirmKey ? uiText(form.dataset.confirmKey, null, form.dataset.confirmKey) : "");
+    if (!msg || form.dataset.confirmed === "true") return;
+    event.preventDefault();
+    confirmDialog(msg, { danger: form.dataset.confirmDanger === "true" }).then((ok) => {
+      if (ok) {
+        form.dataset.confirmed = "true";
+        form.submit();
+      }
+    });
+  });
+
   const editors = document.querySelectorAll("textarea.markdown-editor");
   if (!editors.length || typeof EasyMDE === "undefined") return;
 
