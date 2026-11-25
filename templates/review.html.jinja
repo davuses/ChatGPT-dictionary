@@ -4,14 +4,23 @@
 {% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
-{{ page_header(subtitle=t('review.subtitle_one' if total_quizzable == 1 else 'review.subtitle_many', n=total_quizzable)) }}
+{{ page_header(subtitle=t('review.subtitle_one' if total_quizzable == 1 else 'review.subtitle_many', n=total_quizzable), active="review") }}
 
 <main class="review-page">
     <div class="review-header-row">
         <h1 class="review-title">{{ t('review.title') }}</h1>
-        {% if card_count > 0 %}
-        <span class="review-counter" id="review-counter">{{ t('review.card_counter', i=1, n=card_count) }}</span>
-        {% endif %}
+        <div class="section-actions">
+            {% if total_quizzable > 0 %}
+            <div class="review-size-pills" role="group" aria-label="{{ t('review.size_label') }}">
+                {% for sz in (10, 20, 30) %}
+                <a class="button button-ghost{% if session_size == sz %} active{% endif %}" href="/review?size={{ sz }}">{{ sz }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if card_count > 0 %}
+            <span class="review-counter" id="review-counter">{{ t('review.card_counter', i=1, n=card_count) }}</span>
+            {% endif %}
+        </div>
     </div>
 
     {% if card_count == 0 %}
@@ -33,9 +42,13 @@
 
         <div class="review-answer-panel" id="review-answer-panel" hidden>
             <div class="review-answer-header">
-                <div>
+                <div class="quiz-answer-word-row">
                     <strong class="review-headword" id="review-headword"></strong>
                     <span class="ipa-text" id="review-ipa"></span>
+                    <button type="button" class="audio-btn audio-btn--sm" id="review-audio-btn" aria-label="{{ t('entry.play') }}">
+                        <svg class="icon-play" aria-hidden="true"><use href="#icon-audio-play"/></svg>
+                        <svg class="icon-pause" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
+                    </button>
                 </div>
                 <a class="button button-ghost" id="review-open-entry" href="#" target="_blank" rel="noopener">{{ t('review.open_entry') }}</a>
             </div>
@@ -46,12 +59,13 @@
             </p>
 
             <div class="quiz-actions">
-                <button type="button" class="button button-primary" id="review-next-btn">{{ t('review.next_card') }}</button>
+                <button type="button" class="button button-ghost" id="review-again-btn">{{ t('review.again') }}</button>
+                <button type="button" class="button button-primary" id="review-next-btn">{{ t('review.got_it') }}</button>
             </div>
         </div>
 
         <p class="review-shortcuts">
-            <kbd>Space</kbd> {{ t('review.shortcuts_reveal') }} &middot; <kbd>s</kbd> {{ t('review.shortcuts_or') }} <kbd>&rarr;</kbd> {{ t('review.shortcuts_skip') }} &middot; <kbd>o</kbd> {{ t('review.shortcuts_open') }}
+            <kbd>Space</kbd> {{ t('review.shortcuts_reveal') }} &middot; <kbd>a</kbd> {{ t('review.shortcuts_again') }} &middot; <kbd>p</kbd> {{ t('review.shortcuts_audio') }} &middot; <kbd>s</kbd> {{ t('review.shortcuts_skip') }} &middot; <kbd>o</kbd> {{ t('review.shortcuts_open') }}
         </p>
     </section>
 
@@ -81,40 +95,27 @@
         const answerPanelEl = document.getElementById("review-answer-panel");
         const headwordEl = document.getElementById("review-headword");
         const ipaEl = document.getElementById("review-ipa");
+        const audioBtn = document.getElementById("review-audio-btn");
         const openEntryEl = document.getElementById("review-open-entry");
         const definitionEl = document.getElementById("review-definition");
         const noDefinitionEl = document.getElementById("review-no-definition");
         const addDefinitionEl = document.getElementById("review-add-definition");
+        const againBtn = document.getElementById("review-again-btn");
         const nextBtn = document.getElementById("review-next-btn");
         const summarySectionEl = document.getElementById("review-summary");
         const summaryStatsEl = document.getElementById("review-summary-stats");
         const anotherBtn = document.getElementById("review-another-btn");
 
+        const initialDeckSize = deck.length;
         let index = 0;
         let isRevealed = false;
         let reviewedCount = 0;
         let skippedCount = 0;
+        let retriedCount = 0;
         const seenIds = new Set();
 
-        function renderFilledSentence(card) {
-            sentenceEl.textContent = "";
-            const parts = card.sentence_parts || [];
-            const matches = card.sentence_matches || [];
-            if (!parts.length) {
-                sentenceEl.textContent = card.blanked_sentence;
-                return;
-            }
-            for (let i = 0; i < matches.length; i++) {
-                sentenceEl.appendChild(document.createTextNode(parts[i] || ""));
-                const strong = document.createElement("strong");
-                strong.className = "quiz-filled-word";
-                strong.textContent = matches[i];
-                sentenceEl.appendChild(strong);
-            }
-            sentenceEl.appendChild(document.createTextNode(parts[parts.length - 1] || ""));
-        }
-
         function showCard(nextIndex) {
+            stopWordPronunciation();
             index = nextIndex;
             isRevealed = false;
             const card = deck[index];
@@ -133,7 +134,13 @@
             if (isRevealed || index >= deck.length) return;
             isRevealed = true;
             const card = deck[index];
-            renderFilledSentence(card);
+            renderClozeSentence(
+                sentenceEl,
+                card.sentence_parts || [],
+                card.sentence_matches || [],
+                true,
+                card.blanked_sentence
+            );
             headwordEl.textContent = card.headword;
             ipaEl.textContent = card.ipa ? "/" + card.ipa + "/" : "";
             openEntryEl.href = "/entry/" + encodeURIComponent(card.entry_id);
@@ -152,23 +159,25 @@
             nextBtn.textContent =
                 index === deck.length - 1
                     ? uiText("review_finish", null, "Finish round")
-                    : uiText("review_next", null, "Next card");
+                    : uiText("review_got_it", null, "Got it");
             promptActionsEl.hidden = true;
             answerPanelEl.hidden = false;
+        }
 
-            if (!seenIds.has(card.entry_id)) {
-                seenIds.add(card.entry_id);
-                reviewedCount += 1;
-                fetch("/quiz/" + encodeURIComponent(card.entry_id) + "/seen", {
-                    method: "POST",
-                    headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
-                })
-                    .then(handleProtectedResponse)
-                    .catch((err) => console.error(err));
-            }
+        function markCurrentCardSeen(card) {
+            if (seenIds.has(card.entry_id)) return;
+            seenIds.add(card.entry_id);
+            reviewedCount += 1;
+            fetch("/quiz/" + encodeURIComponent(card.entry_id) + "/seen", {
+                method: "POST",
+                headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
+            })
+                .then(handleProtectedResponse)
+                .catch((err) => console.error(err));
         }
 
         function advanceCard() {
+            stopWordPronunciation();
             if (index + 1 < deck.length) {
                 showCard(index + 1);
             } else {
@@ -176,31 +185,49 @@
                 isRevealed = false;
                 cardSectionEl.hidden = true;
                 counterEl.textContent = uiText("review_complete", null, "Complete");
-                const skipSuffix =
-                    skippedCount > 0
-                        ? uiText(
-                              "review_skip_suffix",
-                              { skipped: skippedCount },
-                              " (" + skippedCount + " skipped)"
-                          )
-                        : "";
+                const extraBits = [];
+                if (skippedCount > 0) {
+                    extraBits.push(
+                        uiText("review_skip_suffix", { skipped: skippedCount }, " (" + skippedCount + " skipped)")
+                    );
+                }
+                if (retriedCount > 0) {
+                    extraBits.push(
+                        uiText("review_again_suffix", { retried: retriedCount }, " (" + retriedCount + " retried)")
+                    );
+                }
                 const cardsWord = uiText(
-                    deck.length === 1 ? "review_card_one" : "review_card_many",
+                    initialDeckSize === 1 ? "review_card_one" : "review_card_many",
                     null,
-                    deck.length === 1 ? "card" : "cards"
+                    initialDeckSize === 1 ? "card" : "cards"
                 );
                 summaryStatsEl.textContent = uiText(
                     "review_summary",
                     {
                         reviewed: reviewedCount,
-                        total: deck.length,
+                        total: initialDeckSize,
                         cards: cardsWord,
-                        skip: skipSuffix,
+                        skip: extraBits.join(""),
                     },
-                    "Reviewed " + reviewedCount + " of " + deck.length + " " + cardsWord + skipSuffix + "."
+                    "Reviewed " + reviewedCount + " of " + initialDeckSize + " " + cardsWord + extraBits.join("") + "."
                 );
                 summarySectionEl.hidden = false;
             }
+        }
+
+        function gotItCurrentCard() {
+            if (!isRevealed || index >= deck.length) return;
+            markCurrentCardSeen(deck[index]);
+            advanceCard();
+        }
+
+        function againCurrentCard() {
+            if (!isRevealed || index >= deck.length) return;
+            retriedCount += 1;
+            const card = deck[index];
+            const insertAt = Math.min(deck.length, index + 3);
+            deck.splice(insertAt, 0, card);
+            advanceCard();
         }
 
         function skipCurrentCard() {
@@ -209,9 +236,16 @@
             advanceCard();
         }
 
+        if (audioBtn) {
+            audioBtn.addEventListener("click", () => {
+                if (!isRevealed || index >= deck.length) return;
+                playWordPronunciation(deck[index].headword || "", audioBtn);
+            });
+        }
         revealBtn.addEventListener("click", revealCurrentCard);
         skipBtn.addEventListener("click", skipCurrentCard);
-        nextBtn.addEventListener("click", advanceCard);
+        againBtn.addEventListener("click", againCurrentCard);
+        nextBtn.addEventListener("click", gotItCurrentCard);
 
         document.addEventListener("keydown", function (event) {
             if (event.repeat || shouldIgnoreShortcut(event)) return;
@@ -235,15 +269,21 @@
                 if (!isRevealed) {
                     revealCurrentCard();
                 } else {
-                    advanceCard();
+                    gotItCurrentCard();
                 }
             } else if (event.key === "ArrowRight") {
                 event.preventDefault();
                 if (!isRevealed) {
                     skipCurrentCard();
                 } else {
-                    advanceCard();
+                    gotItCurrentCard();
                 }
+            } else if ((event.key === "a" || event.key === "1") && isRevealed) {
+                event.preventDefault();
+                againCurrentCard();
+            } else if (event.key === "p" && isRevealed) {
+                event.preventDefault();
+                if (audioBtn) audioBtn.click();
             } else if (event.key === "s" && !isRevealed) {
                 event.preventDefault();
                 skipCurrentCard();

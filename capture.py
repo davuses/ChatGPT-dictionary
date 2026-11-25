@@ -266,6 +266,7 @@ def promote_capture_items(
 @api_router.get("/lookup", response_class=JSONResponse)
 def lookup_word(
     word: str = Query(...),
+    include_synonym_links: bool = Query(False),
     current_user: UserRecord = Depends(require_api_user),
 ):
     clean_word = " ".join(word.split())
@@ -302,16 +303,24 @@ def lookup_word(
         )
         thesaurus_error = "Thesaurus lookup temporarily unavailable"
 
-    return JSONResponse(
-        {
-            "word": clean_word,
-            "ipa": ipa,
-            "existing_entries": existing_entries,
-            "senses": senses,
-            "thesaurus_error": thesaurus_error,
-        },
-        headers={"Cache-Control": "no-store"},
-    )
+    payload: dict[str, object] = {
+        "word": clean_word,
+        "ipa": ipa,
+        "existing_entries": existing_entries,
+        "senses": senses,
+        "thesaurus_error": thesaurus_error,
+    }
+    if include_synonym_links:
+        syn_links: dict[str, int] = {}
+        for sense in senses:
+            for syn in sense.get("synonyms", []):
+                if isinstance(syn, str):
+                    key = syn.strip().lower()
+                    if key and key not in syn_links and key in all_words:
+                        syn_links[key] = all_words[key][0]
+        payload["synonym_links"] = syn_links
+
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
 
 
 @api_router.get("/quick-search", response_class=JSONResponse)

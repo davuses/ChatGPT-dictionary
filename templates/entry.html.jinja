@@ -3,36 +3,15 @@
 {% block title %}{{ word }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
 
-{% macro audio_button(btn_id, audio_id, label) %}
-<button type="button"
-    class="audio-btn"
-    id="{{ btn_id }}"
-    data-audio-id="{{ audio_id }}"
-    aria-label="{{ label }}"
-    hidden>
-    <svg class="icon-play" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
-        <polygon points="10,8 16.5,12 10,16" fill="currentColor" />
-    </svg>
-    <svg class="icon-pause" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
-        <rect x="9" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
-        <rect x="12.6" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
-    </svg>
-</button>
-{% endmacro %}
-
 {% block body %}
     {% set synonyms_link %}<a class="button button-ghost" href="/show_synonyms/{{ entry_id }}">{{ t('nav.synonyms') }}</a>{% endset %}
     {{ page_header(extra_nav=synonyms_link) }}
-    <article class="entry-page" id="entry-article" data-entry-text="{{ entry_text }}">
+    <article class="entry-page" id="entry-article" data-entry-text="{{ entry_text }}" data-word="{{ word }}">
         <header class="word-hero">
             <div class="word-hero-top">
                 <h1 class="word-title">{{ word }}</h1>
                 <div class="section-actions">
-                    <button class="button button-ghost"
-                        onclick="location.href='/edit_entry/{{ entry_id }}'"
-                        type="button">{{ t('entry.edit') }}</button>
+                    <button class="button button-ghost" id="toggle-entry-edit" type="button">{{ t('entry.edit') }}</button>
                     <button class="button button-danger"
                         onclick="deleteEntry({{ entry_id }})"
                         type="button"
@@ -41,38 +20,41 @@
             </div>
 
             <div class="pronunciation-row IPA-player">
+                {% if IPA_transcript %}
                 <span class="ipa-text">/{{ IPA_transcript }}/</span>
-
-                <audio id="1-ipa-audio"
-                    class="ipa-audio"
-                    preload="metadata"
-                    hidden>
-                    <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_1.mp3"
-                        type="audio/mp3">
-                    <source src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/x{{ oxford_audio_slug }}--_us_1.mp3"
-                        type="audio/mp3">
-                </audio>
-                {{ audio_button("audio-icon-1", "1-ipa-audio", t('entry.play_1')) }}
-
-                <audio id="2-ipa-audio"
-                    class="ipa-audio"
-                    preload="metadata"
-                    hidden>
-                    <source id="2nd-ipa-source"
-                        src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/{{ oxford_audio_slug }}--_us_2.mp3"
-                        type="audio/mp3">
-                </audio>
-                {{ audio_button("audio-icon-2", "2-ipa-audio", t('entry.play_2')) }}
-
-                <audio id="google-translate-audio"
-                    preload="metadata"
-                    hidden>
-                    <source
-                        src="https://www.google.com/speech-api/v1/synthesize?text={{ tts_audio_query }}&enc=mpeg&lang=en-us&speed=0.45&client=lr-language-tts&use_google_only_voices=1"
-                        type="audio/mp3">
-                </audio>
-                {{ audio_button("google-translate-audio-icon", "google-translate-audio", t('entry.play')) }}
+                {% endif %}
+                <button type="button"
+                    class="audio-btn"
+                    id="entry-audio-btn"
+                    data-word="{{ word }}"
+                    aria-label="{{ t('entry.play') }}"
+                    title="{{ t('entry.play') }}">
+                    <svg class="icon-play" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><use href="#icon-audio-play"/></svg>
+                    <svg class="icon-pause" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
+                </button>
+                <div class="inbox-dict-links">
+                    <a class="inbox-dict-link" href="https://www.google.com/search?q={{ ('define ' ~ word) | urlencode }}" target="_blank" rel="noopener noreferrer">Google</a>
+                    <a class="inbox-dict-link" href="https://www.oxfordlearnersdictionaries.com/search/english/?q={{ word | urlencode }}" target="_blank" rel="noopener noreferrer">Oxford</a>
+                    <a class="inbox-dict-link" href="https://www.ldoceonline.com/search/english/direct/?q={{ word | urlencode }}" target="_blank" rel="noopener noreferrer">Longman</a>
+                    <a class="inbox-dict-link" href="https://www.merriam-webster.com/dictionary/{{ word | urlencode }}" target="_blank" rel="noopener noreferrer">MW</a>
+                </div>
             </div>
+
+            <form class="entry-inline-form form-page" id="inline-entry-form" method="post" action="/edit_entry/{{ entry_id }}" hidden>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="form-field">
+                    <label for="inline-word-input">{{ t('form.word_label') }}</label>
+                    <input type="text" id="inline-word-input" name="word" value="{{ word }}" required>
+                </div>
+                <div class="form-field">
+                    <label for="inline-context-input">{{ t('form.context_label') }} <span class="field-hint">{{ t('form.optional_hint') }}</span></label>
+                    <input type="text" id="inline-context-input" name="context" value="{{ raw_context_text }}">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">{{ t('form.save_changes') }}</button>
+                    <button type="button" class="button button-ghost" id="cancel-entry-edit">{{ t('form.cancel') }}</button>
+                </div>
+            </form>
 
             <div class="word-meta">
                 <div class="word-meta-stats">
@@ -105,9 +87,8 @@
                 <h2>{{ t('entry.definition') }}</h2>
                 {% if definition_exists %}
                 <div class="section-actions">
-                    <button class="button button-ghost"
-                        onclick="location.href='/edit_definition/{{ definition_id }}'"
-                        type="button">{{ t('entry.edit') }}</button>
+                    <button class="button button-ghost" id="toggle-def-edit" type="button">{{ t('entry.edit') }}</button>
+                    <a class="button button-ghost" href="/edit_definition/{{ definition_id }}">{{ t('entry.full_editor') }}</a>
                     <button class="button button-danger"
                         onclick="deleteDefinition(this, {{ definition_id }})"
                         type="button">{{ t('entry.delete') }}</button>
@@ -115,34 +96,93 @@
                 {% endif %}
             </div>
             {% if not definition_exists %}
-            <button class="button button-ghost"
-                onclick="location.href='/add_definition?entry_id={{ entry_id }}'"
-                type="button">{{ t('entry.add_definition') }}</button>
+            <div class="section-actions" id="add-def-actions">
+                <button class="button button-ghost" id="toggle-def-edit" type="button">{{ t('entry.add_definition') }}</button>
+                <a class="button button-ghost" href="/add_definition?entry_id={{ entry_id }}">{{ t('entry.full_editor') }}</a>
+            </div>
             {% else %}
             <div id="definition-div" class="markdown-body">
                 {{ definition_html | safe }}
             </div>
             {% endif %}
+            <form class="entry-inline-form form-page" id="inline-def-form" hidden>
+                <div class="form-field">
+                    <label for="inline-def-textarea">{{ t('entry.definition') }} <span class="field-hint">{{ t('form.md_hint') }}</span></label>
+                    <textarea id="inline-def-textarea" name="definition_text" rows="6" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">{{ t('form.save_changes') }}</button>
+                    <button type="button" class="button button-ghost" id="cancel-def-edit">{{ t('form.cancel') }}</button>
+                </div>
+            </form>
         </section>
 
         <section class="content-section">
             <div class="section-header">
                 <h2>{{ t('entry.example') }}</h2>
-                <button class="button button-ghost"
-                    onclick="location.href='/edit_example/{{ entry_id }}'"
-                    type="button"
-                    id="edit-example">{{ t('entry.edit') }}</button>
+                <div class="section-actions">
+                    <button class="button button-ghost" id="edit-example" type="button">{{ t('entry.edit') if example_exists else t('entry.add_example') }}</button>
+                    <a class="button button-ghost" href="/edit_example/{{ entry_id }}">{{ t('entry.full_editor') }}</a>
+                </div>
             </div>
-            <div class="markdown-body">{{ example_html | safe }}</div>
+            <div id="example-div" class="markdown-body">{{ example_html | safe }}</div>
+            <form class="entry-inline-form form-page" id="inline-example-form" hidden>
+                <div class="form-field">
+                    <label for="inline-example-textarea">{{ t('entry.example') }} <span class="field-hint">{{ t('form.md_hint') }}</span></label>
+                    <textarea id="inline-example-textarea" name="example_text" rows="6"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">{{ t('form.save_changes') }}</button>
+                    <button type="button" class="button button-ghost" id="cancel-example-edit">{{ t('form.cancel') }}</button>
+                </div>
+            </form>
         </section>
+
+        <details class="content-section" id="entry-synonyms-details">
+            <summary class="section-header" style="cursor: pointer;">
+                <h2>{{ t('entry.synonyms_title') }}</h2>
+                <a class="button button-ghost" href="/show_synonyms/{{ entry_id }}" onclick="event.stopPropagation()">{{ t('entry.synonyms_open_full') }}</a>
+            </summary>
+            <div id="entry-synonyms-panel" class="synonym-panel"></div>
+        </details>
+
+        <div class="entry-shortcuts-hint">
+            <button type="button" class="button button-ghost" id="open-entry-shortcuts">{{ t('entry.shortcuts_btn') }}</button>
+        </div>
     </article>
+
+    <dialog id="entry-shortcuts-dialog" class="app-dialog">
+        <div class="app-dialog-body">
+            <h2 class="app-dialog-title">{{ t('entry.shortcuts_title') }}</h2>
+            <table class="shortcut-table">
+                <tbody>
+                    <tr><td><kbd>p</kbd></td><td>{{ t('entry.shortcut_p') }}</td></tr>
+                    <tr><td><kbd>e</kbd></td><td>{{ t('entry.shortcut_e') }}</td></tr>
+                    <tr><td><kbd>b</kbd></td><td>{{ t('entry.shortcut_b') }}</td></tr>
+                    <tr><td><kbd>Q</kbd></td><td>{{ t('entry.shortcut_q') }}</td></tr>
+                    <tr><td><kbd>D</kbd></td><td>{{ t('entry.shortcut_d') }}</td></tr>
+                    <tr><td><kbd>a</kbd> / <kbd>A</kbd></td><td>{{ t('entry.shortcut_a') }}</td></tr>
+                    <tr><td><kbd>/</kbd></td><td>{{ t('entry.shortcut_slash') }}</td></tr>
+                </tbody>
+            </table>
+            <div class="app-dialog-actions">
+                <button type="button" class="button button-primary" id="close-entry-shortcuts">{{ t('entry.close') }}</button>
+            </div>
+        </div>
+    </dialog>
 
     <script>
         var entryId = "{{ entry_id }}";
+        var definitionId = {{ definition_id | tojson }};
+        var csrfToken = "{{ csrf_token or '' }}";
 
-        function deleteDefinition(button, definitionId) {
-            if (confirm(uiText("confirm_delete_def", null, "Are you sure you want to delete this definition?"))) {
-                fetch("/delete_definition/" + definitionId, {
+        function deleteDefinition(button, defId) {
+            confirmDialog(
+                uiText("confirm_delete_def", null, "Are you sure you want to delete this definition?"),
+                { danger: true }
+            ).then((confirmed) => {
+                if (!confirmed) return;
+                fetch("/delete_definition/" + defId, {
                     method: "DELETE",
                     headers: csrfHeaders()
                 }).then(handleProtectedResponse).then((Response) => {
@@ -150,7 +190,7 @@
                         location.reload();
                     }
                 });
-            }
+            });
         }
 
         function handleSetReviewBookmark() {
@@ -159,7 +199,7 @@
             }).then(handleProtectedResponse)
                 .then(response => {
                     if (response.ok) location.reload();
-                    else alert(uiText('bookmark_set_failed', null, 'Failed to set resume point.'));
+                    else showToast(uiText('bookmark_set_failed', null, 'Failed to set resume point.'), { type: 'error' });
                 });
         }
 
@@ -169,103 +209,247 @@
             }).then(handleProtectedResponse)
                 .then(response => {
                     if (response.ok) location.reload();
-                    else alert(uiText('bookmark_clear_failed', null, 'Failed to clear resume point.'));
+                    else showToast(uiText('bookmark_clear_failed', null, 'Failed to clear resume point.'), { type: 'error' });
                 });
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            const buttons = document.querySelectorAll(".audio-btn");
-            const ipaAudios = [
-                document.getElementById("1-ipa-audio"),
-                document.getElementById("2-ipa-audio"),
-            ];
-            const ttsAudio = document.getElementById("google-translate-audio");
-            const ttsBtn = document.getElementById("google-translate-audio-icon");
-
-            function syncAudioFallback() {
-                if (!ttsBtn || !ttsAudio) return;
-                const hasIpa = ipaAudios.some((a) => a && a.readyState > 0);
-                if (!hasIpa && ttsAudio.readyState > 0) {
-                    ttsBtn.hidden = false;
-                } else if (hasIpa) {
-                    ttsBtn.hidden = true;
-                }
+            const article = document.getElementById("entry-article");
+            const audioBtn = document.getElementById("entry-audio-btn");
+            if (audioBtn) {
+                audioBtn.addEventListener("click", () => {
+                    playWordPronunciation(audioBtn.dataset.word || "", audioBtn);
+                });
             }
 
-            buttons.forEach((btn) => {
-                const audio = document.getElementById(btn.dataset.audioId);
-                if (!audio) return;
-
-                btn.addEventListener("click", () => {
-                    if (audio.paused) {
-                        audio.play();
-                    } else {
-                        audio.pause();
+            // Inline Word/Context edit toggle
+            const toggleEntryBtn = document.getElementById("toggle-entry-edit");
+            const inlineEntryForm = document.getElementById("inline-entry-form");
+            const cancelEntryBtn = document.getElementById("cancel-entry-edit");
+            if (toggleEntryBtn && inlineEntryForm) {
+                toggleEntryBtn.addEventListener("click", () => {
+                    inlineEntryForm.hidden = !inlineEntryForm.hidden;
+                    if (!inlineEntryForm.hidden) {
+                        const input = document.getElementById("inline-word-input");
+                        if (input) input.focus();
                     }
                 });
-
-                audio.addEventListener("play", () => btn.classList.add("is-playing"));
-                audio.addEventListener("pause", () => btn.classList.remove("is-playing"));
-                audio.addEventListener("ended", () => btn.classList.remove("is-playing"));
-                audio.addEventListener("canplay", () => {
-                    if (audio === ttsAudio) {
-                        syncAudioFallback();
-                    } else {
-                        btn.hidden = false;
-                        syncAudioFallback();
-                    }
+            }
+            if (cancelEntryBtn && inlineEntryForm) {
+                cancelEntryBtn.addEventListener("click", () => {
+                    inlineEntryForm.hidden = true;
                 });
+            }
 
-                if (audio.readyState > 0) {
-                    if (audio === ttsAudio) {
-                        syncAudioFallback();
-                    } else {
-                        btn.hidden = false;
-                        syncAudioFallback();
-                    }
-                }
-            });
+            let rawCache = null;
+            function ensureRawLoaded() {
+                if (rawCache) return Promise.resolve(rawCache);
+                return fetchJson("/entry/" + encodeURIComponent(entryId) + "/raw").then((data) => {
+                    rawCache = data || { definition_text: "", example_text: "" };
+                    return rawCache;
+                });
+            }
 
-            document.addEventListener("keydown", (event) => {
-                if (event.altKey && event.key === "v") {
-                    if (shouldIgnoreShortcut(event, { allowAlt: true })) return;
-                    event.preventDefault();
-                    const definitionDiv = document.getElementById("definition-div");
-                    if (!definitionDiv) {
-                        navigator.clipboard
-                            .readText()
-                            .then((text) => {
-                                const definitionForm = document.createElement("form");
-                                definitionForm.method = "post";
-                                definitionForm.action = "/add_definition";
-                                let formData = { entry_id: entryId, definition_text: text, csrf_token: "{{ csrf_token or '' }}" };
-                                for (const key in formData) {
-                                    const hiddenField = document.createElement("input");
-                                    hiddenField.type = "hidden";
-                                    hiddenField.name = key;
-                                    hiddenField.value = formData[key];
-                                    definitionForm.appendChild(hiddenField);
-                                }
-                                document.body.appendChild(definitionForm);
-                                definitionForm.submit();
+            // Inline Definition edit/add
+            const toggleDefBtn = document.getElementById("toggle-def-edit");
+            const inlineDefForm = document.getElementById("inline-def-form");
+            const cancelDefBtn = document.getElementById("cancel-def-edit");
+            const defDiv = document.getElementById("definition-div");
+            if (toggleDefBtn && inlineDefForm) {
+                toggleDefBtn.addEventListener("click", () => {
+                    const opening = inlineDefForm.hidden;
+                    inlineDefForm.hidden = !opening;
+                    if (defDiv) defDiv.hidden = opening;
+                    if (opening) {
+                        const ta = document.getElementById("inline-def-textarea");
+                        ensureRawLoaded()
+                            .then((data) => {
+                                if (ta && !ta.value) ta.value = data.definition_text || "";
+                                if (ta) ta.focus();
                             })
-                            .catch((error) => {
-                                console.error("Failed to read clipboard: ", error);
+                            .catch(() => {
+                                if (ta) ta.focus();
                             });
                     }
-                    return;
-                }
+                });
+            }
+            if (cancelDefBtn && inlineDefForm) {
+                cancelDefBtn.addEventListener("click", () => {
+                    inlineDefForm.hidden = true;
+                    if (defDiv) defDiv.hidden = false;
+                });
+            }
+            if (inlineDefForm) {
+                inlineDefForm.addEventListener("submit", (event) => {
+                    event.preventDefault();
+                    const ta = document.getElementById("inline-def-textarea");
+                    const text = ta ? ta.value.trim() : "";
+                    if (!text) return;
+                    const fd = new FormData();
+                    fd.append("csrf_token", csrfToken);
+                    fd.append("definition_text", text);
+                    let url = "/edit_definition/" + encodeURIComponent(definitionId);
+                    if (!definitionId) {
+                        url = "/add_definition";
+                        fd.append("entry_id", entryId);
+                    }
+                    fetch(url, { method: "POST", body: fd })
+                        .then(handleProtectedResponse)
+                        .then((resp) => {
+                            if (resp.ok) {
+                                location.reload();
+                            } else {
+                                showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+                            }
+                        })
+                        .catch(() => {
+                            showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+                        });
+                });
+            }
+
+            // Inline Example edit
+            const toggleExBtn = document.getElementById("edit-example");
+            const inlineExForm = document.getElementById("inline-example-form");
+            const cancelExBtn = document.getElementById("cancel-example-edit");
+            const exDiv = document.getElementById("example-div");
+            if (toggleExBtn && inlineExForm) {
+                toggleExBtn.addEventListener("click", () => {
+                    const opening = inlineExForm.hidden;
+                    inlineExForm.hidden = !opening;
+                    if (exDiv) exDiv.hidden = opening;
+                    if (opening) {
+                        const ta = document.getElementById("inline-example-textarea");
+                        ensureRawLoaded()
+                            .then((data) => {
+                                if (ta && !ta.value) ta.value = data.example_text || "";
+                                if (ta) ta.focus();
+                            })
+                            .catch(() => {
+                                if (ta) ta.focus();
+                            });
+                    }
+                });
+            }
+            if (cancelExBtn && inlineExForm) {
+                cancelExBtn.addEventListener("click", () => {
+                    inlineExForm.hidden = true;
+                    if (exDiv) exDiv.hidden = false;
+                });
+            }
+            if (inlineExForm) {
+                inlineExForm.addEventListener("submit", (event) => {
+                    event.preventDefault();
+                    const ta = document.getElementById("inline-example-textarea");
+                    const fd = new FormData();
+                    fd.append("csrf_token", csrfToken);
+                    fd.append("example_text", ta ? ta.value : "");
+                    fetch("/edit_example/" + encodeURIComponent(entryId), { method: "POST", body: fd })
+                        .then(handleProtectedResponse)
+                        .then((resp) => {
+                            if (resp.ok) {
+                                location.reload();
+                            } else {
+                                showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+                            }
+                        })
+                        .catch(() => {
+                            showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+                        });
+                });
+            }
+
+            // Lazy Synonyms section
+            const synDetails = document.getElementById("entry-synonyms-details");
+            const synPanel = document.getElementById("entry-synonyms-panel");
+            let synLoaded = false;
+            if (synDetails && synPanel) {
+                synDetails.addEventListener("toggle", () => {
+                    if (!synDetails.open || synLoaded) return;
+                    synLoaded = true;
+                    synPanel.textContent = uiText("synonyms_loading", null, "Loading synonyms…");
+                    const word = article ? article.dataset.word || "" : "";
+                    fetchJson("/api/v1/lookup?word=" + encodeURIComponent(word) + "&include_synonym_links=true")
+                        .then((data) => {
+                            synPanel.textContent = "";
+                            if (data.thesaurus_error) {
+                                const p = document.createElement("p");
+                                p.className = "quiz-empty";
+                                p.textContent = uiText("synonyms_error", null, "Thesaurus lookup temporarily unavailable.");
+                                synPanel.appendChild(p);
+                                return;
+                            }
+                            const senses = Array.isArray(data.senses) ? data.senses : [];
+                            if (!senses.length) {
+                                const p = document.createElement("p");
+                                p.className = "quiz-empty";
+                                p.textContent = uiText("synonyms_empty", null, "No synonyms found for this word.");
+                                synPanel.appendChild(p);
+                                return;
+                            }
+                            const links = data.synonym_links || {};
+                            const table = document.createElement("table");
+                            table.className = "synonyms-table";
+                            const tbody = document.createElement("tbody");
+                            senses.forEach((sense) => {
+                                const tr = document.createElement("tr");
+                                const tdPos = document.createElement("td");
+                                tdPos.textContent = sense.part_of_speech || "";
+                                const tdMean = document.createElement("td");
+                                tdMean.textContent = sense.meaning || "";
+                                const tdSyns = document.createElement("td");
+                                const syns = Array.isArray(sense.synonyms) ? sense.synonyms : [];
+                                syns.forEach((syn, idx) => {
+                                    if (idx > 0) tdSyns.appendChild(document.createTextNode(", "));
+                                    const linkedId = links[String(syn).toLowerCase()];
+                                    if (linkedId) {
+                                        const a = document.createElement("a");
+                                        a.href = "/entry/" + encodeURIComponent(linkedId);
+                                        a.textContent = syn;
+                                        tdSyns.appendChild(a);
+                                    } else {
+                                        tdSyns.appendChild(document.createTextNode(syn));
+                                    }
+                                });
+                                tr.appendChild(tdPos);
+                                tr.appendChild(tdMean);
+                                tr.appendChild(tdSyns);
+                                tbody.appendChild(tr);
+                            });
+                            table.appendChild(tbody);
+                            synPanel.appendChild(table);
+                        })
+                        .catch(() => {
+                            synPanel.textContent = uiText("synonyms_error", null, "Thesaurus lookup temporarily unavailable.");
+                        });
+                });
+            }
+
+            // Shortcuts dialog
+            const shortcutsDialog = document.getElementById("entry-shortcuts-dialog");
+            const openShortcutsBtn = document.getElementById("open-entry-shortcuts");
+            const closeShortcutsBtn = document.getElementById("close-entry-shortcuts");
+            if (openShortcutsBtn && shortcutsDialog) {
+                openShortcutsBtn.addEventListener("click", () => shortcutsDialog.showModal());
+            }
+            if (closeShortcutsBtn && shortcutsDialog) {
+                closeShortcutsBtn.addEventListener("click", () => shortcutsDialog.close());
+            }
+            if (shortcutsDialog) {
+                shortcutsDialog.addEventListener("click", (event) => {
+                    if (event.target === shortcutsDialog) shortcutsDialog.close();
+                });
+            }
+
+            document.addEventListener("keydown", (event) => {
                 if (shouldIgnoreShortcut(event)) return;
-                if (event.key === "p") {
-                    const readyIpa = ipaAudios.filter((a) => a && a.readyState > 0);
-                    const audioElems = readyIpa.length ? readyIpa : (ttsAudio ? [ttsAudio] : []);
-                    let delayMs = 0;
-                    audioElems.forEach((audio) => {
-                        setTimeout(() => audio.play(), delayMs);
-                        if (Number.isFinite(audio.duration)) {
-                            delayMs += audio.duration * 1000;
-                        }
-                    });
+                if (event.key === "?") {
+                    if (shortcutsDialog) {
+                        event.preventDefault();
+                        shortcutsDialog.showModal();
+                    }
+                } else if (event.key === "p") {
+                    if (audioBtn) audioBtn.click();
                 } else if (event.key === "b") {
                     if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
                         history.back();
@@ -273,18 +457,16 @@
                         window.location.href = "/entries";
                     }
                 } else if (event.key === "e") {
-                    const editBtn = document.getElementById("edit-example");
-                    if (editBtn) editBtn.click();
+                    if (toggleExBtn) toggleExBtn.click();
                 } else if (event.key === "D") {
                     const delBtn = document.getElementById("dbt");
                     if (delBtn) delBtn.click();
                 } else if (event.key === "a") {
                     window.open("/add_entry", "_blank").focus();
                 } else if (event.key === "Q") {
-                    const article = document.getElementById("entry-article");
                     const textToCopy = article ? article.dataset.entryText || "" : "";
                     navigator.clipboard.writeText(textToCopy).then(() => {
-                        console.log("Text copied to clipboard!");
+                        showToast(uiText("entry_copied", null, "Copied to clipboard"));
                     }).catch((err) => {
                         console.error("Failed to copy text: ", err);
                     });

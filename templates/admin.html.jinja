@@ -68,7 +68,7 @@
                     <td>{{ how_long_ago(inv.created_at) }}</td>
                     <td>
                         {% if not inv.used_at %}
-                        <form class="inline-form" method="post" action="/admin/invites/{{ inv.id }}/revoke">
+                        <form class="inline-form" method="post" action="/admin/invites/{{ inv.id }}/revoke" data-confirm-key="confirm_revoke_invite" data-confirm-danger="true">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button class="button button-danger" type="submit">{{ t('account.revoke') }}</button>
                         </form>
@@ -121,7 +121,7 @@
                             </form>
                             {% endif %}
                             {% if u.id != current_user.id %}
-                            <form class="inline-form" method="post" action="/admin/users/{{ u.id }}/toggle-active">
+                            <form class="inline-form" method="post" action="/admin/users/{{ u.id }}/toggle-active"{% if u.is_active %} data-confirm-key="confirm_disable_user" data-confirm-danger="true"{% endif %}>
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button class="button {% if u.is_active %}button-danger{% else %}button-ghost{% endif %}" type="submit">
                                     {{ t('admin.disable' if u.is_active else 'admin.enable') }}

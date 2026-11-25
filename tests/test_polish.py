@@ -174,14 +174,10 @@ async def test_entry_page_encodes_audio_urls_cleanly(client, admin_user, monkeyp
 
     resp = await client.get(f"/entry/{eid}")
     assert resp.status_code == 200
-    assert (
-        'src="https://ssl.gstatic.com/dictionary/static/sounds/oxford/'
-        'pipe%20dream%2Fwish--_us_1.mp3"' in resp.text
-    )
-    assert (
-        'src="https://www.google.com/speech-api/v1/synthesize?'
-        'text=Pipe+dream%2Fwish&enc=mpeg' in resp.text
-    )
+    assert 'id="entry-audio-btn"' in resp.text
+    assert 'data-word="Pipe dream/wish"' in resp.text
+    assert "merriam-webster.com/dictionary/Pipe%20dream" in resp.text
+    assert "google.com/search?q=define%20Pipe%20dream" in resp.text
 
 
 async def test_edit_note_oserror_returns_500_page(
@@ -592,6 +588,62 @@ async def test_nav_inbox_badge_dashboard_pills_and_rich_quiz_next(client, admin_
     assert len(q_data["sentence_parts"]) == 2
     assert "Frankness and honesty in expression." in q_data["definition_preview"]
     assert e2 != e1
+
+
+async def test_phase3_entry_detail_lookup_synonym_links_review_and_admin(
+    client, admin_user, monkeypatch
+):
+    e1 = database.db_add_entry(
+        admin_user.id,
+        "She spoke with candor at the forum. - candor",
+        "```text\nfrankness\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+    )
+    e2 = database.db_add_entry(admin_user.id, "ctx - frankness")
+    utils.invalidate_words_cache(admin_user.id)
+    utils.invalidate_quiz_pool_cache(admin_user.id)
+
+    await _login(client)
+
+    entry_resp = await client.get(f"/entry/{e1}")
+    assert entry_resp.status_code == 200
+    assert 'id="entry-audio-btn"' in entry_resp.text
+    assert "<audio " not in entry_resp.text
+    assert "merriam-webster.com/dictionary/candor" in entry_resp.text
+    assert 'id="inline-entry-form"' in entry_resp.text
+    assert 'id="inline-def-form"' in entry_resp.text
+    assert 'id="inline-example-form"' in entry_resp.text
+    assert 'id="entry-synonyms-details"' in entry_resp.text
+    assert 'id="entry-shortcuts-dialog"' in entry_resp.text
+    assert "navigator.clipboard" in entry_resp.text
+    assert "readText" not in entry_resp.text
+    assert "<table>" in entry_resp.text
+    assert "<pre>" in entry_resp.text
+
+    # /api/v1/lookup with include_synonym_links=true
+    monkeypatch.setattr(
+        "capture.get_thesaurus_senses_plain",
+        lambda _w: ({"part_of_speech": "noun", "meaning": "honesty", "synonyms": ["frankness", "openness"]},),
+    )
+    lookup_resp = await client.get("/api/v1/lookup?word=candor&include_synonym_links=true")
+    assert lookup_resp.status_code == 200
+    lookup_data = lookup_resp.json()
+    assert lookup_data["synonym_links"] == {"frankness": e2}
+
+    # /review accepts size=30 and renders Again/Got it + audio button
+    review_resp = await client.get("/review?size=30")
+    assert review_resp.status_code == 200
+    assert 'id="review-again-btn"' in review_resp.text
+    assert 'id="review-audio-btn"' in review_resp.text
+    assert "/review?size=30" in review_resp.text
+
+    # /admin renders confirmation attributes on destructive actions
+    database.db_create_user("alice", "x" * 60, is_admin=False)
+    database.db_create_invite_token(admin_user.id, "hash-inv-1", "Alice", int(database.time.time()) + 3600)
+    admin_resp = await client.get("/admin")
+    assert admin_resp.status_code == 200
+    assert 'data-confirm-key="confirm_revoke_invite"' in admin_resp.text
+    assert 'data-confirm-key="confirm_disable_user"' in admin_resp.text
+
 
 
 

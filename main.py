@@ -923,7 +923,7 @@ REVIEW_EXCLUDE_HISTORY_SIZE = 40
 @protected_router.get("/review", response_class=HTMLResponse)
 def review_page(
     request: Request,
-    size: int = Query(REVIEW_DEFAULT_SIZE, ge=1, le=25),
+    size: int = Query(REVIEW_DEFAULT_SIZE, ge=1, le=50),
     exclude: str = Query(""),
     current_user: UserRecord = Depends(require_user),
 ):
@@ -1134,21 +1134,26 @@ def entry_page(
     definition_exists = bool(entry.definitions)
     definition_html = None
     definition_id = None
+    definition_raw = ""
     if definition_exists:
         d = entry.definitions[0]
-        definition_html = render_safe_markdown(d.text, extras=["strike"])
+        definition_raw = d.text or ""
+        definition_html = render_safe_markdown(
+            definition_raw,
+            extras=["strike", "tables", "fenced-code-blocks"],
+            wrap_ipa=True,
+        )
         definition_id = d.id
     context_text, word = parse_entry_text(entry.text)
     IPA_transcript = get_IPA(word)
-    oxford_audio_slug = urllib.parse.quote(word.lower(), safe="")
-    tts_audio_query = urllib.parse.quote_plus(word)
+    example_raw = entry.example or ""
     example_html = (
         render_safe_markdown(
-            normalize_pronoun_casing(entry.example),
-            extras=["strike", "tables"],
+            normalize_pronoun_casing(example_raw),
+            extras=["strike", "tables", "fenced-code-blocks"],
             wrap_ipa=True,
         )
-        if entry.example
+        if example_raw
         else ""
     )
     review_bookmark_entry_id = get_review_bookmark(current_user.id)
@@ -1159,19 +1164,37 @@ def entry_page(
         "is_review_bookmark": entry_id == review_bookmark_entry_id,
         "entry_text": normalize_pronoun_casing(entry.text),
         "context_text": normalize_pronoun_casing(context_text),
+        "raw_context_text": context_text,
         "entry_id": entry_id,
         "IPA_transcript": IPA_transcript,
         "word": word,
-        "oxford_audio_slug": oxford_audio_slug,
-        "tts_audio_query": tts_audio_query,
         "definition_exists": definition_exists,
         "definition_html": definition_html,
         "definition_id": definition_id,
         "example_html": example_html,
+        "example_exists": bool(example_raw),
         "needs_markdown_css": True,
     }
     return templates.TemplateResponse(
         request=request, name="entry.html.jinja", context=context
+    )
+
+
+@protected_router.get("/entry/{entry_id}/raw", response_class=JSONResponse)
+def entry_raw_markdown(
+    entry_id: int,
+    current_user: UserRecord = Depends(require_user),
+):
+    entry = db_get_entry_by_id(current_user.id, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    def_text = entry.definitions[0].text if entry.definitions else ""
+    return JSONResponse(
+        {
+            "definition_text": def_text or "",
+            "example_text": entry.example or "",
+        },
+        headers={"Cache-Control": "no-store"},
     )
 
 
