@@ -28,6 +28,7 @@
         {% if is_admin %}
         <a class="nav-link{% if active == 'notes' %} active{% endif %}" href="/notes/"{% if active == 'notes' %} aria-current="page"{% endif %}>{{ t('nav.notes') }}</a>
         {% endif %}
+        <button type="button" class="button button-ghost nav-search-btn" id="open-quick-search" aria-label="{{ t('nav.search_aria') }}"><span>{{ t('nav.search_btn') }}</span><kbd>/</kbd></button>
         {{ extra_nav | safe }}
         {% if show_add %}<a class="button button-primary nav-add-btn{% if active == 'add' %} active{% endif %}" href="/add_entry">{{ t('nav.add') }}</a>{% endif %}
         <details class="nav-account-menu">

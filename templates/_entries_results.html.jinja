@@ -6,7 +6,12 @@
   view_qs) since a standalone render has no access to macros defined in the
   including template.
 #}
-{% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
+{% macro view_qs(extra) -%}
+{%- set parts = [] -%}
+{%- if search_query %}{% set _ = parts.append('q=' ~ (search_query | urlencode)) %}{% endif -%}
+{%- if sort and sort != 'newest' %}{% set _ = parts.append('sort=' ~ (sort | urlencode)) %}{% endif -%}
+{%- if parts %}{{ extra }}{{ parts | join('&') }}{% endif -%}
+{%- endmacro %}
 
 {% if not entry_displays %}
 <p class="entries-empty">

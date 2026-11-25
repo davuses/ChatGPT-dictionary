@@ -507,5 +507,93 @@ async def test_definitions_tab_renders_clamped_plain_definitions_and_xhr(
     assert "<mark>skimp</mark>" in payload["results_html"]
 
 
+async def test_entries_sorting_and_definition_search(client, admin_user):
+    e1 = database.db_add_entry(admin_user.id, "ctx - alpha", "unique_gloss_needle")
+    e2 = database.db_add_entry(admin_user.id, "ctx - beta", "other meaning")
+    e3 = database.db_add_entry(admin_user.id, "ctx - gamma", "")
+    base_ts = int(database.time.time()) + database.VISIT_COOLDOWN_SECONDS + 10
+    for step in range(3):
+        database.db_record_entry_visit(
+            admin_user.id, e1, now=base_ts + step * (database.VISIT_COOLDOWN_SECONDS + 1)
+        )
+    database.db_record_entry_visit(admin_user.id, e2, now=base_ts)
+
+    await _login(client)
+
+    r_newest = await client.get("/entries?sort=newest")
+    assert r_newest.status_code == 200
+    assert r_newest.text.index(f'id="{e3}"') < r_newest.text.index(f'id="{e2}"') < r_newest.text.index(f'id="{e1}"')
+
+    r_unvisited = await client.get("/entries?sort=unvisited")
+    assert r_unvisited.status_code == 200
+    assert r_unvisited.text.index(f'id="{e3}"') < r_unvisited.text.index(f'id="{e2}"') < r_unvisited.text.index(f'id="{e1}"')
+
+    r_most = await client.get("/entries?sort=most_visited")
+    assert r_most.status_code == 200
+    assert r_most.text.index(f'id="{e1}"') < r_most.text.index(f'id="{e2}"') < r_most.text.index(f'id="{e3}"')
+
+    # Definition text is searched only in show_definition mode
+    r_all = await client.get("/entries?q=unique_gloss_needle")
+    assert f'id="{e1}"' not in r_all.text
+    r_def = await client.get("/entries?show_definition=true&q=unique_gloss_needle")
+    assert f'id="{e1}"' in r_def.text
+    assert "<mark>unique_gloss_needle</mark>" in r_def.text
+
+
+async def test_quick_search_ranking_and_user_isolation(client, admin_user):
+    other = database.db_create_user("other-member", "x" * 60, is_admin=False)
+    e_ctx = database.db_add_entry(admin_user.id, "She saw a starlight sky - twilight")
+    e_mid = database.db_add_entry(admin_user.id, "ctx - outsmart")
+    e_pre = database.db_add_entry(admin_user.id, "ctx - stark")
+    database.db_add_entry(other.id, "ctx - starship")
+
+    await _login(client)
+    resp = await client.get("/api/v1/quick-search?q=star")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    words = [item["word"] for item in items]
+    assert "starship" not in words
+    assert [item["id"] for item in items] == [e_pre, e_ctx]
+    assert e_mid not in [item["id"] for item in items]
+
+
+async def test_nav_inbox_badge_dashboard_pills_and_rich_quiz_next(client, admin_user):
+    e1 = database.db_add_entry(
+        admin_user.id,
+        "The team showed great candor during the meeting - candor",
+        "**Frankness** and honesty in expression.",
+    )
+    e2 = database.db_add_entry(admin_user.id, "ctx - undefinedword", "")
+    database.db_set_review_bookmark(admin_user.id, e1)
+    database.db_add_capture_item(
+        admin_user.id,
+        "https://example.com/article",
+        "Example Article",
+        word="ephemeral",
+        context="Trends are ephemeral.",
+    )
+    utils.invalidate_quiz_pool_cache(admin_user.id)
+
+    await _login(client)
+    dash = await client.get("/")
+    assert dash.status_code == 200
+    assert 'id="nav-inbox-badge">1<' in dash.text
+    assert "1 inbox item waiting" in dash.text
+    assert "1 word needs definition" in dash.text
+    assert "Last marked: candor" in dash.text
+    assert 'id="quick-search-dialog"' in dash.text
+
+    q_resp = await client.get("/quiz/next")
+    assert q_resp.status_code == 200
+    q_data = q_resp.json()
+    assert q_data["entry_id"] == e1
+    assert q_data["headword"] == "candor"
+    assert q_data["sentence_matches"] == ["candor"]
+    assert len(q_data["sentence_parts"]) == 2
+    assert "Frankness and honesty in expression." in q_data["definition_preview"]
+    assert e2 != e1
+
+
+
 
 

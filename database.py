@@ -21,6 +21,7 @@ from sqlalchemy import (
     exists,
     func,
     or_,
+    select,
     update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -1208,10 +1209,12 @@ def db_get_entries_page(
     query: str = "",
     include_examples: bool = False,
     needs_definition: bool = False,
+    search_definitions: bool = False,
+    sort: str = "newest",
     page: int = 1,
     page_size: int = ENTRIES_PAGE_SIZE,
 ) -> tuple[list[EntrySummary], int]:
-    """Return (entries for this page, total matching count), newest first."""
+    """Return (entries for this page, total matching count)."""
     with Session(engine) as session:
         columns = [Entry.id, Entry.text, Entry.visit_count]
         if include_examples:
@@ -1233,18 +1236,32 @@ def db_get_entries_page(
                 .replace("_", "\\_")
             )
             like_pattern = f"%{escaped_query}%"
-            base_query = base_query.filter(
-                or_(
-                    Entry.text.ilike(like_pattern, escape="\\"),
-                    Entry.example.ilike(like_pattern, escape="\\"),
+            search_clauses = [
+                Entry.text.ilike(like_pattern, escape="\\"),
+                Entry.example.ilike(like_pattern, escape="\\"),
+            ]
+            if search_definitions:
+                search_clauses.append(
+                    Entry.id.in_(
+                        select(Definition.question_id).where(
+                            Definition.text.ilike(like_pattern, escape="\\")
+                        )
+                    )
                 )
-            )
+            base_query = base_query.filter(or_(*search_clauses))
 
         total = base_query.order_by(None).count()
 
+        if sort == "unvisited":
+            order_clauses = (func.coalesce(Entry.visit_count, 0).asc(), Entry.id.desc())
+        elif sort == "most_visited":
+            order_clauses = (func.coalesce(Entry.visit_count, 0).desc(), Entry.id.desc())
+        else:
+            order_clauses = (Entry.id.desc(),)
+
         page = max(page, 1)
         rows = (
-            base_query.order_by(Entry.id.desc())
+            base_query.order_by(*order_clauses)
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
@@ -1728,6 +1745,43 @@ def _upsert_page_note_row(
         .filter(PageNote.user_id == user_id, PageNote.url == normalized_url)
         .one()
     )
+
+
+def db_quick_search(
+    user_id: int, query: str = "", limit: int = 12
+) -> list[tuple[int, str]]:
+    """Lightweight entry lookup selecting only id + text (never Entry.example)."""
+    with Session(engine) as session:
+        q = session.query(Entry.id, Entry.text).filter(
+            Entry.user_id == user_id, Entry.is_hidden == False
+        )
+        cleaned = query.strip()
+        if cleaned:
+            escaped = (
+                cleaned.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            q = q.filter(Entry.text.ilike(f"%{escaped}%", escape="\\"))
+            fetch_limit = max(limit * 6, 80)
+        else:
+            fetch_limit = limit
+        rows = q.order_by(Entry.id.desc()).limit(fetch_limit).all()
+        return [(row.id, row.text) for row in rows]
+
+
+def db_count_pending_capture_items(user_id: int) -> int:
+    with Session(engine) as session:
+        return (
+            session.query(func.count(PageCaptureItem.id))
+            .join(PageNote, PageCaptureItem.page_note_id == PageNote.id)
+            .filter(
+                PageNote.user_id == user_id,
+                PageCaptureItem.promoted_entry_id.is_(None),
+            )
+            .scalar()
+            or 0
+        )
 
 
 def db_get_page_note_by_url(

@@ -6,7 +6,15 @@
 <tbody>
 {% for display in entry_displays %}
 <tr id="{{ display.entry.id }}">
-    <td class="entry-col"><a href="/entry/{{ display.entry.id }}">{{ display.text }}</a></td>
+    <td class="entry-col">
+        <div class="entry-cell-head">
+            <button type="button" class="audio-btn audio-btn--sm" data-word="{{ display.raw_word }}" aria-label="{{ t('entries.play_aria', word=display.raw_word) }}">
+                <svg class="icon-play" aria-hidden="true"><use href="#icon-audio-play"/></svg>
+                <svg class="icon-pause" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
+            </button>
+            <a href="/entry/{{ display.entry.id }}">{{ display.text }}</a>
+        </div>
+    </td>
 </tr>
 {% endfor %}
 </tbody>

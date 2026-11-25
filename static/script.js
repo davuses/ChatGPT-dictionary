@@ -199,6 +199,23 @@ function deleteEntry(entryId) {
   });
 }
 
+function renderClozeSentence(el, parts, matches, filled, blankedFallback) {
+  if (!el) return;
+  if (!filled || !Array.isArray(parts) || parts.length === 0) {
+    el.textContent = blankedFallback || "";
+    return;
+  }
+  el.textContent = "";
+  parts.forEach((part, idx) => {
+    el.appendChild(document.createTextNode(part));
+    if (idx < (matches ? matches.length : 0)) {
+      const strong = document.createElement("strong");
+      strong.textContent = matches[idx];
+      el.appendChild(strong);
+    }
+  });
+}
+
 function toggleQuizAnswer(button) {
   const card = button.closest(".quiz-card");
   if (!card) return;
@@ -209,6 +226,16 @@ function toggleQuizAnswer(button) {
   button.textContent = isHidden
     ? uiText("hide_answer", {}, "Hide answer")
     : uiText("show_answer", {}, "Show answer");
+
+  const sentenceEl = card.querySelector(".quiz-sentence");
+  let parts = [];
+  let matches = [];
+  try {
+    parts = JSON.parse(card.dataset.parts || "[]");
+    matches = JSON.parse(card.dataset.matches || "[]");
+  } catch (_) {}
+  renderClozeSentence(sentenceEl, parts, matches, isHidden, card.dataset.blanked || "");
+
   if (isHidden && card.dataset.entryId && card.dataset.seen !== "true") {
     card.dataset.seen = "true";
     fetch("/quiz/" + encodeURIComponent(card.dataset.entryId) + "/seen", {
@@ -235,6 +262,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!card) return;
 
     const exclude = nextBtn.dataset.exclude || "";
+    stopWordPronunciation();
 
     fetchJson("/quiz/next?exclude=" + encodeURIComponent(exclude))
       .then((data) => {
@@ -251,13 +279,29 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         card.dataset.entryId = String(data.entry_id);
+        card.dataset.headword = data.headword || data.word || "";
+        card.dataset.blanked = data.blanked_sentence || "";
+        card.dataset.parts = JSON.stringify(data.sentence_parts || []);
+        card.dataset.matches = JSON.stringify(data.sentence_matches || []);
         delete card.dataset.seen;
         card.querySelector(".quiz-sentence").textContent = data.blanked_sentence;
 
         const answerEl = card.querySelector(".quiz-answer");
         answerEl.hidden = true;
-        answerEl.querySelector("strong").textContent = data.word;
-        answerEl.querySelector("a").href = "/entry/" + data.entry_id;
+        const wordEl = answerEl.querySelector(".quiz-answer-word") || answerEl.querySelector("strong");
+        if (wordEl) wordEl.textContent = data.word;
+        const ipaEl = answerEl.querySelector(".quiz-answer-ipa");
+        if (ipaEl) {
+          ipaEl.textContent = data.ipa || "";
+          ipaEl.hidden = !data.ipa;
+        }
+        const linkEl = answerEl.querySelector(".quiz-answer-link") || answerEl.querySelector("a");
+        if (linkEl) linkEl.href = "/entry/" + data.entry_id;
+        const defEl = answerEl.querySelector(".quiz-answer-def");
+        if (defEl) {
+          defEl.textContent = data.definition_preview || "";
+          defEl.hidden = !data.definition_preview;
+        }
 
         const revealBtn = card.querySelector(".quiz-reveal-btn");
         revealBtn.textContent = uiText("show_answer", {}, "Show answer");
@@ -269,6 +313,155 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   });
 });
+
+function initQuickSearch() {
+  const dialog = document.getElementById("quick-search-dialog");
+  const input = document.getElementById("quick-search-input");
+  const list = document.getElementById("quick-search-list");
+  const openBtn = document.getElementById("open-quick-search");
+  if (!dialog || !input || !list || typeof dialog.showModal !== "function") return;
+
+  let activeIndex = -1;
+  let debounceTimer = null;
+  let abortController = null;
+
+  function setActive(index) {
+    const items = list.querySelectorAll(".quick-search-item");
+    if (!items.length) {
+      activeIndex = -1;
+      return;
+    }
+    activeIndex = ((index % items.length) + items.length) % items.length;
+    items.forEach((li, i) => {
+      li.classList.toggle("is-active", i === activeIndex);
+      if (i === activeIndex) {
+        li.scrollIntoView({ block: "nearest" });
+      }
+    });
+  }
+
+  function renderItems(items, query) {
+    list.textContent = "";
+    activeIndex = -1;
+    if (!items.length && !query) {
+      const empty = document.createElement("li");
+      empty.className = "quick-search-empty";
+      empty.textContent = uiText("quick_search_hint", null, "Type to filter your words, ↑↓ to navigate, Enter to open");
+      list.appendChild(empty);
+      return;
+    }
+    if (!items.length) {
+      const empty = document.createElement("li");
+      empty.className = "quick-search-empty";
+      empty.textContent = uiText("quick_search_empty", null, "No matching words.");
+      list.appendChild(empty);
+    } else {
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "quick-search-item";
+        li.setAttribute("role", "option");
+        const a = document.createElement("a");
+        a.href = "/entry/" + encodeURIComponent(item.id);
+        const wordSpan = document.createElement("span");
+        wordSpan.className = "quick-search-word";
+        wordSpan.textContent = item.word || "";
+        a.appendChild(wordSpan);
+        if (item.context) {
+          const ctxSpan = document.createElement("span");
+          ctxSpan.className = "quick-search-ctx";
+          ctxSpan.textContent = item.context;
+          a.appendChild(ctxSpan);
+        }
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+    }
+    if (query) {
+      const allLi = document.createElement("li");
+      allLi.className = "quick-search-item";
+      allLi.setAttribute("role", "option");
+      const a = document.createElement("a");
+      a.href = "/entries?q=" + encodeURIComponent(query);
+      const span = document.createElement("span");
+      span.className = "quick-search-ctx";
+      span.textContent = uiText("quick_search_see_all", { q: query }, 'Search all entries for "' + query + '" →');
+      a.appendChild(span);
+      allLi.appendChild(a);
+      list.appendChild(allLi);
+    }
+    if (list.querySelector(".quick-search-item")) {
+      setActive(0);
+    }
+  }
+
+  function runQuery() {
+    if (abortController) abortController.abort();
+    abortController = new AbortController();
+    const q = input.value.trim();
+    fetchJson("/api/v1/quick-search?q=" + encodeURIComponent(q) + "&limit=12", {
+      signal: abortController.signal,
+    })
+      .then((data) => renderItems(Array.isArray(data.items) ? data.items : [], q))
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error(err);
+      });
+  }
+
+  function openQuickSearch() {
+    if (dialog.open) return;
+    input.value = "";
+    dialog.showModal();
+    input.focus();
+    runQuery();
+  }
+
+  if (openBtn) {
+    openBtn.addEventListener("click", openQuickSearch);
+  }
+
+  dialog.addEventListener("click", function (event) {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+
+  input.addEventListener("input", function () {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runQuery, 150);
+  });
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActive(activeIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActive(activeIndex - 1);
+    } else if (event.key === "Enter") {
+      const active = list.querySelector(".quick-search-item.is-active a");
+      if (active) {
+        event.preventDefault();
+        window.location.href = active.href;
+      }
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (dialog.open) {
+        dialog.close();
+      } else {
+        openQuickSearch();
+      }
+      return;
+    }
+    if (event.key === "/" && !shouldIgnoreShortcut(event)) {
+      event.preventDefault();
+      openQuickSearch();
+    }
+  });
+}
 
 let activeAudio = null;
 let activeAudioButton = null;
@@ -410,6 +603,7 @@ document.addEventListener("keydown", function (event) {
 
 document.addEventListener("DOMContentLoaded", function () {
   applyThemePreference(getThemePreference());
+  initQuickSearch();
   document.querySelectorAll(".theme-toggle-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const current = getThemePreference();

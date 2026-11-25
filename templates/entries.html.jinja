@@ -16,13 +16,18 @@
 
 {% block body %}
 
-{% macro view_qs(extra) %}{% if search_query %}{{ extra }}q={{ search_query | urlencode }}{% endif %}{% endmacro %}
+{% macro view_qs(extra) -%}
+{%- set parts = [] -%}
+{%- if search_query %}{% set _ = parts.append('q=' ~ (search_query | urlencode)) %}{% endif -%}
+{%- if sort and sort != 'newest' %}{% set _ = parts.append('sort=' ~ (sort | urlencode)) %}{% endif -%}
+{%- if parts %}{{ extra }}{{ parts | join('&') }}{% endif -%}
+{%- endmacro %}
 
 {% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>{{ t('dash.resume_link') }}</a>{% endset %}
 {{ page_header(subtitle=t('entries.count_matching' if search_query else 'entries.count_plain', n=entries_count), active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
 
 <main class="page-content">
-<form class="search-form" role="search" action="/entries" method="get">
+<form class="search-form" id="entries-search-form" role="search" action="/entries" method="get">
     {% if entries_only %}<input type="hidden" name="entries_only" value="true">{% endif %}
     {% if show_definition %}<input type="hidden" name="show_definition" value="true">{% endif %}
     {% if show_example %}<input type="hidden" name="show_example" value="true">{% endif %}
@@ -33,26 +38,42 @@
         placeholder="{{ t('entries.search_placeholder') }}"
         aria-label="{{ t('dash.search_aria') }}">
     <button class="button button-primary" type="submit">{{ t('dash.search_btn') }}</button>
-    <a class="button button-ghost" id="clear-search-link" href="/entries{% if entries_only %}?entries_only=true{% elif show_definition %}?show_definition=true{% elif show_example %}?show_example=true{% elif needs_definition %}?needs_definition=true{% endif %}"{% if not search_query %} hidden{% endif %}>{{ t('entries.clear') }}</a>
+    {% set clear_parts = [] %}
+    {% if entries_only %}{% set _ = clear_parts.append('entries_only=true') %}
+    {% elif show_definition %}{% set _ = clear_parts.append('show_definition=true') %}
+    {% elif show_example %}{% set _ = clear_parts.append('show_example=true') %}
+    {% elif needs_definition %}{% set _ = clear_parts.append('needs_definition=true') %}{% endif %}
+    {% if sort and sort != 'newest' %}{% set _ = clear_parts.append('sort=' ~ (sort | urlencode)) %}{% endif %}
+    <a class="button button-ghost" id="clear-search-link" href="/entries{% if clear_parts %}?{{ clear_parts | join('&') }}{% endif %}"{% if not search_query %} hidden{% endif %}>{{ t('entries.clear') }}</a>
 </form>
 
-<nav class="view-tabs" aria-label="{{ t('entries.views_aria') }}">
-    <a class="view-tab {% if not entries_only and not show_definition and not show_example and not needs_definition %}active{% endif %}"
-        id="tab-all"
-        href="/entries{{ view_qs('?') }}">{{ t('entries.tab_all') }}</a>
-    <a class="view-tab {% if entries_only %}active{% endif %}"
-        id="tab-entries-only"
-        href="/entries?entries_only=true{{ view_qs('&') }}">{{ t('entries.tab_only') }}</a>
-    <a class="view-tab {% if show_example %}active{% endif %}"
-        id="tab-examples"
-        href="/entries?show_example=true{{ view_qs('&') }}">{{ t('entries.tab_examples') }}</a>
-    <a class="view-tab {% if show_definition %}active{% endif %}"
-        id="tab-definitions"
-        href="/entries?show_definition=true{{ view_qs('&') }}">{{ t('entries.tab_definitions') }}</a>
-    <a class="view-tab {% if needs_definition %}active{% endif %}"
-        id="tab-needs-definition"
-        href="/entries?needs_definition=true{{ view_qs('&') }}">{{ t('entries.tab_needs_def') }}{% if undefined_count > 0 %}<span id="undefined-count-badge" data-count="{{ undefined_count }}"{% if search_query %} hidden{% endif %}> ({{ undefined_count }})</span>{% endif %}</a>
-</nav>
+<div class="entries-toolbar">
+    <nav class="view-tabs" aria-label="{{ t('entries.views_aria') }}">
+        <a class="view-tab {% if not entries_only and not show_definition and not show_example and not needs_definition %}active{% endif %}"
+            id="tab-all"
+            href="/entries{{ view_qs('?') }}">{{ t('entries.tab_all') }}</a>
+        <a class="view-tab {% if entries_only %}active{% endif %}"
+            id="tab-entries-only"
+            href="/entries?entries_only=true{{ view_qs('&') }}">{{ t('entries.tab_only') }}</a>
+        <a class="view-tab {% if show_example %}active{% endif %}"
+            id="tab-examples"
+            href="/entries?show_example=true{{ view_qs('&') }}">{{ t('entries.tab_examples') }}</a>
+        <a class="view-tab {% if show_definition %}active{% endif %}"
+            id="tab-definitions"
+            href="/entries?show_definition=true{{ view_qs('&') }}">{{ t('entries.tab_definitions') }}</a>
+        <a class="view-tab {% if needs_definition %}active{% endif %}"
+            id="tab-needs-definition"
+            href="/entries?needs_definition=true{{ view_qs('&') }}">{{ t('entries.tab_needs_def') }}{% if undefined_count > 0 %}<span id="undefined-count-badge" data-count="{{ undefined_count }}"{% if search_query %} hidden{% endif %}> ({{ undefined_count }})</span>{% endif %}</a>
+    </nav>
+    <label class="sort-control" for="entries-sort-select">
+        <span>{{ t('entries.sort_label') }}</span>
+        <select class="sort-select" id="entries-sort-select" name="sort" form="entries-search-form">
+            <option value="newest"{% if sort == 'newest' %} selected{% endif %}>{{ t('entries.sort_newest') }}</option>
+            <option value="unvisited"{% if sort == 'unvisited' %} selected{% endif %}>{{ t('entries.sort_unvisited') }}</option>
+            <option value="most_visited"{% if sort == 'most_visited' %} selected{% endif %}>{{ t('entries.sort_most_visited') }}</option>
+        </select>
+    </label>
+</div>
 
 <div id="results">
     {% include "_entries_results.html.jinja" %}
@@ -90,17 +111,24 @@
         }
 
         results.addEventListener("click", function (event) {
+            const audioBtn = event.target.closest(".audio-btn");
+            if (audioBtn) {
+                event.stopPropagation();
+                playWordPronunciation(audioBtn.dataset.word || "", audioBtn);
+                return;
+            }
+
             const toggleBtn = event.target.closest(".definition-toggle");
             if (toggleBtn) {
                 event.stopPropagation();
-                const cell = toggleBtn.closest(".definition-col");
+                const cell = toggleBtn.closest("td");
                 if (cell) toggleDefinitionCell(cell);
                 return;
             }
 
             const preview = event.target.closest(".definition-preview.is-expandable");
             if (preview && !(window.getSelection && window.getSelection().toString())) {
-                const cell = preview.closest(".definition-col");
+                const cell = preview.closest("td");
                 if (cell) toggleDefinitionCell(cell);
                 return;
             }
@@ -157,6 +185,7 @@
         const showDefinitionInput = form.querySelector('input[name="show_definition"]');
         const showExampleInput = form.querySelector('input[name="show_example"]');
         const needsDefinitionInput = form.querySelector('input[name="needs_definition"]');
+        const sortSelect = document.getElementById("entries-sort-select");
         const countEl = document.getElementById("results-count");
         const clearLink = document.getElementById("clear-search-link");
         const undefinedBadge = document.getElementById("undefined-count-badge");
@@ -176,29 +205,38 @@
             debounceTimer = setTimeout(runLiveSearch, 300);
         });
 
+        if (sortSelect) {
+            sortSelect.addEventListener("change", function () {
+                clearTimeout(debounceTimer);
+                runLiveSearch();
+            });
+        }
+
         function runLiveSearch() {
             if (abortController) abortController.abort();
             abortController = new AbortController();
 
             const url = new URL(form.action, window.location.href);
             const query = input.value.trim();
+            const sortVal = sortSelect ? sortSelect.value : "newest";
             if (query) url.searchParams.set("q", query);
             if (entriesOnlyInput) url.searchParams.set("entries_only", "true");
             if (showDefinitionInput) url.searchParams.set("show_definition", "true");
             if (showExampleInput) url.searchParams.set("show_example", "true");
             if (needsDefinitionInput) url.searchParams.set("needs_definition", "true");
+            if (sortVal && sortVal !== "newest") url.searchParams.set("sort", sortVal);
 
             fetchJson(url, {
                 headers: { "X-Requested-With": "XMLHttpRequest" },
                 signal: abortController.signal,
             })
-                .then((data) => applyResults(data, url))
+                .then((data) => applyResults(data, url, sortVal))
                 .catch((err) => {
                     if (err.name !== "AbortError") console.error(err);
                 });
         }
 
-        function applyResults(data, url) {
+        function applyResults(data, url, sortVal) {
             results.innerHTML = data.results_html;
             if (countEl) {
                 countEl.textContent = uiText(
@@ -207,7 +245,16 @@
                     data.count + (data.matching ? " matching entries" : " entries")
                 );
             }
-            if (clearLink) clearLink.hidden = !data.matching;
+            if (clearLink) {
+                clearLink.hidden = !data.matching;
+                const clearUrl = new URL(clearLink.href, window.location.href);
+                if (sortVal && sortVal !== "newest") {
+                    clearUrl.searchParams.set("sort", sortVal);
+                } else {
+                    clearUrl.searchParams.delete("sort");
+                }
+                clearLink.href = clearUrl.toString();
+            }
             if (undefinedBadge) undefinedBadge.hidden = data.matching;
 
             for (const tab of Object.values(tabs)) {
@@ -217,6 +264,11 @@
                     tabUrl.searchParams.set("q", data.query);
                 } else {
                     tabUrl.searchParams.delete("q");
+                }
+                if (sortVal && sortVal !== "newest") {
+                    tabUrl.searchParams.set("sort", sortVal);
+                } else {
+                    tabUrl.searchParams.delete("sort");
                 }
                 tab.href = tabUrl.toString();
             }
@@ -276,16 +328,17 @@
             return;
         }
         const selectedEntryId = selectedRow.id;
-        const entryText = selectedRow.firstElementChild.textContent.trim();
-        if (
-            confirm(
-                uiText(
-                    "confirm_delete_entry_detail",
-                    { id: selectedEntryId, entry: entryText },
-                    "Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText
-                )
-            )
-        ) {
+        const entryLink = selectedRow.querySelector(".entry-col a");
+        const entryText = entryLink ? entryLink.textContent.trim() : selectedRow.firstElementChild.textContent.trim();
+        confirmDialog(
+            uiText(
+                "confirm_delete_entry_detail",
+                { id: selectedEntryId, entry: entryText },
+                "Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText
+            ),
+            { danger: true }
+        ).then((confirmed) => {
+            if (!confirmed) return;
             fetch("/delete_entry/" + selectedEntryId, {
                 method: "DELETE",
                 headers: csrfHeaders()
@@ -313,7 +366,7 @@
                     }
                 }
             });
-        }
+        });
     };
 </script>
 

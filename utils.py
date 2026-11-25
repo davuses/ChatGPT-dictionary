@@ -418,6 +418,11 @@ class QuizQuestion:
     entry_id: int
     word: str
     blanked_sentence: str
+    headword: str = ""
+    ipa: str = ""
+    sentence_parts: tuple[str, ...] = ()
+    sentence_matches: tuple[str, ...] = ()
+    definition_preview: str = ""
 
 
 @dataclass(frozen=True)
@@ -530,11 +535,15 @@ def _pick_weighted_candidate(
 
 def _question_from_candidate(candidate: QuizCandidate, rng: random.Random) -> QuizQuestion:
     sentence = normalize_pronoun_casing(rng.choice(candidate.sentences))
-    blanked_sentence, display_word = _blank_word(sentence, candidate.word)
+    parts, matches, blanked_sentence = _split_cloze_sentence(sentence, candidate.word)
+    display_word = matches[0] if matches else candidate.word
     return QuizQuestion(
         entry_id=candidate.entry_id,
         word=display_word,
         blanked_sentence=blanked_sentence,
+        headword=candidate.word,
+        sentence_parts=tuple(parts),
+        sentence_matches=tuple(matches),
     )
 
 
@@ -549,7 +558,32 @@ def pick_random_question(
     candidate = _pick_weighted_candidate(pool, visit_stats, exclude_entry_ids)
     if not candidate:
         return None
-    return _question_from_candidate(candidate, random)
+    question = _question_from_candidate(candidate, random)
+    ipa = ""
+    try:
+        ipa = get_IPA(question.headword or question.word)
+    except Exception:
+        ipa = ""
+    def_preview = ""
+    raw_def = db_get_primary_definitions_by_entry_ids(user_id, [question.entry_id]).get(
+        question.entry_id, ""
+    )
+    if raw_def:
+        plain = normalize_pronoun_casing(strip_markdown_to_plain(raw_def))
+        plain = " ".join(plain.split())
+        if len(plain) > 220:
+            plain = plain[:217].rstrip() + "…"
+        def_preview = plain
+    return QuizQuestion(
+        entry_id=question.entry_id,
+        word=question.word,
+        blanked_sentence=question.blanked_sentence,
+        headword=question.headword,
+        ipa=ipa,
+        sentence_parts=question.sentence_parts,
+        sentence_matches=question.sentence_matches,
+        definition_preview=def_preview,
+    )
 
 
 def _pick_weighted_candidates(
@@ -837,6 +871,9 @@ class EntryDisplay:
     context: str
     definition: str = ""
     definition_is_long: bool = False
+    raw_word: str = ""
+    example_preview: str = ""
+    example_is_long: bool = False
 
 
 def clear_thesaurus_cache() -> None:

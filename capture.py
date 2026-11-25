@@ -312,3 +312,36 @@ def lookup_word(
         },
         headers={"Cache-Control": "no-store"},
     )
+
+
+@api_router.get("/quick-search", response_class=JSONResponse)
+def quick_search_entries(
+    q: str = Query(""),
+    limit: int = Query(12, ge=1, le=25),
+    current_user: UserRecord = Depends(require_api_user),
+):
+    from database import db_quick_search
+
+    rows = db_quick_search(current_user.id, q, limit=limit)
+    ql = q.strip().lower()
+    parsed: list[tuple[int, int, str, str]] = []
+    for eid, text in rows:
+        context, word = parse_entry_text(text)
+        if ql:
+            wl = word.lower()
+            if wl.startswith(ql):
+                rank = 0
+            elif ql in wl:
+                rank = 1
+            else:
+                rank = 2
+        else:
+            rank = 0
+        parsed.append((rank, -eid, word, context))
+    if ql:
+        parsed.sort(key=lambda item: (item[0], item[1]))
+    items = [
+        {"id": -neg_id, "word": word, "context": context}
+        for _, neg_id, word, context in parsed[:limit]
+    ]
+    return JSONResponse({"items": items}, headers={"Cache-Control": "no-store"})

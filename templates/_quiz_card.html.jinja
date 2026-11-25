@@ -1,15 +1,30 @@
 {% macro quiz_card(question, action_exclude=None, action_label=None, action_id=None) %}
 {% if question %}
-<div class="quiz-card" data-entry-id="{{ question.entry_id }}">
+<div class="quiz-card"
+    data-entry-id="{{ question.entry_id }}"
+    data-headword="{{ question.headword or question.word }}"
+    data-blanked="{{ question.blanked_sentence }}"
+    data-parts="{{ (question.sentence_parts | list) | tojson | forceescape }}"
+    data-matches="{{ (question.sentence_matches | list) | tojson | forceescape }}">
     <p class="quiz-sentence">{{ question.blanked_sentence }}</p>
     <div class="quiz-actions">
         <button type="button" class="button button-primary quiz-reveal-btn" onclick="toggleQuizAnswer(this)">{{ t('quiz.show_answer') }}</button>
         {% if action_label %}<button type="button" class="button button-ghost" data-exclude="{{ action_exclude or '' }}"{% if action_id %} id="{{ action_id }}"{% endif %}>{{ action_label }}</button>{% endif %}
     </div>
-    <p class="quiz-answer" hidden>
-        <strong>{{ question.word }}</strong>
-        &mdash; <a href="/entry/{{ question.entry_id }}">{{ t('quiz.view_entry') }}</a>
-    </p>
+    <div class="quiz-answer" hidden>
+        <div class="quiz-answer-head">
+            <span class="quiz-answer-word-row">
+                <strong class="quiz-answer-word">{{ question.word }}</strong>
+                <span class="ipa-text quiz-answer-ipa"{% if not question.ipa %} hidden{% endif %}>{{ question.ipa }}</span>
+                <button type="button" class="audio-btn audio-btn--sm quiz-audio-btn" aria-label="{{ t('entry.play') }}" onclick="playWordPronunciation(this.closest('.quiz-card').dataset.headword, this)">
+                    <svg class="icon-play" aria-hidden="true"><use href="#icon-audio-play"/></svg>
+                    <svg class="icon-pause" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
+                </button>
+            </span>
+            <a class="quiz-answer-link" href="/entry/{{ question.entry_id }}">{{ t('quiz.view_entry') }}</a>
+        </div>
+        <p class="quiz-answer-def"{% if not question.definition_preview %} hidden{% endif %}>{{ question.definition_preview }}</p>
+    </div>
 </div>
 {% else %}
 <p class="quiz-empty">{{ t('quiz.empty') }}</p>

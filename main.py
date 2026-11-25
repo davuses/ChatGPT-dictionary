@@ -60,6 +60,7 @@ from database import (
     db_count_api_tokens,
     db_count_entries,
     db_count_entries_visited_since,
+    db_count_pending_capture_items,
     db_count_undefined_entries,
     db_create_api_token,
     db_create_invite_token,
@@ -191,10 +192,24 @@ def static_url(filename: str) -> str:
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+def nav_template_context(request: Request) -> dict[str, object]:
+    user = get_current_user(request)
+    if user is None:
+        return {"inbox_pending_count": 0}
+    try:
+        return {"inbox_pending_count": db_count_pending_capture_items(user.id)}
+    except Exception:
+        return {"inbox_pending_count": 0}
+
+
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(
     directory=str(TEMPLATES_DIR),
-    context_processors=[auth_template_context, i18n_template_context],
+    context_processors=[
+        auth_template_context,
+        i18n_template_context,
+        nav_template_context,
+    ],
 )
 templates.env.globals["static_url"] = static_url
 templates.env.globals["extension_version"] = EXTENSION_VERSION
@@ -838,6 +853,11 @@ def root_page(
     current_user: UserRecord = Depends(require_user),
 ):
     review_bookmark_entry_id = get_review_bookmark(current_user.id)
+    bookmark_word = ""
+    if review_bookmark_entry_id:
+        bm_entry = db_get_entry_by_id(current_user.id, review_bookmark_entry_id)
+        if bm_entry:
+            _, bookmark_word = parse_entry_text(bm_entry.text)
     seven_days_ago = int(time.time()) - 7 * 86400
     question, next_exclude = _next_quiz_question(current_user.id, "")
     context = {
@@ -845,7 +865,10 @@ def root_page(
         "visited_last_7_days": db_count_entries_visited_since(
             current_user.id, seven_days_ago
         ),
+        "pending_inbox_count": db_count_pending_capture_items(current_user.id),
+        "undefined_count": db_count_undefined_entries(current_user.id),
         "review_bookmark_entry_id": review_bookmark_entry_id,
+        "bookmark_word": bookmark_word,
         "has_api_token": db_count_api_tokens(current_user.id) > 0,
         "question": question,
         "next_exclude": next_exclude,
@@ -869,7 +892,12 @@ def quiz_next(
         {
             "entry_id": question.entry_id,
             "word": question.word,
+            "headword": question.headword or question.word,
+            "ipa": question.ipa,
             "blanked_sentence": question.blanked_sentence,
+            "sentence_parts": list(question.sentence_parts),
+            "sentence_matches": list(question.sentence_matches),
+            "definition_preview": question.definition_preview,
             "next_exclude": next_exclude,
         },
         headers={"Cache-Control": "no-store"},
@@ -943,6 +971,9 @@ def review_page(
     )
 
 
+_VALID_ENTRY_SORTS = frozenset({"newest", "unvisited", "most_visited"})
+
+
 @protected_router.get("/entries", response_class=HTMLResponse)
 def entries_page(
     request: Request,
@@ -950,10 +981,13 @@ def entries_page(
     show_definition: bool = Query(False),
     entries_only: bool = Query(False),
     needs_definition: bool = Query(False),
+    sort: str = Query("newest"),
     q: str = Query(""),
     page: int = Query(1, ge=1),
     current_user: UserRecord = Depends(require_user),
 ):
+    if sort not in _VALID_ENTRY_SORTS:
+        sort = "newest"
     if needs_definition:
         entries_only = False
         show_definition = False
@@ -969,6 +1003,8 @@ def entries_page(
         query=q,
         include_examples=show_example,
         needs_definition=needs_definition,
+        search_definitions=show_definition,
+        sort=sort,
         page=page,
     )
     total_pages = max(1, -(-total_count // ENTRIES_PAGE_SIZE))
@@ -980,6 +1016,8 @@ def entries_page(
                 query=q,
                 include_examples=show_example,
                 needs_definition=needs_definition,
+                search_definitions=show_definition,
+                sort=sort,
                 page=page,
             )
     q_stripped = q.strip()
@@ -1002,11 +1040,16 @@ def entries_page(
     review_bookmark_entry_id = get_review_bookmark(current_user.id)
     entry_displays: list[EntryDisplay] = []
     for entry in entries:
-        context_text, display_text = parse_entry_text(entry.text)
+        context_text, raw_word = parse_entry_text(entry.text)
         context_text = normalize_pronoun_casing(context_text)
 
+        example_preview = ""
+        example_is_long = False
         if show_example and entry.example:
-            entry = replace(entry, example=normalize_pronoun_casing(entry.example))
+            plain_ex = normalize_pronoun_casing(strip_markdown_to_plain(entry.example))
+            if plain_ex:
+                example_is_long = len(plain_ex) > 150 or plain_ex.count("\n") >= 3
+                example_preview = highlight_matches(plain_ex, q_stripped)
 
         definition_markup = ""
         definition_is_long = False
@@ -1023,10 +1066,8 @@ def entries_page(
                 )
                 definition_markup = highlight_matches(plain_def, q_stripped)
 
-        display_text = highlight_matches(display_text, q_stripped)
+        display_text = highlight_matches(raw_word, q_stripped)
         context_text = highlight_matches(context_text, q_stripped)
-        if show_example and entry.example:
-            entry = replace(entry, example=highlight_matches(entry.example, q_stripped))
 
         entry_displays.append(
             EntryDisplay(
@@ -1035,6 +1076,9 @@ def entries_page(
                 context=context_text,
                 definition=definition_markup,
                 definition_is_long=definition_is_long,
+                raw_word=raw_word,
+                example_preview=example_preview,
+                example_is_long=example_is_long,
             )
         )
 
@@ -1048,6 +1092,7 @@ def entries_page(
         "undefined_count": undefined_count,
         "review_bookmark_entry_id": review_bookmark_entry_id,
         "search_query": q,
+        "sort": sort,
         "page": page,
         "total_pages": total_pages,
         "has_prev_page": page > 1,

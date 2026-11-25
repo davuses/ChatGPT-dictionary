@@ -71,5 +71,13 @@
             </div>
         </div>
     </dialog>
+    {% if is_authenticated %}
+    <dialog id="quick-search-dialog" class="app-dialog app-dialog--search" aria-label="{{ t('nav.search_btn') }}">
+        <div class="quick-search-header">
+            <input type="search" id="quick-search-input" class="quick-search-input" placeholder="{{ t('quick_search.placeholder') }}" autocomplete="off" spellcheck="false">
+        </div>
+        <ul id="quick-search-list" class="quick-search-list" role="listbox"></ul>
+    </dialog>
+    {% endif %}
 </body>
 </html>
