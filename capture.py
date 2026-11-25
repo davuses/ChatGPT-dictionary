@@ -21,6 +21,7 @@ from database import (
     db_upsert_page_note,
 )
 from utils import (
+    EXTENSION_VERSION,
     get_all_words,
     get_IPA,
     get_IPA_batch,
@@ -132,8 +133,10 @@ def get_page_note(
     canonical_url = _canonical_url_or_400(url)
     note = db_get_page_note_by_url(current_user.id, canonical_url)
     all_words = get_all_words(current_user.id)
+    payload = _serialize_page_note(canonical_url, note, all_words, fallback_title=title)
+    payload["latest_extension_version"] = EXTENSION_VERSION
     return JSONResponse(
-        _serialize_page_note(canonical_url, note, all_words, fallback_title=title),
+        payload,
         headers={"Cache-Control": "no-store"},
     )
 

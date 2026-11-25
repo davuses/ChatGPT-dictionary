@@ -39,6 +39,7 @@ from thesaurus import ThesaurusSense, fetch_thesaurus_senses, lookup_thesaurus
 
 
 ENTRY_TEXT_SEPARATOR = " - "
+EXTENSION_VERSION = "0.5.0"
 
 
 def parse_entry_text(text: str) -> tuple[str, str]:

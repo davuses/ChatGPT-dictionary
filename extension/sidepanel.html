@@ -4,15 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Glossbook</title>
+  <script src="theme-init.js"></script>
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
   <header class="sp-header">
     <div class="sp-brand-row">
-      <h1 class="sp-brand">Glossbook</h1>
+      <h1 class="sp-brand"><a id="brand-link" class="sp-brand-link" href="#" target="_blank" rel="noopener noreferrer">Glossbook</a></h1>
       <div class="sp-header-actions">
         <a id="open-inbox-link" class="sp-btn sp-btn-ghost" href="#" target="_blank" rel="noopener noreferrer" hidden data-i18n="inbox">Inbox</a>
-        <button id="toggle-settings-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="settings">Settings</button>
+        <button id="toggle-settings-btn" class="sp-btn sp-btn-ghost" type="button" aria-expanded="false" aria-controls="settings-panel" data-i18n="settings">Settings</button>
       </div>
     </div>
     <div id="page-banner" class="sp-page-banner">
@@ -21,18 +22,44 @@
     </div>
   </header>
 
+  <div id="update-banner" class="sp-update-banner" hidden>
+    <span id="update-banner-text"></span>
+    <a id="update-banner-link" class="sp-link-btn" href="#" target="_blank" rel="noopener noreferrer" data-i18n="update_how">How to update &rarr;</a>
+  </div>
+
   <section id="settings-panel" class="sp-card sp-settings" hidden>
-    <h2 data-i18n="settings_title">Connection settings</h2>
+    <div class="sp-section-head">
+      <h2><span data-i18n="settings_title">Connection settings</span> <span id="ext-version-badge" class="sp-count"></span></h2>
+      <button id="close-settings-btn" class="sp-link-btn" type="button" data-i18n="close">Close</button>
+    </div>
     <label class="sp-label" for="server-url-input" data-i18n="settings_server_url">Server URL</label>
     <input id="server-url-input" class="sp-input" type="url" placeholder="http://localhost:8000">
-    <label class="sp-label" for="api-token-input"><span data-i18n="settings_api_token">API Token</span> <span class="sp-hint" data-i18n="settings_token_hint">(stored locally only)</span></label>
-    <input id="api-token-input" class="sp-input" type="password" placeholder="Paste your API token from /account" data-i18n-placeholder="settings_token_placeholder">
-    <label class="sp-label" for="lang-select" data-i18n="settings_lang_label">Language</label>
-    <select id="lang-select" class="sp-input">
-      <option value="auto" data-i18n="lang_auto">Auto (Browser)</option>
-      <option value="en">English</option>
-      <option value="zh-CN">简体中文</option>
-    </select>
+    <div class="sp-label-row">
+      <label class="sp-label" for="api-token-input"><span data-i18n="settings_api_token">API Token</span> <span class="sp-hint" data-i18n="settings_token_hint">(stored locally only)</span></label>
+      <a id="get-token-link" class="sp-link-btn" href="#" target="_blank" rel="noopener noreferrer" hidden data-i18n="get_token">Get token &nearr;</a>
+    </div>
+    <div class="sp-input-group">
+      <input id="api-token-input" class="sp-input" type="password" placeholder="Paste your API token from /account" data-i18n-placeholder="settings_token_placeholder">
+      <button id="toggle-token-vis-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="show">Show</button>
+    </div>
+    <div class="sp-settings-grid">
+      <div>
+        <label class="sp-label" for="theme-select" data-i18n="settings_theme_label">Theme</label>
+        <select id="theme-select" class="sp-input">
+          <option value="auto" data-i18n="theme_auto">Auto (System)</option>
+          <option value="light" data-i18n="theme_light">Light</option>
+          <option value="dark" data-i18n="theme_dark">Dark</option>
+        </select>
+      </div>
+      <div>
+        <label class="sp-label" for="lang-select" data-i18n="settings_lang_label">Language</label>
+        <select id="lang-select" class="sp-input">
+          <option value="auto" data-i18n="lang_auto">Auto (Browser)</option>
+          <option value="en">English</option>
+          <option value="zh-CN">简体中文</option>
+        </select>
+      </div>
+    </div>
     <div class="sp-row">
       <button id="save-settings-btn" class="sp-btn sp-btn-primary" type="button" data-i18n="save_test">Save &amp; test</button>
       <span id="settings-status" class="sp-status"></span>

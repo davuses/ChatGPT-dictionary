@@ -10,8 +10,22 @@ const STRINGS = {
     settings_token_hint: "(stored locally only)",
     settings_token_placeholder: "Paste your API token from /account",
     settings_lang_label: "Language",
+    settings_theme_label: "Theme",
+    theme_auto: "Auto (System)",
+    theme_light: "Light",
+    theme_dark: "Dark",
     lang_auto: "Auto (Browser)",
     save_test: "Save & test",
+    close: "Close",
+    show: "Show",
+    hide: "Hide",
+    get_token: "Get token ↗",
+    update_available: "Extension v{version} is available",
+    update_how: "How to update →",
+    close_lookup: "Close lookup",
+    select_item_aria: "Select {word}",
+    confirm_delete: "Confirm?",
+    def_added: "Definition added",
     quick_jot: "Quick jot",
     grab_from_page: "Grab from page",
     grab_selection: "Grab selection",
@@ -85,8 +99,22 @@ const STRINGS = {
     settings_token_hint: "（仅保存在本地）",
     settings_token_placeholder: "粘贴来自「账户」页面的 API 令牌",
     settings_lang_label: "界面语言",
+    settings_theme_label: "明暗主题",
+    theme_auto: "跟随系统",
+    theme_light: "浅色",
+    theme_dark: "深色",
     lang_auto: "跟随浏览器",
     save_test: "保存并测试",
+    close: "关闭",
+    show: "显示",
+    hide: "隐藏",
+    get_token: "获取令牌 ↗",
+    update_available: "扩展有新版本 v{version}",
+    update_how: "查看更新方法 →",
+    close_lookup: "关闭查词",
+    select_item_aria: "选中 {word}",
+    confirm_delete: "确认删除？",
+    def_added: "已添加到释义",
     quick_jot: "随手记词",
     grab_from_page: "从网页抓取",
     grab_selection: "抓取选中文本",
@@ -154,8 +182,11 @@ const STRINGS = {
 const state = {
   serverUrl: "",
   apiToken: "",
+  themePref: "auto",
   langPref: "auto",
   lang: "en",
+  latestServerExtVersion: "",
+  jotLookupWord: "",
   noticeKind: null,
   tabId: null,
   rawUrl: "",
@@ -173,11 +204,20 @@ const state = {
 };
 
 const els = {
+  brandLink: document.getElementById("brand-link"),
   openInboxLink: document.getElementById("open-inbox-link"),
   toggleSettingsBtn: document.getElementById("toggle-settings-btn"),
+  closeSettingsBtn: document.getElementById("close-settings-btn"),
+  extVersionBadge: document.getElementById("ext-version-badge"),
+  updateBanner: document.getElementById("update-banner"),
+  updateBannerText: document.getElementById("update-banner-text"),
+  updateBannerLink: document.getElementById("update-banner-link"),
   settingsPanel: document.getElementById("settings-panel"),
   serverUrlInput: document.getElementById("server-url-input"),
   apiTokenInput: document.getElementById("api-token-input"),
+  toggleTokenVisBtn: document.getElementById("toggle-token-vis-btn"),
+  getTokenLink: document.getElementById("get-token-link"),
+  themeSelect: document.getElementById("theme-select"),
   langSelect: document.getElementById("lang-select"),
   saveSettingsBtn: document.getElementById("save-settings-btn"),
   settingsStatus: document.getElementById("settings-status"),
@@ -231,6 +271,104 @@ function t(key, vars) {
   return text;
 }
 
+function applyTheme(pref) {
+  const normalized = pref === "light" || pref === "dark" ? pref : "auto";
+  state.themePref = normalized;
+  if (normalized === "auto") {
+    document.documentElement.removeAttribute("data-theme");
+  } else {
+    document.documentElement.setAttribute("data-theme", normalized);
+  }
+  try {
+    if (normalized === "auto") {
+      localStorage.removeItem("glossbook_theme");
+    } else {
+      localStorage.setItem("glossbook_theme", normalized);
+    }
+  } catch (_) {}
+  if (els.themeSelect) {
+    els.themeSelect.value = normalized;
+  }
+}
+
+function getLocalExtensionVersion() {
+  try {
+    return (chrome.runtime && chrome.runtime.getManifest && chrome.runtime.getManifest().version) || "";
+  } catch {
+    return "";
+  }
+}
+
+function isNewerVersion(remoteVer, localVer) {
+  if (!remoteVer || !localVer) return false;
+  const rParts = String(remoteVer).split(".").map((n) => parseInt(n, 10) || 0);
+  const lParts = String(localVer).split(".").map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(rParts.length, lParts.length);
+  for (let i = 0; i < len; i++) {
+    const r = rParts[i] || 0;
+    const l = lParts[i] || 0;
+    if (r > l) return true;
+    if (r < l) return false;
+  }
+  return false;
+}
+
+function syncUpdateBanner() {
+  if (!els.updateBanner || !els.updateBannerText || !els.updateBannerLink) return;
+  const localVer = getLocalExtensionVersion();
+  if (
+    state.latestServerExtVersion &&
+    hasConfig() &&
+    isNewerVersion(state.latestServerExtVersion, localVer)
+  ) {
+    els.updateBannerText.textContent = t("update_available", {
+      version: state.latestServerExtVersion,
+    });
+    els.updateBannerLink.href = state.serverUrl + "/account#extension";
+    els.updateBanner.hidden = false;
+  } else {
+    els.updateBanner.hidden = true;
+  }
+}
+
+function setSettingsOpen(open) {
+  const isOpen = Boolean(open);
+  els.settingsPanel.hidden = !isOpen;
+  els.toggleSettingsBtn.classList.toggle("is-active", isOpen);
+  els.toggleSettingsBtn.setAttribute("aria-expanded", String(isOpen));
+}
+
+function syncServerLinks() {
+  const configured = hasConfig();
+  if (configured) {
+    els.openInboxLink.href = state.serverUrl + "/inbox";
+    els.openInboxLink.hidden = false;
+    if (els.brandLink) {
+      els.brandLink.href = state.serverUrl + "/";
+      els.brandLink.removeAttribute("aria-disabled");
+    }
+  } else {
+    els.openInboxLink.hidden = true;
+    if (els.brandLink) {
+      els.brandLink.href = "#";
+      els.brandLink.setAttribute("aria-disabled", "true");
+    }
+  }
+  syncGetTokenLink();
+  syncUpdateBanner();
+}
+
+function syncGetTokenLink() {
+  if (!els.getTokenLink) return;
+  const raw = cleanServerUrl(els.serverUrlInput ? els.serverUrlInput.value : state.serverUrl);
+  if (isHttpUrl(raw)) {
+    els.getTokenLink.href = raw + "/account#extension";
+    els.getTokenLink.hidden = false;
+  } else {
+    els.getTokenLink.hidden = true;
+  }
+}
+
 function applyLanguage() {
   state.lang = resolveLang(state.langPref);
   document.documentElement.lang = state.lang;
@@ -245,6 +383,10 @@ function applyLanguage() {
     const key = el.dataset.i18nPlaceholder;
     if (key) el.placeholder = t(key);
   });
+  if (els.toggleTokenVisBtn && els.apiTokenInput) {
+    els.toggleTokenVisBtn.textContent =
+      els.apiTokenInput.type === "text" ? t("hide") : t("show");
+  }
   if (state.tabId !== null && !state.title) {
     els.pageTitle.textContent = t("untitled_tab");
   }
@@ -256,6 +398,7 @@ function applyLanguage() {
     els.grabPageBtn.textContent = t("grab_from_page");
   }
   setPendingTimestamp(state.pendingTimestamp);
+  syncUpdateBanner();
   renderItems();
   if (els.workspace.hidden && state.noticeKind === "not_http") {
     showNotice(t("notice_open_page"), false, "not_http");
@@ -531,9 +674,24 @@ function createAudioButton(word) {
   return btn;
 }
 
-function setStatus(el, text, isError = false) {
+const statusTimers = new WeakMap();
+
+function setStatus(el, text, isError = false, { autoClearMs = 0 } = {}) {
+  if (statusTimers.has(el)) {
+    clearTimeout(statusTimers.get(el));
+    statusTimers.delete(el);
+  }
   el.textContent = text;
   el.classList.toggle("is-error", isError);
+  if (autoClearMs > 0 && text && !isError) {
+    const timer = setTimeout(() => {
+      if (el.textContent === text) {
+        el.textContent = "";
+      }
+      statusTimers.delete(el);
+    }, autoClearMs);
+    statusTimers.set(el, timer);
+  }
 }
 
 function showNotice(text, isError = false, kind = null) {
@@ -598,20 +756,31 @@ async function apiRequest(path, options = {}) {
 }
 
 async function loadSettings() {
-  const stored = await chrome.storage.local.get(["serverUrl", "apiToken", "langPref"]);
-  state.serverUrl = cleanServerUrl(stored.serverUrl || "http://localhost:8000");
+  const stored = await chrome.storage.local.get([
+    "serverUrl",
+    "apiToken",
+    "langPref",
+    "themePref",
+  ]);
+  state.serverUrl = cleanServerUrl(stored.serverUrl || "");
   state.apiToken = (stored.apiToken || "").trim();
   state.langPref =
     stored.langPref === "en" || stored.langPref === "zh-CN" ? stored.langPref : "auto";
+  const themePref =
+    stored.themePref === "light" || stored.themePref === "dark"
+      ? stored.themePref
+      : "auto";
+  applyTheme(themePref);
   els.serverUrlInput.value = state.serverUrl;
   els.apiTokenInput.value = state.apiToken;
-  applyLanguage();
-  if (state.serverUrl) {
-    els.openInboxLink.href = state.serverUrl + "/inbox";
-    els.openInboxLink.hidden = false;
+  if (els.extVersionBadge) {
+    const ver = getLocalExtensionVersion();
+    els.extVersionBadge.textContent = ver ? "v" + ver : "";
   }
+  applyLanguage();
+  syncServerLinks();
   if (!hasConfig()) {
-    els.settingsPanel.hidden = false;
+    setSettingsOpen(true);
   }
 }
 
@@ -619,7 +788,9 @@ async function saveSettings() {
   const serverUrl = cleanServerUrl(els.serverUrlInput.value);
   const apiToken = els.apiTokenInput.value.trim();
   const langPref = els.langSelect ? els.langSelect.value : state.langPref;
+  const themePref = els.themeSelect ? els.themeSelect.value : state.themePref;
   state.langPref = langPref === "en" || langPref === "zh-CN" ? langPref : "auto";
+  applyTheme(themePref);
   applyLanguage();
   if (!isHttpUrl(serverUrl)) {
     setStatus(els.settingsStatus, t("err_invalid_url"), true);
@@ -631,16 +802,24 @@ async function saveSettings() {
   }
   state.serverUrl = serverUrl;
   state.apiToken = apiToken;
-  await chrome.storage.local.set({ serverUrl, apiToken, langPref: state.langPref });
-  els.openInboxLink.href = serverUrl + "/inbox";
-  els.openInboxLink.hidden = false;
+  await chrome.storage.local.set({
+    serverUrl,
+    apiToken,
+    langPref: state.langPref,
+    themePref: state.themePref,
+  });
+  syncServerLinks();
   setStatus(els.settingsStatus, t("testing"));
   try {
-    await apiRequest(
+    const data = await apiRequest(
       "/api/v1/page-note?url=" + encodeURIComponent("https://example.com/")
     );
-    setStatus(els.settingsStatus, t("connected"));
-    els.settingsPanel.hidden = true;
+    if (data && data.latest_extension_version) {
+      state.latestServerExtVersion = String(data.latest_extension_version);
+      syncUpdateBanner();
+    }
+    setStatus(els.settingsStatus, t("connected"), false, { autoClearMs: 2500 });
+    setSettingsOpen(false);
     await refreshActiveTab();
   } catch (err) {
     setStatus(els.settingsStatus, t("conn_failed", { err: err.message }), true);
@@ -663,7 +842,7 @@ async function flushPendingNotesSave({ keepalive = false } = {}) {
       body: JSON.stringify(payload),
     });
     if (state.rawUrl === payload.url || state.canonicalUrl === payload.url) {
-      setStatus(els.notesStatus, t("saved"));
+      setStatus(els.notesStatus, t("saved"), false, { autoClearMs: 2500 });
     }
   } catch (err) {
     // Restore pending payload so a failed save can be retried unless superseded
@@ -740,6 +919,7 @@ function renderItems() {
     checkbox.type = "checkbox";
     checkbox.disabled = Boolean(item.promoted_entry_id);
     checkbox.checked = state.selectedIds.has(item.id);
+    checkbox.setAttribute("aria-label", t("select_item_aria", { word: item.word }));
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) state.selectedIds.add(item.id);
       else state.selectedIds.delete(item.id);
@@ -847,9 +1027,21 @@ function renderItems() {
 
     const delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.className = "sp-link-btn";
+    delBtn.className = "sp-link-btn sp-link-btn--danger";
     delBtn.textContent = t("delete");
+    let deleteConfirmTimer = null;
     delBtn.addEventListener("click", async () => {
+      if (!delBtn.classList.contains("is-confirming")) {
+        delBtn.classList.add("is-confirming");
+        delBtn.textContent = t("confirm_delete");
+        deleteConfirmTimer = setTimeout(() => {
+          delBtn.classList.remove("is-confirming");
+          delBtn.textContent = t("delete");
+        }, 4000);
+        return;
+      }
+      if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
+      delBtn.disabled = true;
       try {
         await apiRequest(`/api/v1/page-note/items/${item.id}`, {
           method: "DELETE",
@@ -857,6 +1049,9 @@ function renderItems() {
         state.items = state.items.filter((it) => it.id !== item.id);
         renderItems();
       } catch (err) {
+        delBtn.disabled = false;
+        delBtn.classList.remove("is-confirming");
+        delBtn.textContent = t("delete");
         setStatus(els.promoteStatus, t("delete_failed", { err: err.message }), true);
       }
     });
@@ -953,7 +1148,11 @@ function toggleEditBox(li, item) {
   li.appendChild(box);
 }
 
-async function renderLookupIntoBox(box, word, { includeDictLinks = false, onUseSense = null } = {}) {
+async function renderLookupIntoBox(
+  box,
+  word,
+  { includeDictLinks = false, onUseSense = null, onClose = null } = {}
+) {
   box.replaceChildren();
   box.textContent = t("looking_up");
   box.hidden = false;
@@ -964,11 +1163,8 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false, onUseS
     );
     box.replaceChildren();
 
-    if (includeDictLinks) {
-      const linksRow = createDictionaryLinksRow(word);
-      linksRow.style.margin = "0 0 6px 0";
-      box.appendChild(linksRow);
-    }
+    const headRow = document.createElement("div");
+    headRow.className = "sp-lookup-head";
 
     const ipaRow = document.createElement("div");
     ipaRow.className = "sp-lookup-ipa-row";
@@ -979,7 +1175,25 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false, onUseS
       ipaRow.appendChild(ipaEl);
     }
     ipaRow.appendChild(createAudioButton(word));
-    box.appendChild(ipaRow);
+    headRow.appendChild(ipaRow);
+
+    if (typeof onClose === "function") {
+      const closeBtn = document.createElement("button");
+      closeBtn.type = "button";
+      closeBtn.className = "sp-lookup-close-btn";
+      closeBtn.setAttribute("aria-label", t("close_lookup"));
+      closeBtn.title = t("close_lookup");
+      closeBtn.textContent = "×";
+      closeBtn.addEventListener("click", onClose);
+      headRow.appendChild(closeBtn);
+    }
+    box.appendChild(headRow);
+
+    if (includeDictLinks) {
+      const linksRow = createDictionaryLinksRow(word);
+      linksRow.style.margin = "0 0 6px 0";
+      box.appendChild(linksRow);
+    }
 
     if (data.existing_entries && data.existing_entries.length) {
       data.existing_entries.forEach((entry) => {
@@ -1028,7 +1242,7 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false, onUseS
         if (typeof onUseSense === "function" && sense.meaning) {
           const useBtn = document.createElement("button");
           useBtn.type = "button";
-          useBtn.className = "sp-link-btn";
+          useBtn.className = "sp-pill sp-pill-btn sp-use-btn";
           useBtn.textContent = t("use_sense");
           useBtn.addEventListener("click", () => {
             useBtn.disabled = true;
@@ -1090,12 +1304,16 @@ async function toggleLookupBox(li, item) {
             state.items[idx] = resp.item;
           }
           renderItems();
+          setStatus(els.promoteStatus, t("def_added"), false, { autoClearMs: 2800 });
         } catch (err) {
           setStatus(els.promoteStatus, t("save_failed", { err: err.message }), true);
         }
       }
     : null;
-  await renderLookupIntoBox(box, item.word, { onUseSense });
+  await renderLookupIntoBox(box, item.word, {
+    onUseSense,
+    onClose: () => box.remove(),
+  });
 }
 
 function samePageUrl(urlA, urlB) {
@@ -1145,6 +1363,7 @@ async function loadPageForTab(tab) {
   els.jotContext.value = "";
   els.jotLookupBox.hidden = true;
   els.jotLookupBox.replaceChildren();
+  state.jotLookupWord = "";
   setPendingTimestamp(null);
   setStatus(els.jotStatus, "");
   setStatus(els.promoteStatus, "");
@@ -1161,7 +1380,7 @@ async function loadPageForTab(tab) {
 
   if (!hasConfig()) {
     els.workspace.hidden = true;
-    els.settingsPanel.hidden = false;
+    setSettingsOpen(true);
     showNotice(t("notice_configure"), false, "no_config");
     return;
   }
@@ -1184,6 +1403,10 @@ async function loadPageForTab(tab) {
     const data = await apiRequest(query, { signal: controller.signal });
     if (controller.signal.aborted || gen !== state.loadGeneration) return;
 
+    if (data && data.latest_extension_version) {
+      state.latestServerExtVersion = String(data.latest_extension_version);
+      syncUpdateBanner();
+    }
     state.canonicalUrl = data.url || state.rawUrl;
     els.pageUrl.textContent = state.canonicalUrl;
     state.items = data.items || [];
@@ -1238,8 +1461,31 @@ async function consumePendingCapture() {
 }
 
 els.toggleSettingsBtn.addEventListener("click", () => {
-  els.settingsPanel.hidden = !els.settingsPanel.hidden;
+  setSettingsOpen(els.settingsPanel.hidden);
 });
+
+if (els.closeSettingsBtn) {
+  els.closeSettingsBtn.addEventListener("click", () => setSettingsOpen(false));
+}
+
+if (els.serverUrlInput) {
+  els.serverUrlInput.addEventListener("input", syncGetTokenLink);
+}
+
+if (els.toggleTokenVisBtn && els.apiTokenInput) {
+  els.toggleTokenVisBtn.addEventListener("click", () => {
+    const showing = els.apiTokenInput.type === "text";
+    els.apiTokenInput.type = showing ? "password" : "text";
+    els.toggleTokenVisBtn.textContent = showing ? t("show") : t("hide");
+  });
+}
+
+if (els.themeSelect) {
+  els.themeSelect.addEventListener("change", () => {
+    applyTheme(els.themeSelect.value);
+    chrome.storage.local.set({ themePref: state.themePref });
+  });
+}
 
 if (els.langSelect) {
   els.langSelect.addEventListener("change", () => {
@@ -1253,6 +1499,12 @@ if (els.langSelect) {
 els.saveSettingsBtn.addEventListener("click", saveSettings);
 els.clearTsBtn.addEventListener("click", () => setPendingTimestamp(null));
 
+function closeJotLookupBox() {
+  els.jotLookupBox.hidden = true;
+  els.jotLookupBox.replaceChildren();
+  state.jotLookupWord = "";
+}
+
 els.jotLookupBtn.addEventListener("click", async () => {
   const word = els.jotWord.value.trim();
   if (!word) {
@@ -1261,8 +1513,16 @@ els.jotLookupBtn.addEventListener("click", async () => {
     return;
   }
   if (!hasConfig()) return;
+  if (!els.jotLookupBox.hidden && state.jotLookupWord.toLowerCase() === word.toLowerCase()) {
+    closeJotLookupBox();
+    return;
+  }
+  state.jotLookupWord = word;
   setStatus(els.jotStatus, "");
-  await renderLookupIntoBox(els.jotLookupBox, word, { includeDictLinks: true });
+  await renderLookupIntoBox(els.jotLookupBox, word, {
+    includeDictLinks: true,
+    onClose: closeJotLookupBox,
+  });
 });
 
 els.jotContext.addEventListener("keydown", (event) => {
@@ -1339,10 +1599,9 @@ els.jotForm.addEventListener("submit", async (event) => {
     }
     els.jotWord.value = "";
     els.jotContext.value = "";
-    els.jotLookupBox.hidden = true;
-    els.jotLookupBox.replaceChildren();
+    closeJotLookupBox();
     setPendingTimestamp(null);
-    setStatus(els.jotStatus, t("saved"));
+    setStatus(els.jotStatus, t("saved"), false, { autoClearMs: 2500 });
     els.jotWord.focus();
   } catch (err) {
     if (gen === state.loadGeneration) {

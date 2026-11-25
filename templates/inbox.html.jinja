@@ -11,7 +11,8 @@
 {%- endmacro %}
 
 {% block body %}
-{{ page_header(subtitle=t('inbox.subtitle'), active="inbox", show_add=True) }}
+{% set ext_nav_link %}<a class="button button-ghost" href="/account#extension">{{ t('inbox.ext_link', version=extension_version) }}</a>{% endset %}
+{{ page_header(subtitle=t('inbox.subtitle'), active="inbox", extra_nav=ext_nav_link, show_add=True) }}
 
 <main class="inbox-page" id="inbox-main">
     <div class="inbox-toolbar" id="inbox-toolbar"{% if not promoted_count %} hidden{% endif %}>

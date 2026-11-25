@@ -699,6 +699,39 @@ async def test_phase4_cm6_preview_and_inbox_note_deleted(client, admin_user):
     assert del2.json() == {"message": "deleted", "note_deleted": True}
 
 
+async def test_extension_visibility_update_guide_and_version_parity(client, admin_user):
+    import json
+    from pathlib import Path
+
+    manifest = json.loads(
+        (Path(__file__).resolve().parent.parent / "extension" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["version"] == utils.EXTENSION_VERSION
+
+    await _login(client)
+
+    dash = await client.get("/")
+    assert dash.status_code == 200
+    assert f"Chrome extension (v{utils.EXTENSION_VERSION})" in dash.text
+    assert 'href="/account#extension"' in dash.text
+
+    inbox = await client.get("/inbox")
+    assert inbox.status_code == 200
+    assert f"Chrome extension (v{utils.EXTENSION_VERSION})" in inbox.text
+
+    account = await client.get("/account")
+    assert account.status_code == 200
+    assert "Updating an existing install?" in account.text
+    assert "do not click Remove" in account.text
+
+    note_resp = await client.get("/api/v1/page-note?url=https://example.com/vercheck")
+    assert note_resp.status_code == 200
+    assert note_resp.json()["latest_extension_version"] == utils.EXTENSION_VERSION
+
+
+
 
 
 

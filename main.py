@@ -122,6 +122,7 @@ from utils import (
     highlight_matches,
     invalidate_quiz_pool_cache,
     invalidate_words_cache,
+    EXTENSION_VERSION,
     normalize_pronoun_casing,
     parse_entry_text,
     parse_user_import_json,
@@ -139,7 +140,6 @@ auth_settings = get_auth_settings()
 
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 PASSWORD_RESET_TTL_SECONDS = 24 * 60 * 60
-EXTENSION_VERSION = "0.4.0"
 EXTENSION_DOWNLOAD_URL = (
     f"https://github.com/davuses/glossbook/releases/download/"
     f"extension-v{EXTENSION_VERSION}/glossbook-extension-v{EXTENSION_VERSION}.zip"
