@@ -176,3 +176,4 @@ wordhoard_error.yaml
 config.toml
 sync-backup-db.sh
 back_up_db.py
+tools/cm6/node_modules/

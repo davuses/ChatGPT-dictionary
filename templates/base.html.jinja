@@ -34,11 +34,7 @@
     <link rel="manifest"
         href="{{ static_url('manifest.json') }}">
     {% if needs_editor %}
-    <link rel="stylesheet"
-        href="{{ static_url('font-awesome.min.css') }}">
-    <link rel="stylesheet"
-        href="{{ static_url('md-editor.min.css') }}">
-    <script src="{{ static_url('md-editor.min.js') }}"></script>
+    <script src="{{ static_url('cm6-editor.js') }}" defer></script>
     {% endif %}
     {% block head %}{% endblock head %}
 </head>

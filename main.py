@@ -139,7 +139,7 @@ auth_settings = get_auth_settings()
 
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 PASSWORD_RESET_TTL_SECONDS = 24 * 60 * 60
-EXTENSION_VERSION = "0.3.0"
+EXTENSION_VERSION = "0.4.0"
 EXTENSION_DOWNLOAD_URL = (
     f"https://github.com/davuses/glossbook/releases/download/"
     f"extension-v{EXTENSION_VERSION}/glossbook-extension-v{EXTENSION_VERSION}.zip"
@@ -876,6 +876,23 @@ def root_page(
     return templates.TemplateResponse(
         request=request, name="root.html.jinja", context=context
     )
+
+
+class MarkdownPreviewRequest(BaseModel):
+    text: str = Field("", max_length=100_000)
+
+
+@protected_router.post("/markdown/preview", response_class=JSONResponse)
+def markdown_preview(
+    payload: MarkdownPreviewRequest,
+    _: None = Depends(verify_header_csrf),
+):
+    html = render_safe_markdown(
+        payload.text,
+        extras=["strike", "tables", "fenced-code-blocks"],
+        wrap_ipa=True,
+    )
+    return JSONResponse({"html": html}, headers={"Cache-Control": "no-store"})
 
 
 @protected_router.get("/quiz/next", response_class=JSONResponse)

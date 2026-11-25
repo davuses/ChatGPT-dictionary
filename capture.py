@@ -242,9 +242,15 @@ def delete_capture_item(
     item_id: int,
     current_user: UserRecord = Depends(require_api_user),
 ):
-    if not db_delete_capture_item(current_user.id, item_id):
+    from database import db_delete_capture_item_with_status
+
+    deleted, note_deleted = db_delete_capture_item_with_status(current_user.id, item_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail="Capture item not found")
-    return JSONResponse({"message": "deleted"}, headers={"Cache-Control": "no-store"})
+    return JSONResponse(
+        {"message": "deleted", "note_deleted": note_deleted},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @api_router.post("/page-note/promote", response_class=JSONResponse)

@@ -645,6 +645,61 @@ async def test_phase3_entry_detail_lookup_synonym_links_review_and_admin(
     assert 'data-confirm-key="confirm_disable_user"' in admin_resp.text
 
 
+async def test_phase4_cm6_preview_and_inbox_note_deleted(client, admin_user):
+    # Unauthenticated preview is rejected
+    assert (await client.post("/markdown/preview", json={"text": "**hi**"})).status_code == 401
+
+    e1 = database.db_add_entry(admin_user.id, "ctx - candor")
+    await _login(client)
+
+    add_def = await client.get(f"/add_definition?entry_id={e1}")
+    assert add_def.status_code == 200
+    assert "cm6-editor.js" in add_def.text
+    assert "md-editor.min.js" not in add_def.text
+    assert "font-awesome.min.css" not in add_def.text
+
+    csrf_token = _csrf_from_html(add_def.text)
+    assert (await client.post("/markdown/preview", json={"text": "**hi**"})).status_code == 403
+
+    preview = await client.post(
+        "/markdown/preview",
+        json={"text": "**bold** /ˈkændər/ <script>alert(1)</script>\n\n```py\nx=1\n```"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert preview.status_code == 200
+    assert preview.headers.get("cache-control") == "no-store"
+    html = preview.json()["html"]
+    assert "<strong>bold</strong>" in html
+    assert '<span class="ipa">/ˈkændər/</span>' in html
+    assert "<script>" not in html
+    assert "<pre>" in html
+
+    # Inbox DELETE returns note_deleted accurately
+    _, item1 = database.db_add_capture_item(
+        admin_user.id, "https://example.com/p1", "Page 1", word="alpha"
+    )
+    _, item2 = database.db_add_capture_item(
+        admin_user.id, "https://example.com/p1", "Page 1", word="beta"
+    )
+    inbox = await client.get("/inbox")
+    assert inbox.status_code == 200
+    assert "inbox-collapse-btn" in inbox.text
+    assert "inbox-lookup-toggle" in inbox.text
+
+    del1 = await client.delete(
+        f"/api/v1/page-note/items/{item1.id}", headers={"X-CSRF-Token": csrf_token}
+    )
+    assert del1.status_code == 200
+    assert del1.json() == {"message": "deleted", "note_deleted": False}
+
+    del2 = await client.delete(
+        f"/api/v1/page-note/items/{item2.id}", headers={"X-CSRF-Token": csrf_token}
+    )
+    assert del2.status_code == 200
+    assert del2.json() == {"message": "deleted", "note_deleted": True}
+
+
+
 
 
 

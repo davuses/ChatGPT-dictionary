@@ -46,6 +46,7 @@ const STRINGS = {
     saved_visits_one: "Saved ({n} visit)",
     saved_visits_many: "Saved ({n} visits)",
     synonyms_prefix: "Synonyms: ",
+    use_sense: "+ Use",
     no_senses: "No thesaurus senses found.",
     lookup_failed: "Lookup failed: {err}",
     err_invalid_url: "Enter a valid http(s) server URL.",
@@ -120,6 +121,7 @@ const STRINGS = {
     saved_visits_one: "词库已有（访问 {n} 次）",
     saved_visits_many: "词库已有（访问 {n} 次）",
     synonyms_prefix: "同义词：",
+    use_sense: "+ 采用",
     no_senses: "未找到同义词释义。",
     lookup_failed: "查询失败：{err}",
     err_invalid_url: "请输入有效的 http(s) 服务器地址。",
@@ -357,11 +359,9 @@ function buildPronunciationUrls(word) {
   if (!clean) return [];
   const urls = [];
   if (!/\s/.test(clean)) {
-    urls.push(
-      `https://ssl.gstatic.com/dictionary/static/sounds/oxford/${encodeURIComponent(
-        clean.toLowerCase()
-      )}--_us_1.mp3`
-    );
+    const slug = encodeURIComponent(clean.toLowerCase());
+    urls.push(`https://ssl.gstatic.com/dictionary/static/sounds/oxford/${slug}--_us_1.mp3`);
+    urls.push(`https://ssl.gstatic.com/dictionary/static/sounds/oxford/x${slug}--_us_1.mp3`);
   }
   urls.push(
     `https://www.google.com/speech-api/v1/synthesize?text=${encodeURIComponent(
@@ -865,7 +865,7 @@ function renderItems() {
     li.appendChild(actions);
 
     lookupBtn.addEventListener("click", () => {
-      toggleLookupBox(li, item.word);
+      toggleLookupBox(li, item);
     });
 
     els.itemsList.appendChild(li);
@@ -953,7 +953,7 @@ function toggleEditBox(li, item) {
   li.appendChild(box);
 }
 
-async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {}) {
+async function renderLookupIntoBox(box, word, { includeDictLinks = false, onUseSense = null } = {}) {
   box.replaceChildren();
   box.textContent = t("looking_up");
   box.hidden = false;
@@ -1025,6 +1025,22 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {})
           syns.textContent = t("synonyms_prefix") + sense.synonyms.slice(0, 8).join(", ");
           div.appendChild(syns);
         }
+        if (typeof onUseSense === "function" && sense.meaning) {
+          const useBtn = document.createElement("button");
+          useBtn.type = "button";
+          useBtn.className = "sp-link-btn";
+          useBtn.textContent = t("use_sense");
+          useBtn.addEventListener("click", () => {
+            useBtn.disabled = true;
+            const formatted = sense.part_of_speech
+              ? `(${sense.part_of_speech}) ${sense.meaning}`
+              : sense.meaning;
+            Promise.resolve(onUseSense(formatted)).finally(() => {
+              useBtn.disabled = false;
+            });
+          });
+          div.appendChild(useBtn);
+        }
         box.appendChild(div);
       });
     } else if (data.thesaurus_error) {
@@ -1047,7 +1063,7 @@ async function renderLookupIntoBox(box, word, { includeDictLinks = false } = {})
   }
 }
 
-async function toggleLookupBox(li, word) {
+async function toggleLookupBox(li, item) {
   const existing = li.querySelector(".sp-lookup-box");
   if (existing) {
     existing.remove();
@@ -1056,7 +1072,30 @@ async function toggleLookupBox(li, word) {
   const box = document.createElement("div");
   box.className = "sp-lookup-box";
   li.appendChild(box);
-  await renderLookupIntoBox(box, word);
+  const onUseSense = !item.promoted_entry_id
+    ? async (formattedSense) => {
+        const prev = (item.definition_text || "").trim();
+        const nextDef = prev ? `${prev}\n${formattedSense}` : formattedSense;
+        try {
+          const resp = await apiRequest(`/api/v1/page-note/items/${item.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              word: item.word,
+              context: item.context || "",
+              definition_text: nextDef,
+            }),
+          });
+          const idx = state.items.findIndex((it) => it.id === item.id);
+          if (idx >= 0 && resp.item) {
+            state.items[idx] = resp.item;
+          }
+          renderItems();
+        } catch (err) {
+          setStatus(els.promoteStatus, t("save_failed", { err: err.message }), true);
+        }
+      }
+    : null;
+  await renderLookupIntoBox(box, item.word, { onUseSense });
 }
 
 function samePageUrl(urlA, urlB) {

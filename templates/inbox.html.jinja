@@ -13,17 +13,14 @@
 {% block body %}
 {{ page_header(subtitle=t('inbox.subtitle'), active="inbox", show_add=True) }}
 
-<main class="inbox-page">
-    {% if promoted_count %}
-    <div class="inbox-toolbar">
+<main class="inbox-page" id="inbox-main">
+    <div class="inbox-toolbar" id="inbox-toolbar"{% if not promoted_count %} hidden{% endif %}>
         <button type="button" class="button button-ghost" id="inbox-clear-promoted">
             {{ t('inbox.clear_promoted', n=promoted_count) }}
         </button>
     </div>
-    {% endif %}
 
-    {% if not page_notes %}
-    <section class="card">
+    <section class="card" id="inbox-empty-card"{% if page_notes %} hidden{% endif %}>
         <h2>{{ t('inbox.empty_title') }}</h2>
         <p>{{ t('inbox.empty_desc') }}</p>
         <div class="form-actions">
@@ -31,8 +28,9 @@
             <a class="button button-ghost" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('inbox.download_zip') }}</a>
         </div>
     </section>
-    {% else %}
+
     {% for note in page_notes %}
+    {% set unpromoted = note.items | selectattr("promoted_entry_id", "none") | list %}
     <section class="card inbox-note-card"
         data-note-id="{{ note.id }}"
         data-note-url="{{ note.url }}"
@@ -45,14 +43,17 @@
                 <p class="inbox-note-url">{{ note.url }}</p>
             </div>
             <div class="inbox-note-actions">
-                {% set unpromoted = note.items | selectattr("promoted_entry_id", "none") | list %}
-                {% if unpromoted %}
+                <button type="button"
+                    class="button button-ghost inbox-collapse-btn"
+                    aria-expanded="true"
+                    aria-controls="inbox-note-body-{{ note.id }}">
+                    {{ t('inbox.collapse') }}
+                </button>
                 <button type="button"
                     class="button button-primary inbox-promote-all"
-                    data-item-ids="{{ unpromoted | map(attribute='id') | join(',') }}">
+                    data-item-ids="{{ unpromoted | map(attribute='id') | join(',') }}"{% if not unpromoted %} hidden{% endif %}>
                     {{ t('inbox.add_all', n=unpromoted | length) }}
                 </button>
-                {% endif %}
                 <button type="button"
                     class="button button-danger inbox-delete-note"
                     data-note-id="{{ note.id }}">
@@ -61,6 +62,7 @@
             </div>
         </div>
 
+        <div class="inbox-note-body" id="inbox-note-body-{{ note.id }}">
         {% if note.items %}
         <ul class="inbox-item-list">
             {% for item in note.items %}
@@ -82,15 +84,8 @@
                             data-word="{{ item.word }}"
                             aria-label="{{ t('inbox.play_aria', word=item.word) }}"
                             title="{{ t('inbox.play_title') }}">
-                            <svg class="icon-play" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
-                                <polygon points="10,8 16.5,12 10,16" fill="currentColor" />
-                            </svg>
-                            <svg class="icon-pause" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
-                                <rect x="9" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
-                                <rect x="12.6" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
-                            </svg>
+                            <svg class="icon-play" aria-hidden="true"><use href="#icon-audio-play"/></svg>
+                            <svg class="icon-pause" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
                         </button>
                         {% if item.timestamp_seconds is not none %}
                         {% set ts_url = note.url ~ ("&t=" if "?" in note.url else "?t=") ~ item.timestamp_seconds %}
@@ -104,18 +99,15 @@
                         {% endfor %}
                         {% endif %}
                     </div>
-                    {% if item.context %}
-                    <p class="inbox-item-context">{{ item.context }}</p>
-                    {% endif %}
-                    {% if item.definition_text %}
-                    <p class="inbox-item-def">{{ item.definition_text }}</p>
-                    {% endif %}
+                    <p class="inbox-item-context"{% if not item.context %} hidden{% endif %}>{{ item.context }}</p>
+                    <p class="inbox-item-def"{% if not item.definition_text %} hidden{% endif %}>{{ item.definition_text }}</p>
                     <div class="inbox-dict-links">
-                        <a class="inbox-dict-link" href="https://www.google.com/search?q={{ ('define ' ~ item.word) | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search &quot;define {{ item.word }}&quot; on Google">Google</a>
-                        <a class="inbox-dict-link" href="https://www.oxfordlearnersdictionaries.com/search/english/?q={{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Oxford Learner's Dictionaries">Oxford</a>
-                        <a class="inbox-dict-link" href="https://www.ldoceonline.com/search/english/direct/?q={{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Longman Dictionary">Longman</a>
-                        <a class="inbox-dict-link" href="https://www.merriam-webster.com/dictionary/{{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer" title="Search on Merriam-Webster">MW</a>
+                        <a class="inbox-dict-link" href="https://www.google.com/search?q={{ ('define ' ~ item.word) | urlencode }}" target="_blank" rel="noopener noreferrer">Google</a>
+                        <a class="inbox-dict-link" href="https://www.oxfordlearnersdictionaries.com/search/english/?q={{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer">Oxford</a>
+                        <a class="inbox-dict-link" href="https://www.ldoceonline.com/search/english/direct/?q={{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer">Longman</a>
+                        <a class="inbox-dict-link" href="https://www.merriam-webster.com/dictionary/{{ item.word | urlencode }}" target="_blank" rel="noopener noreferrer">MW</a>
                     </div>
+                    <div class="inbox-lookup-panel" hidden></div>
                     <p class="inbox-item-error form-error" role="alert" hidden></p>
                     <form class="inbox-edit-form" hidden>
                         <label class="inbox-edit-label">
@@ -138,6 +130,7 @@
                 </div>
                 <div class="inbox-item-actions">
                     {% if not item.promoted_entry_id %}
+                    <button type="button" class="button button-ghost inbox-lookup-toggle">{{ t('inbox.lookup') }}</button>
                     <button type="button" class="button button-ghost inbox-edit-toggle">{{ t('entry.edit') }}</button>
                     <button type="button" class="button button-ghost inbox-promote-one" data-item-id="{{ item.id }}">{{ t('inbox.add_one') }}</button>
                     {% endif %}
@@ -158,25 +151,72 @@
                 </div>
             </div>
         </details>
+        </div>
     </section>
     {% endfor %}
-    {% endif %}
 </main>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    const emptyCard = document.getElementById("inbox-empty-card");
+    const toolbar = document.getElementById("inbox-toolbar");
+    const clearPromotedBtn = document.getElementById("inbox-clear-promoted");
+
+    function syncInboxCounters() {
+        const cards = document.querySelectorAll(".inbox-note-card");
+        if (emptyCard) emptyCard.hidden = cards.length > 0;
+
+        let totalPending = 0;
+        let totalPromoted = 0;
+
+        cards.forEach((card) => {
+            const unpromotedItems = Array.from(card.querySelectorAll(".inbox-item:not(.is-promoted)"));
+            const promotedItems = card.querySelectorAll(".inbox-item.is-promoted");
+            totalPending += unpromotedItems.length;
+            totalPromoted += promotedItems.length;
+
+            const addAllBtn = card.querySelector(".inbox-promote-all");
+            if (addAllBtn) {
+                const ids = unpromotedItems.map((li) => li.dataset.itemId).filter(Boolean);
+                addAllBtn.dataset.itemIds = ids.join(",");
+                addAllBtn.hidden = ids.length === 0;
+                addAllBtn.disabled = false;
+                if (ids.length > 0) {
+                    addAllBtn.textContent = uiText("inbox_add_all", { n: ids.length }, "Add all (" + ids.length + ")");
+                }
+            }
+        });
+
+        if (toolbar && clearPromotedBtn) {
+            toolbar.hidden = totalPromoted === 0;
+            clearPromotedBtn.disabled = false;
+            if (totalPromoted > 0) {
+                clearPromotedBtn.textContent = uiText(
+                    "inbox_clear_promoted",
+                    { n: totalPromoted },
+                    "Clear promoted (" + totalPromoted + ")"
+                );
+            }
+        }
+
+        const navBadge = document.getElementById("nav-inbox-badge");
+        if (navBadge) {
+            if (totalPending > 0) {
+                navBadge.textContent = String(totalPending);
+                navBadge.hidden = false;
+            } else {
+                navBadge.remove();
+            }
+        }
+    }
+
     function showItemError(itemId, message) {
         const li = document.querySelector('.inbox-item[data-item-id="' + itemId + '"]');
         if (!li) return;
         const errEl = li.querySelector(".inbox-item-error");
         if (!errEl) return;
-        if (message) {
-            errEl.textContent = message;
-            errEl.hidden = false;
-        } else {
-            errEl.textContent = "";
-            errEl.hidden = true;
-        }
+        errEl.textContent = message || "";
+        errEl.hidden = !message;
     }
 
     function markItemPromoted(itemId, entryId) {
@@ -184,7 +224,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!li) return;
         li.classList.add("is-promoted");
         showItemError(itemId, "");
-        li.querySelectorAll(".inbox-promote-one, .inbox-edit-toggle, .inbox-existing-badge").forEach((el) => el.remove());
+        li.querySelectorAll(".inbox-promote-one, .inbox-edit-toggle, .inbox-lookup-toggle, .inbox-existing-badge").forEach((el) => el.remove());
+        const editForm = li.querySelector(".inbox-edit-form");
+        if (editForm) editForm.hidden = true;
+        const lookupPanel = li.querySelector(".inbox-lookup-panel");
+        if (lookupPanel) lookupPanel.hidden = true;
         const head = li.querySelector(".inbox-item-head");
         if (head && entryId && !head.querySelector(".inbox-promoted-badge")) {
             const link = document.createElement("a");
@@ -205,21 +249,21 @@ document.addEventListener("DOMContentLoaded", function () {
         })
             .then((data) => {
                 const results = (data && data.results) || [];
-                const failures = results.filter((r) => r.status === "error" || r.status === "not_found");
-                if (failures.length === 0) {
-                    location.reload();
-                    return;
-                }
+                let okCount = 0;
                 results.forEach((r) => {
                     if (r.status === "error") {
                         showItemError(r.item_id, r.error || uiText("inbox_err_add", null, "Could not add this word."));
                     } else if (r.status === "not_found") {
                         showItemError(r.item_id, uiText("inbox_err_missing", null, "Item no longer exists."));
                     } else if (r.entry_id) {
+                        okCount += 1;
                         markItemPromoted(r.item_id, r.entry_id);
                     }
                 });
-                if (triggerBtn) triggerBtn.disabled = false;
+                if (okCount > 0) {
+                    showToast(uiText("inbox_promoted_toast", null, "Added to dictionary"));
+                }
+                syncInboxCounters();
             })
             .catch((err) => {
                 console.error(err);
@@ -227,6 +271,45 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (triggerBtn) triggerBtn.disabled = false;
             });
     }
+
+    function applyItemUpdateToDom(li, word, context, defText) {
+        li.dataset.word = word;
+        li.dataset.context = context;
+        li.dataset.definition = defText;
+        const wordEl = li.querySelector(".inbox-item-word");
+        if (wordEl) wordEl.textContent = word;
+        const audioBtn = li.querySelector(".inbox-audio-btn");
+        if (audioBtn) audioBtn.dataset.word = word;
+        const ctxEl = li.querySelector(".inbox-item-context");
+        if (ctxEl) {
+            ctxEl.textContent = context;
+            ctxEl.hidden = !context.trim();
+        }
+        const defEl = li.querySelector(".inbox-item-def");
+        if (defEl) {
+            defEl.textContent = defText;
+            defEl.hidden = !defText.trim();
+        }
+        const form = li.querySelector(".inbox-edit-form");
+        if (form) {
+            const defTa = form.querySelector('textarea[name="definition_text"]');
+            if (defTa) defTa.value = defText;
+        }
+    }
+
+    document.querySelectorAll(".inbox-collapse-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const bodyId = btn.getAttribute("aria-controls");
+            const body = bodyId ? document.getElementById(bodyId) : null;
+            if (!body) return;
+            const expanded = btn.getAttribute("aria-expanded") === "true";
+            btn.setAttribute("aria-expanded", String(!expanded));
+            body.hidden = expanded;
+            btn.textContent = expanded
+                ? uiText("inbox_expand", null, "Expand")
+                : uiText("inbox_collapse", null, "Collapse");
+        });
+    });
 
     document.querySelectorAll(".inbox-audio-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -240,8 +323,82 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.querySelectorAll(".inbox-promote-all").forEach((btn) => {
         btn.addEventListener("click", () => {
-            const ids = btn.dataset.itemIds.split(",").map(Number).filter(Boolean);
+            const ids = (btn.dataset.itemIds || "").split(",").map(Number).filter(Boolean);
             if (ids.length) promoteIds(ids, btn);
+        });
+    });
+
+    document.querySelectorAll(".inbox-lookup-toggle").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const li = btn.closest(".inbox-item");
+            if (!li) return;
+            const panel = li.querySelector(".inbox-lookup-panel");
+            if (!panel) return;
+            if (!panel.hidden) {
+                panel.hidden = true;
+                return;
+            }
+            panel.hidden = false;
+            panel.textContent = uiText("inbox_looking_up", null, "Looking up…");
+            const word = li.dataset.word || "";
+            const itemId = li.dataset.itemId;
+            fetchJson("/api/v1/lookup?word=" + encodeURIComponent(word))
+                .then((data) => {
+                    panel.textContent = "";
+                    const senses = Array.isArray(data.senses) ? data.senses.slice(0, 4) : [];
+                    if (!senses.length) {
+                        const empty = document.createElement("p");
+                        empty.className = "quiz-empty";
+                        empty.textContent = uiText("inbox_no_senses", null, "No thesaurus senses found.");
+                        panel.appendChild(empty);
+                        return;
+                    }
+                    senses.forEach((sense) => {
+                        const row = document.createElement("div");
+                        row.className = "inbox-lookup-sense";
+                        const text = document.createElement("span");
+                        const pos = sense.part_of_speech ? "(" + sense.part_of_speech + ") " : "";
+                        text.textContent = pos + (sense.meaning || "");
+                        row.appendChild(text);
+                        if (sense.meaning && !li.classList.contains("is-promoted")) {
+                            const useBtn = document.createElement("button");
+                            useBtn.type = "button";
+                            useBtn.className = "button button-ghost";
+                            useBtn.style.marginLeft = "8px";
+                            useBtn.textContent = uiText("inbox_use_sense", null, "+ Use");
+                            useBtn.addEventListener("click", () => {
+                                useBtn.disabled = true;
+                                const formatted = pos + sense.meaning;
+                                const prevDef = (li.dataset.definition || "").trim();
+                                const nextDef = prevDef ? prevDef + "\n" + formatted : formatted;
+                                fetchJson("/api/v1/page-note/items/" + encodeURIComponent(itemId), {
+                                    method: "PATCH",
+                                    headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
+                                    body: JSON.stringify({
+                                        word: li.dataset.word || "",
+                                        context: li.dataset.context || "",
+                                        definition_text: nextDef,
+                                    }),
+                                })
+                                    .then(() => {
+                                        applyItemUpdateToDom(li, li.dataset.word || "", li.dataset.context || "", nextDef);
+                                        showToast(uiText("inbox_updated_toast", null, "Item updated"));
+                                    })
+                                    .catch(() => {
+                                        showItemError(itemId, uiText("inbox_err_update", null, "Failed to update item."));
+                                    })
+                                    .finally(() => {
+                                        useBtn.disabled = false;
+                                    });
+                            });
+                            row.appendChild(useBtn);
+                        }
+                        panel.appendChild(row);
+                    });
+                })
+                .catch(() => {
+                    panel.textContent = uiText("synonyms_error", null, "Thesaurus lookup temporarily unavailable.");
+                });
         });
     });
 
@@ -291,7 +448,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     definition_text: definitionText,
                 }),
             })
-                .then(() => location.reload())
+                .then(() => {
+                    applyItemUpdateToDom(li, word, context, definitionText);
+                    form.hidden = true;
+                    if (submitBtn) submitBtn.disabled = false;
+                    showToast(uiText("inbox_updated_toast", null, "Item updated"));
+                })
                 .catch((err) => {
                     console.error(err);
                     showItemError(itemId, uiText("inbox_err_update", null, "Failed to update item."));
@@ -302,49 +464,85 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.querySelectorAll(".inbox-delete-one").forEach((btn) => {
         btn.addEventListener("click", () => {
-            if (!confirm(uiText("inbox_confirm_delete_item", null, "Remove this captured item?"))) return;
-            fetch("/api/v1/page-note/items/" + encodeURIComponent(btn.dataset.itemId), {
-                method: "DELETE",
-                headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
-            })
-                .then(handleProtectedResponse)
-                .then((resp) => {
-                    if (resp.ok) location.reload();
+            confirmDialog(
+                uiText("inbox_confirm_delete_item", null, "Remove this captured item?"),
+                { danger: true }
+            ).then((ok) => {
+                if (!ok) return;
+                const li = btn.closest(".inbox-item");
+                const card = btn.closest(".inbox-note-card");
+                fetchJson("/api/v1/page-note/items/" + encodeURIComponent(btn.dataset.itemId), {
+                    method: "DELETE",
+                    headers: csrfHeaders(),
                 })
-                .catch((err) => console.error(err));
+                    .then((data) => {
+                        if (data && data.note_deleted && card) {
+                            card.remove();
+                        } else if (li) {
+                            li.remove();
+                        }
+                        syncInboxCounters();
+                        showToast(uiText("inbox_deleted_toast", null, "Removed"));
+                    })
+                    .catch((err) => console.error(err));
+            });
         });
     });
 
     document.querySelectorAll(".inbox-delete-note").forEach((btn) => {
         btn.addEventListener("click", () => {
-            if (!confirm(uiText("inbox_confirm_delete_note", null, "Delete this page note and all of its captured items?"))) return;
-            fetch("/api/v1/page-note/" + encodeURIComponent(btn.dataset.noteId), {
-                method: "DELETE",
-                headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
-            })
-                .then(handleProtectedResponse)
-                .then((resp) => {
-                    if (resp.ok) location.reload();
+            confirmDialog(
+                uiText("inbox_confirm_delete_note", null, "Delete this page note and all of its captured items?"),
+                { danger: true }
+            ).then((ok) => {
+                if (!ok) return;
+                const card = btn.closest(".inbox-note-card");
+                fetch("/api/v1/page-note/" + encodeURIComponent(btn.dataset.noteId), {
+                    method: "DELETE",
+                    headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
                 })
-                .catch((err) => console.error(err));
+                    .then(handleProtectedResponse)
+                    .then((resp) => {
+                        if (resp.ok && card) {
+                            card.remove();
+                            syncInboxCounters();
+                            showToast(uiText("inbox_deleted_toast", null, "Removed"));
+                        }
+                    })
+                    .catch((err) => console.error(err));
+            });
         });
     });
 
-    const clearPromotedBtn = document.getElementById("inbox-clear-promoted");
     if (clearPromotedBtn) {
         clearPromotedBtn.addEventListener("click", () => {
-            if (!confirm(uiText("inbox_confirm_clear_promoted", null, "Remove all already-added items from the inbox?"))) return;
-            clearPromotedBtn.disabled = true;
-            fetchJson("/api/v1/page-note/clear-promoted", {
-                method: "POST",
-                headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
-                body: JSON.stringify({}),
-            })
-                .then(() => location.reload())
-                .catch((err) => {
-                    console.error(err);
-                    clearPromotedBtn.disabled = false;
-                });
+            confirmDialog(
+                uiText("inbox_confirm_clear_promoted", null, "Remove all already-added items from the inbox?"),
+                { danger: true }
+            ).then((ok) => {
+                if (!ok) return;
+                clearPromotedBtn.disabled = true;
+                fetchJson("/api/v1/page-note/clear-promoted", {
+                    method: "POST",
+                    headers: Object.assign({ "Content-Type": "application/json" }, csrfHeaders()),
+                    body: JSON.stringify({}),
+                })
+                    .then(() => {
+                        document.querySelectorAll(".inbox-item.is-promoted").forEach((li) => li.remove());
+                        document.querySelectorAll(".inbox-note-card").forEach((card) => {
+                            const hasItems = card.querySelector(".inbox-item") !== null;
+                            const ta = card.querySelector(".inbox-scratchpad-input");
+                            const hasNotes = ta && ta.value.trim().length > 0;
+                            if (!hasItems && !hasNotes) card.remove();
+                        });
+                        syncInboxCounters();
+                        showToast(uiText("inbox_cleared_toast", null, "Cleared promoted items"));
+                    })
+                    .catch((err) => {
+                        console.error(err);
+                        clearPromotedBtn.disabled = false;
+                    });
+            });
         });
     }
 
@@ -368,7 +566,8 @@ document.addEventListener("DOMContentLoaded", function () {
             })
                 .then((data) => {
                     if (data && data.id === null) {
-                        location.reload();
+                        card.remove();
+                        syncInboxCounters();
                         return;
                     }
                     if (statusEl) statusEl.textContent = uiText("inbox_saved", null, "Saved");

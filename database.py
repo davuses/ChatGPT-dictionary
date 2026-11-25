@@ -1904,7 +1904,8 @@ def db_update_capture_item(
         return _to_item_record(item)
 
 
-def db_delete_capture_item(user_id: int, item_id: int) -> bool:
+def db_delete_capture_item_with_status(user_id: int, item_id: int) -> tuple[bool, bool]:
+    """Delete a capture item; returns (item_deleted, parent_note_deleted)."""
     now = int(time.time())
     with Session(engine) as session:
         row = (
@@ -1914,11 +1915,12 @@ def db_delete_capture_item(user_id: int, item_id: int) -> bool:
             .first()
         )
         if not row:
-            return False
+            return False, False
         item, note = row
         page_note_id = note.id
         session.delete(item)
         session.flush()
+        note_deleted = False
         refreshed = (
             session.query(PageNote)
             .options(joinedload(PageNote.items))
@@ -1928,10 +1930,16 @@ def db_delete_capture_item(user_id: int, item_id: int) -> bool:
         if refreshed:
             if not refreshed.notes_md.strip() and not refreshed.items:
                 session.delete(refreshed)
+                note_deleted = True
             else:
                 refreshed.updated_at = now
         session.commit()
-        return True
+        return True, note_deleted
+
+
+def db_delete_capture_item(user_id: int, item_id: int) -> bool:
+    deleted, _ = db_delete_capture_item_with_status(user_id, item_id)
+    return deleted
 
 
 def db_delete_page_note(user_id: int, note_id: int) -> bool:

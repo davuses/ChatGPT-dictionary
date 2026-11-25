@@ -1,0 +1,20 @@
+{
+  "name": "glossbook-cm6-editor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --minify --format=iife --outfile=../../static/cm6-editor.js"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.8.0",
+    "@codemirror/lang-markdown": "6.3.2",
+    "@codemirror/language": "6.10.8",
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.36.4",
+    "@lezer/highlight": "1.2.1",
+    "@lezer/markdown": "1.4.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0"
+  }
+}
