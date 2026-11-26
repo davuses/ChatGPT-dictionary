@@ -13,7 +13,7 @@
         <p class="section-desc">{{ t('account.export_desc_one' if entry_count == 1 else 'account.export_desc_many', n=entry_count) }}</p>
         <div class="form-actions">
             <a class="button button-primary" href="/account/export.json">{{ t('account.download_json') }}</a>
-            <a class="button button-ghost" href="/account/export.md">{{ t('account.download_md') }}</a>
+            <a class="button" href="/account/export.md">{{ t('account.download_md') }}</a>
         </div>
 
         <hr class="account-divider">
@@ -22,15 +22,32 @@
         <p class="section-desc">{{ t('account.import_desc') }}</p>
         {% if import_notice %}<p class="form-notice" role="status">{{ import_notice }}</p>{% endif %}
         {% if import_error %}<p class="form-error" role="alert">{{ import_error }}</p>{% endif %}
+        <p class="form-error" id="import-drop-error" role="alert" hidden></p>
         <form class="import-form" method="post" action="/account/import" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="file" name="file" accept=".json,application/json" required>
+            <div class="file-dropzone" id="import-dropzone">
+                <input id="import-file-input" class="file-dropzone-input" type="file" name="file" accept=".json,application/json" required>
+                <label class="file-dropzone-label" for="import-file-input">
+                    <svg class="file-dropzone-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                        <path d="M12 15V4m0 0-4 4m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="file-dropzone-empty" id="import-drop-empty">
+                        <span class="file-dropzone-title">{{ t('account.import_drop_title') }}</span>
+                        <span class="file-dropzone-hint">{{ t('account.import_drop_hint') }}</span>
+                    </span>
+                    <span class="file-dropzone-selected" id="import-drop-selected" hidden>
+                        <strong class="file-dropzone-name" id="import-file-name"></strong>
+                        <span class="file-dropzone-meta" id="import-file-size"></span>
+                    </span>
+                </label>
+                <button type="button" class="button button-ghost button-sm file-dropzone-clear" id="import-file-clear" hidden>{{ t('account.import_clear_file') }}</button>
+            </div>
             <label class="import-checkbox">
                 <input type="checkbox" name="include_inbox" value="true" checked>
                 <span>{{ t('account.import_include_inbox') }}</span>
             </label>
             <div class="form-actions">
-                <button class="button button-ghost" type="submit">{{ t('account.import_btn') }}</button>
+                <button class="button" type="submit">{{ t('account.import_btn') }}</button>
             </div>
         </form>
     </section>
@@ -152,6 +169,107 @@ document.addEventListener("DOMContentLoaded", function () {
             }).catch(() => {});
         });
     });
+
+    const dropzone = document.getElementById("import-dropzone");
+    const fileInput = document.getElementById("import-file-input");
+    const emptyEl = document.getElementById("import-drop-empty");
+    const selectedEl = document.getElementById("import-drop-selected");
+    const nameEl = document.getElementById("import-file-name");
+    const sizeEl = document.getElementById("import-file-size");
+    const clearBtn = document.getElementById("import-file-clear");
+    const dropErrEl = document.getElementById("import-drop-error");
+
+    function formatBytes(bytes) {
+        if (!bytes) return "0 B";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    }
+
+    function syncSelectedFile() {
+        if (!fileInput || !dropzone) return;
+        const file = fileInput.files && fileInput.files[0];
+        if (dropErrEl) dropErrEl.hidden = true;
+        if (file) {
+            const isJson = /\.json$/i.test(file.name) || file.type === "application/json";
+            if (!isJson) {
+                fileInput.value = "";
+                dropzone.classList.remove("has-file");
+                if (emptyEl) emptyEl.hidden = false;
+                if (selectedEl) selectedEl.hidden = true;
+                if (clearBtn) clearBtn.hidden = true;
+                if (dropErrEl) {
+                    dropErrEl.textContent = uiText("import_drop_invalid", null, "Please drop a .json file.");
+                    dropErrEl.hidden = false;
+                }
+                return;
+            }
+            dropzone.classList.add("has-file");
+            if (emptyEl) emptyEl.hidden = true;
+            if (selectedEl) selectedEl.hidden = false;
+            if (nameEl) nameEl.textContent = file.name;
+            if (sizeEl) sizeEl.textContent = formatBytes(file.size);
+            if (clearBtn) clearBtn.hidden = false;
+        } else {
+            dropzone.classList.remove("has-file");
+            if (emptyEl) emptyEl.hidden = false;
+            if (selectedEl) selectedEl.hidden = true;
+            if (clearBtn) clearBtn.hidden = true;
+        }
+    }
+
+    if (dropzone && fileInput) {
+        fileInput.addEventListener("change", syncSelectedFile);
+        if (clearBtn) {
+            clearBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                fileInput.value = "";
+                syncSelectedFile();
+            });
+        }
+
+        let dragDepth = 0;
+        ["dragenter", "dragover"].forEach((evName) => {
+            dropzone.addEventListener(evName, (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (evName === "dragenter") dragDepth += 1;
+                dropzone.classList.add("is-dragover");
+            });
+        });
+        ["dragleave", "dragend"].forEach((evName) => {
+            dropzone.addEventListener(evName, (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                dragDepth = Math.max(0, dragDepth - 1);
+                if (dragDepth === 0) dropzone.classList.remove("is-dragover");
+            });
+        });
+        dropzone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dragDepth = 0;
+            dropzone.classList.remove("is-dragover");
+            const files = event.dataTransfer && event.dataTransfer.files;
+            if (!files || !files.length) return;
+            const file = files[0];
+            const isJson = /\.json$/i.test(file.name) || file.type === "application/json";
+            if (!isJson) {
+                if (dropErrEl) {
+                    dropErrEl.textContent = uiText("import_drop_invalid", null, "Please drop a .json file.");
+                    dropErrEl.hidden = false;
+                }
+                return;
+            }
+            if (typeof DataTransfer === "function") {
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                syncSelectedFile();
+            }
+        });
+    }
 });
 </script>
 {% endblock body %}

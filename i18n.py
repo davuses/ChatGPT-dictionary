@@ -345,6 +345,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "account.import_desc": "Merge a Glossbook .json export into your account. Existing entries and page notes are kept untouched and duplicates are skipped.",
         "account.import_include_inbox": "Also import /inbox page notes",
         "account.import_btn": "Import JSON",
+        "account.import_drop_title": "Drop a Glossbook .json file here, or click to browse",
+        "account.import_drop_hint": "JSON export files up to 20 MB",
+        "account.import_clear_file": "Remove",
         "account.ext_section_title": "Chrome Side Panel Extension",
         "account.ext_section_intro": "Capture vocabulary right beside whatever you're reading or watching, then review and batch-add words to Glossbook.",
         "account.ext_feat_web_title": "Articles & web pages:",
@@ -725,6 +728,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "account.import_desc": "将 Glossbook 导出的 .json 备份合并到当前账户。已有词条与笔记保持不变，重复项会自动跳过。",
         "account.import_include_inbox": "同时导入收件箱网页笔记",
         "account.import_btn": "导入 JSON",
+        "account.import_drop_title": "拖拽 Glossbook .json 文件到此处，或点击选择",
+        "account.import_drop_hint": "支持最大 20 MB 的 JSON 导出文件",
+        "account.import_clear_file": "移除",
         "account.ext_section_title": "Chrome 侧边栏扩展",
         "account.ext_section_intro": "在阅读网页或看 YouTube 时随手收集生词与语境，随时批量入库到 Glossbook。",
         "account.ext_feat_web_title": "网页与文章：",
@@ -904,6 +910,7 @@ JS_TRANSLATIONS: dict[str, dict[str, str]] = {
         "entry_updated_toast": "Saved",
         "review_retried_tag": "Retried",
         "review_skipped_tag": "Skipped",
+        "import_drop_invalid": "Please drop a .json file.",
     },
     "zh-CN": {
         "show_answer": "查看答案",
@@ -977,6 +984,7 @@ JS_TRANSLATIONS: dict[str, dict[str, str]] = {
         "entry_updated_toast": "已保存",
         "review_retried_tag": "重练",
         "review_skipped_tag": "跳过",
+        "import_drop_invalid": "请拖入 .json 文件。",
     },
 }
 
