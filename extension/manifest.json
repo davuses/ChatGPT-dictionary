@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Glossbook Side Panel",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Per-page scratchpad notes and batch vocabulary capture for Glossbook.",
   "permissions": [
     "sidePanel",

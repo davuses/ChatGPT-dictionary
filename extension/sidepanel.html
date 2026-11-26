@@ -42,24 +42,20 @@
       <input id="api-token-input" class="sp-input" type="password" placeholder="Paste your API token from /account" data-i18n-placeholder="settings_token_placeholder">
       <button id="toggle-token-vis-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="show">Show</button>
     </div>
-    <div class="sp-settings-grid">
-      <div>
-        <label class="sp-label" for="theme-select" data-i18n="settings_theme_label">Theme</label>
-        <select id="theme-select" class="sp-input">
-          <option value="auto" data-i18n="theme_auto">Auto (System)</option>
-          <option value="light" data-i18n="theme_light">Light</option>
-          <option value="dark" data-i18n="theme_dark">Dark</option>
-        </select>
-      </div>
-      <div>
-        <label class="sp-label" for="lang-select" data-i18n="settings_lang_label">Language</label>
-        <select id="lang-select" class="sp-input">
-          <option value="auto" data-i18n="lang_auto">Auto (Browser)</option>
-          <option value="en">English</option>
-          <option value="zh-CN">简体中文</option>
-        </select>
+    <div class="sp-settings-field">
+      <span class="sp-label" id="theme-group-label" data-i18n="settings_theme_label">Theme</span>
+      <div id="theme-segmented" class="sp-segmented" role="radiogroup" aria-labelledby="theme-group-label">
+        <button type="button" class="sp-seg-btn" role="radio" aria-checked="true" data-theme-value="auto" data-i18n="theme_auto_short">Auto</button>
+        <button type="button" class="sp-seg-btn" role="radio" aria-checked="false" data-theme-value="light" data-i18n="theme_light">Light</button>
+        <button type="button" class="sp-seg-btn" role="radio" aria-checked="false" data-theme-value="dark" data-i18n="theme_dark">Dark</button>
       </div>
     </div>
+    <label class="sp-label" for="lang-select" data-i18n="settings_lang_label">Language</label>
+    <select id="lang-select" class="sp-input">
+      <option value="auto" data-i18n="lang_auto">Auto (Browser)</option>
+      <option value="en">English</option>
+      <option value="zh-CN">简体中文</option>
+    </select>
     <div class="sp-row">
       <button id="save-settings-btn" class="sp-btn sp-btn-primary" type="button" data-i18n="save_test">Save &amp; test</button>
       <span id="settings-status" class="sp-status"></span>

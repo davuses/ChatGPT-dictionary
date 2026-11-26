@@ -12,6 +12,7 @@ const STRINGS = {
     settings_lang_label: "Language",
     settings_theme_label: "Theme",
     theme_auto: "Auto (System)",
+    theme_auto_short: "Auto",
     theme_light: "Light",
     theme_dark: "Dark",
     lang_auto: "Auto (Browser)",
@@ -101,6 +102,7 @@ const STRINGS = {
     settings_lang_label: "界面语言",
     settings_theme_label: "明暗主题",
     theme_auto: "跟随系统",
+    theme_auto_short: "自动",
     theme_light: "浅色",
     theme_dark: "深色",
     lang_auto: "跟随浏览器",
@@ -185,6 +187,9 @@ const state = {
   themePref: "auto",
   langPref: "auto",
   lang: "en",
+  settingsOpen: false,
+  workspaceShouldShow: false,
+  noticeVisible: false,
   latestServerExtVersion: "",
   jotLookupWord: "",
   noticeKind: null,
@@ -209,6 +214,7 @@ const els = {
   toggleSettingsBtn: document.getElementById("toggle-settings-btn"),
   closeSettingsBtn: document.getElementById("close-settings-btn"),
   extVersionBadge: document.getElementById("ext-version-badge"),
+  pageBanner: document.getElementById("page-banner"),
   updateBanner: document.getElementById("update-banner"),
   updateBannerText: document.getElementById("update-banner-text"),
   updateBannerLink: document.getElementById("update-banner-link"),
@@ -217,7 +223,7 @@ const els = {
   apiTokenInput: document.getElementById("api-token-input"),
   toggleTokenVisBtn: document.getElementById("toggle-token-vis-btn"),
   getTokenLink: document.getElementById("get-token-link"),
-  themeSelect: document.getElementById("theme-select"),
+  themeSegmented: document.getElementById("theme-segmented"),
   langSelect: document.getElementById("lang-select"),
   saveSettingsBtn: document.getElementById("save-settings-btn"),
   settingsStatus: document.getElementById("settings-status"),
@@ -286,8 +292,10 @@ function applyTheme(pref) {
       localStorage.setItem("glossbook_theme", normalized);
     }
   } catch (_) {}
-  if (els.themeSelect) {
-    els.themeSelect.value = normalized;
+  if (els.themeSegmented) {
+    els.themeSegmented.querySelectorAll(".sp-seg-btn").forEach((btn) => {
+      btn.setAttribute("aria-checked", String(btn.dataset.themeValue === normalized));
+    });
   }
 }
 
@@ -331,11 +339,20 @@ function syncUpdateBanner() {
   }
 }
 
+function syncViewVisibility() {
+  els.settingsPanel.hidden = !state.settingsOpen;
+  els.toggleSettingsBtn.classList.toggle("is-active", state.settingsOpen);
+  els.toggleSettingsBtn.setAttribute("aria-expanded", String(state.settingsOpen));
+  if (els.pageBanner) {
+    els.pageBanner.hidden = state.settingsOpen;
+  }
+  els.workspace.hidden = state.settingsOpen || !state.workspaceShouldShow;
+  els.globalNotice.hidden = state.settingsOpen || !state.noticeVisible;
+}
+
 function setSettingsOpen(open) {
-  const isOpen = Boolean(open);
-  els.settingsPanel.hidden = !isOpen;
-  els.toggleSettingsBtn.classList.toggle("is-active", isOpen);
-  els.toggleSettingsBtn.setAttribute("aria-expanded", String(isOpen));
+  state.settingsOpen = Boolean(open);
+  syncViewVisibility();
 }
 
 function syncServerLinks() {
@@ -696,14 +713,16 @@ function setStatus(el, text, isError = false, { autoClearMs = 0 } = {}) {
 
 function showNotice(text, isError = false, kind = null) {
   state.noticeKind = kind;
+  state.noticeVisible = true;
   els.globalNotice.textContent = text;
   els.globalNotice.classList.toggle("is-error", isError);
-  els.globalNotice.hidden = false;
+  syncViewVisibility();
 }
 
 function hideNotice() {
   state.noticeKind = null;
-  els.globalNotice.hidden = true;
+  state.noticeVisible = false;
+  syncViewVisibility();
 }
 
 function setPendingTimestamp(seconds) {
@@ -788,9 +807,8 @@ async function saveSettings() {
   const serverUrl = cleanServerUrl(els.serverUrlInput.value);
   const apiToken = els.apiTokenInput.value.trim();
   const langPref = els.langSelect ? els.langSelect.value : state.langPref;
-  const themePref = els.themeSelect ? els.themeSelect.value : state.themePref;
   state.langPref = langPref === "en" || langPref === "zh-CN" ? langPref : "auto";
-  applyTheme(themePref);
+  applyTheme(state.themePref);
   applyLanguage();
   if (!isHttpUrl(serverUrl)) {
     setStatus(els.settingsStatus, t("err_invalid_url"), true);
@@ -1373,20 +1391,21 @@ async function loadPageForTab(tab) {
   els.pageUrl.textContent = state.rawUrl;
 
   if (!isHttpUrl(state.rawUrl)) {
-    els.workspace.hidden = true;
+    state.workspaceShouldShow = false;
     showNotice(t("notice_open_page"), false, "not_http");
     return;
   }
 
   if (!hasConfig()) {
-    els.workspace.hidden = true;
+    state.workspaceShouldShow = false;
     setSettingsOpen(true);
     showNotice(t("notice_configure"), false, "no_config");
     return;
   }
 
+  state.workspaceShouldShow = true;
   hideNotice();
-  els.workspace.hidden = false;
+  syncViewVisibility();
   els.grabPageBtn.textContent = isYouTubeUrl(state.rawUrl)
     ? t("grab_yt")
     : t("grab_selection");
@@ -1480,9 +1499,11 @@ if (els.toggleTokenVisBtn && els.apiTokenInput) {
   });
 }
 
-if (els.themeSelect) {
-  els.themeSelect.addEventListener("change", () => {
-    applyTheme(els.themeSelect.value);
+if (els.themeSegmented) {
+  els.themeSegmented.addEventListener("click", (event) => {
+    const btn = event.target.closest(".sp-seg-btn");
+    if (!btn) return;
+    applyTheme(btn.dataset.themeValue || "auto");
     chrome.storage.local.set({ themePref: state.themePref });
   });
 }

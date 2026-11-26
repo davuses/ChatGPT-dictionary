@@ -344,7 +344,7 @@ textarea {
 }
 
 .page-header-inner {
-  align-items: flex-start;
+  align-items: center;
   display: flex;
   gap: 16px;
   justify-content: space-between;
@@ -360,8 +360,9 @@ textarea {
 .page-header h1,
 .brand-title {
   font-family: var(--font-serif);
-  font-size: 28px;
+  font-size: 29px;
   font-weight: bold;
+  letter-spacing: -0.025em;
   line-height: 1.1;
   margin: 0;
 }
@@ -801,12 +802,10 @@ a.stat-pill:hover {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 13.5px;
+  font-weight: 600;
   position: sticky;
   text-align: left;
-  text-transform: uppercase;
   top: 0;
   z-index: 2;
 }
@@ -1241,8 +1240,9 @@ tr.selected {
 .word-title {
   color: var(--heading);
   font-family: var(--font-serif);
-  font-size: 34px;
-  line-height: 1.15;
+  font-size: 36px;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
 }
 
 .word-hero {
@@ -1314,14 +1314,46 @@ tr.selected {
   font-size: 18px;
   line-height: 1.55;
   margin: 0;
+  max-width: 65ch;
 }
 
 .entry-inline-form {
   background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border: 0;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
   margin-top: 12px;
-  padding: 14px;
+  padding: 14px 16px;
+}
+
+.entry-synonyms-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.entry-synonyms-summary::-webkit-details-marker {
+  display: none;
+}
+
+.entry-synonyms-summary h2 {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.entry-synonyms-summary h2::before {
+  border-bottom: 2px solid var(--muted);
+  border-right: 2px solid var(--muted);
+  content: "";
+  display: inline-block;
+  height: 7px;
+  transform: rotate(-45deg);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: 7px;
+}
+
+.entry-synonyms-details[open] .entry-synonyms-summary h2::before {
+  transform: rotate(45deg);
 }
 
 .entry-shortcuts-hint {
@@ -1332,9 +1364,9 @@ tr.selected {
 }
 
 .entry-shortcuts-hint button {
-  font-size: 12.5px;
-  min-height: 28px;
-  padding: 0 8px;
+  font-size: 13px;
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .synonym-panel {
@@ -1345,6 +1377,7 @@ tr.selected {
 .markdown-body {
   color: var(--ink);
   line-height: 1.65;
+  max-width: 65ch;
   overflow-wrap: break-word;
 }
 
@@ -1679,15 +1712,33 @@ input[type="submit"]:hover {
 }
 
 .inbox-edit-form,
-.inbox-lookup-box {
+.inbox-lookup-box,
+.inbox-lookup-panel {
   background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border: 0;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 8px;
   padding: 10px 12px;
+}
+
+.inbox-lookup-sense {
+  align-items: center;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 14px;
+  gap: 8px;
+  justify-content: space-between;
+  padding-top: 6px;
+}
+
+.inbox-lookup-sense:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .inbox-edit-label {
@@ -1871,8 +1922,9 @@ input[type="submit"]:hover {
 
 .extension-guide {
   background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border: 0;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
   margin: 12px 0 14px;
   padding: 10px 14px;
 }
@@ -1960,7 +2012,52 @@ input[type="submit"]:hover {
   color: var(--heading);
   font-family: var(--font-serif);
   font-size: 26px;
+  letter-spacing: -0.02em;
   margin: 0;
+}
+
+.review-size-pills {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.review-size-pills .button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.review-size-pills .button:hover {
+  color: var(--heading);
+}
+
+.review-size-pills .button.active {
+  background: var(--surface-elevated);
+  box-shadow: 0 1px 2px rgba(21, 35, 43, 0.08);
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+:root[data-theme="dark"] .review-size-pills .button.active {
+  background: var(--accent-soft);
+  color: var(--heading);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .review-size-pills .button.active {
+    background: var(--accent-soft);
+    color: var(--heading);
+  }
 }
 
 .review-counter {
@@ -2482,5 +2579,16 @@ input[type="submit"]:hover {
     min-height: 40px;
     right: 16px;
     width: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

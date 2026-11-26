@@ -119,6 +119,15 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    function openExtensionGuideIfHash() {
+        if (window.location.hash === "#extension") {
+            const details = document.querySelector(".extension-guide");
+            if (details) details.open = true;
+        }
+    }
+    openExtensionGuideIfHash();
+    window.addEventListener("hashchange", openExtensionGuideIfHash);
+
     document.querySelectorAll(".copy-secret-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
             const input = document.getElementById(btn.dataset.copyTarget);

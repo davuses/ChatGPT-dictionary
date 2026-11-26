@@ -65,6 +65,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -110,7 +114,8 @@ a:hover {
 }
 
 .sp-brand {
-  font-size: 18px;
+  font-size: 19px;
+  letter-spacing: -0.025em;
 }
 
 .sp-brand-link,
@@ -147,7 +152,7 @@ a:hover {
 
 .sp-page-url {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -193,7 +198,8 @@ a:hover {
 .sp-count {
   color: var(--muted);
   font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   font-weight: normal;
 }
 
@@ -250,10 +256,54 @@ a:hover {
   min-width: 0;
 }
 
-.sp-settings-grid {
+.sp-settings-field {
+  margin-bottom: 8px;
+}
+
+.sp-segmented {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
   display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 2px;
+}
+
+.sp-seg-btn {
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  min-height: 28px;
+  padding: 0 8px;
+  transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), color 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sp-seg-btn:hover {
+  color: var(--heading);
+}
+
+.sp-seg-btn[aria-checked="true"] {
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+  color: var(--accent-dark);
+}
+
+:root[data-theme="dark"] .sp-seg-btn[aria-checked="true"] {
+  background: var(--accent-soft);
+  color: var(--heading);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sp-seg-btn[aria-checked="true"] {
+    background: var(--accent-soft);
+    color: var(--heading);
+  }
 }
 
 .sp-row {
@@ -400,7 +450,8 @@ a:hover {
   border-radius: 999px;
   color: var(--accent-dark);
   display: inline-flex;
-  font-size: 11px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   padding: 2px 8px;
 }
@@ -533,8 +584,9 @@ a:hover {
 .sp-edit-box,
 .sp-lookup-box {
   background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border: 0;
+  border-left: 2.5px solid var(--accent);
+  border-radius: 6px;
   margin: 6px 0 0 20px;
   padding: 8px 10px;
 }
@@ -617,4 +669,14 @@ a:hover {
 
 .sp-use-btn {
   margin-top: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
