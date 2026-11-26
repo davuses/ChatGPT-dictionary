@@ -25,8 +25,12 @@ const STRINGS = {
     update_how: "How to update →",
     close_lookup: "Close lookup",
     select_item_aria: "Select {word}",
-    confirm_delete: "Confirm?",
+    confirm_delete: "Confirm delete",
     def_added: "Definition added",
+    auto_saved: "Auto-saved",
+    edit_word_label: "Word",
+    edit_ctx_label: "Context sentence",
+    edit_def_label: "Definition",
     quick_jot: "Quick jot",
     grab_from_page: "Grab from page",
     grab_selection: "Grab selection",
@@ -61,7 +65,7 @@ const STRINGS = {
     saved_visits_one: "Saved ({n} visit)",
     saved_visits_many: "Saved ({n} visits)",
     synonyms_prefix: "Synonyms: ",
-    use_sense: "+ Use",
+    use_sense: "+ Use definition",
     no_senses: "No thesaurus senses found.",
     lookup_failed: "Lookup failed: {err}",
     err_invalid_url: "Enter a valid http(s) server URL.",
@@ -115,8 +119,12 @@ const STRINGS = {
     update_how: "查看更新方法 →",
     close_lookup: "关闭查词",
     select_item_aria: "选中 {word}",
-    confirm_delete: "确认删除？",
+    confirm_delete: "确认删除",
     def_added: "已添加到释义",
+    auto_saved: "自动保存",
+    edit_word_label: "单词或短语",
+    edit_ctx_label: "语境原句",
+    edit_def_label: "释义",
     quick_jot: "随手记词",
     grab_from_page: "从网页抓取",
     grab_selection: "抓取选中文本",
@@ -151,7 +159,7 @@ const STRINGS = {
     saved_visits_one: "词库已有（访问 {n} 次）",
     saved_visits_many: "词库已有（访问 {n} 次）",
     synonyms_prefix: "同义词：",
-    use_sense: "+ 采用",
+    use_sense: "+ 设为释义",
     no_senses: "未找到同义词释义。",
     lookup_failed: "查询失败：{err}",
     err_invalid_url: "请输入有效的 http(s) 服务器地址。",
@@ -243,6 +251,7 @@ const els = {
   clearTsBtn: document.getElementById("clear-ts-btn"),
   jotStatus: document.getElementById("jot-status"),
   itemsCount: document.getElementById("items-count"),
+  itemsToolbar: document.getElementById("items-toolbar"),
   itemsEmpty: document.getElementById("items-empty"),
   itemsList: document.getElementById("items-list"),
   toggleSelectAllBtn: document.getElementById("toggle-select-all-btn"),
@@ -693,7 +702,7 @@ function createAudioButton(word) {
 
 const statusTimers = new WeakMap();
 
-function setStatus(el, text, isError = false, { autoClearMs = 0 } = {}) {
+function setStatus(el, text, isError = false, { autoClearMs = 0, settleText = "" } = {}) {
   if (statusTimers.has(el)) {
     clearTimeout(statusTimers.get(el));
     statusTimers.delete(el);
@@ -703,7 +712,7 @@ function setStatus(el, text, isError = false, { autoClearMs = 0 } = {}) {
   if (autoClearMs > 0 && text && !isError) {
     const timer = setTimeout(() => {
       if (el.textContent === text) {
-        el.textContent = "";
+        el.textContent = settleText;
       }
       statusTimers.delete(el);
     }, autoClearMs);
@@ -860,7 +869,10 @@ async function flushPendingNotesSave({ keepalive = false } = {}) {
       body: JSON.stringify(payload),
     });
     if (state.rawUrl === payload.url || state.canonicalUrl === payload.url) {
-      setStatus(els.notesStatus, t("saved"), false, { autoClearMs: 2500 });
+      setStatus(els.notesStatus, t("saved"), false, {
+        autoClearMs: 2500,
+        settleText: t("auto_saved"),
+      });
     }
   } catch (err) {
     // Restore pending payload so a failed save can be retried unless superseded
@@ -898,6 +910,9 @@ function updatePromoteButton() {
   els.promoteSelectedBtn.textContent =
     count > 0 ? t("add_selected_n", { n: count }) : t("add_selected");
 
+  if (els.itemsToolbar) {
+    els.itemsToolbar.hidden = unpromotedIds.length === 0;
+  }
   if (unpromotedIds.length > 0) {
     const allSelected = unpromotedIds.every((id) => state.selectedIds.has(id));
     els.toggleSelectAllBtn.hidden = false;
@@ -1047,19 +1062,35 @@ function renderItems() {
     delBtn.type = "button";
     delBtn.className = "sp-link-btn sp-link-btn--danger";
     delBtn.textContent = t("delete");
+
+    const cancelDelBtn = document.createElement("button");
+    cancelDelBtn.type = "button";
+    cancelDelBtn.className = "sp-link-btn";
+    cancelDelBtn.textContent = t("cancel");
+    cancelDelBtn.hidden = true;
+
     let deleteConfirmTimer = null;
+    function resetDeleteConfirm() {
+      if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
+      deleteConfirmTimer = null;
+      delBtn.classList.remove("is-confirming");
+      delBtn.textContent = t("delete");
+      cancelDelBtn.hidden = true;
+    }
+
+    cancelDelBtn.addEventListener("click", resetDeleteConfirm);
+
     delBtn.addEventListener("click", async () => {
       if (!delBtn.classList.contains("is-confirming")) {
         delBtn.classList.add("is-confirming");
         delBtn.textContent = t("confirm_delete");
-        deleteConfirmTimer = setTimeout(() => {
-          delBtn.classList.remove("is-confirming");
-          delBtn.textContent = t("delete");
-        }, 4000);
+        cancelDelBtn.hidden = false;
+        deleteConfirmTimer = setTimeout(resetDeleteConfirm, 5000);
         return;
       }
       if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
       delBtn.disabled = true;
+      cancelDelBtn.hidden = true;
       try {
         await apiRequest(`/api/v1/page-note/items/${item.id}`, {
           method: "DELETE",
@@ -1068,12 +1099,12 @@ function renderItems() {
         renderItems();
       } catch (err) {
         delBtn.disabled = false;
-        delBtn.classList.remove("is-confirming");
-        delBtn.textContent = t("delete");
+        resetDeleteConfirm();
         setStatus(els.promoteStatus, t("delete_failed", { err: err.message }), true);
       }
     });
     actions.appendChild(delBtn);
+    actions.appendChild(cancelDelBtn);
 
     li.appendChild(actions);
 
@@ -1099,17 +1130,29 @@ function toggleEditBox(li, item) {
   const box = document.createElement("div");
   box.className = "sp-edit-box";
 
+  const wordLabel = document.createElement("label");
+  wordLabel.className = "sp-label";
+  wordLabel.textContent = t("edit_word_label");
+
   const wordInput = document.createElement("input");
   wordInput.type = "text";
   wordInput.className = "sp-input";
   wordInput.value = item.word;
   wordInput.placeholder = t("edit_word_placeholder");
 
+  const ctxLabel = document.createElement("label");
+  ctxLabel.className = "sp-label";
+  ctxLabel.textContent = t("edit_ctx_label");
+
   const ctxInput = document.createElement("input");
   ctxInput.type = "text";
   ctxInput.className = "sp-input";
   ctxInput.value = item.context || "";
   ctxInput.placeholder = t("edit_ctx_placeholder");
+
+  const defLabel = document.createElement("label");
+  defLabel.className = "sp-label";
+  defLabel.textContent = t("edit_def_label");
 
   const defInput = document.createElement("textarea");
   defInput.className = "sp-textarea";
@@ -1159,8 +1202,11 @@ function toggleEditBox(li, item) {
   row.appendChild(cancelBtn);
   row.appendChild(status);
 
+  box.appendChild(wordLabel);
   box.appendChild(wordInput);
+  box.appendChild(ctxLabel);
   box.appendChild(ctxInput);
+  box.appendChild(defLabel);
   box.appendChild(defInput);
   box.appendChild(row);
   li.appendChild(box);
@@ -1169,7 +1215,7 @@ function toggleEditBox(li, item) {
 async function renderLookupIntoBox(
   box,
   word,
-  { includeDictLinks = false, onUseSense = null, onClose = null } = {}
+  { includeDictLinks = false, showHeaderIpa = true, onUseSense = null, onClose = null } = {}
 ) {
   box.replaceChildren();
   box.textContent = t("looking_up");
@@ -1186,13 +1232,20 @@ async function renderLookupIntoBox(
 
     const ipaRow = document.createElement("div");
     ipaRow.className = "sp-lookup-ipa-row";
-    if (data.ipa) {
-      const ipaEl = document.createElement("span");
-      ipaEl.className = "sp-lookup-ipa";
-      ipaEl.textContent = "/" + data.ipa + "/";
-      ipaRow.appendChild(ipaEl);
+    if (showHeaderIpa) {
+      if (data.ipa) {
+        const ipaEl = document.createElement("span");
+        ipaEl.className = "sp-lookup-ipa";
+        ipaEl.textContent = "/" + data.ipa + "/";
+        ipaRow.appendChild(ipaEl);
+      }
+      ipaRow.appendChild(createAudioButton(word));
+    } else {
+      const titleEl = document.createElement("span");
+      titleEl.className = "sp-status";
+      titleEl.textContent = t("lookup");
+      ipaRow.appendChild(titleEl);
     }
-    ipaRow.appendChild(createAudioButton(word));
     headRow.appendChild(ipaRow);
 
     if (typeof onClose === "function") {
@@ -1329,6 +1382,7 @@ async function toggleLookupBox(li, item) {
       }
     : null;
   await renderLookupIntoBox(box, item.word, {
+    showHeaderIpa: false,
     onUseSense,
     onClose: () => box.remove(),
   });
@@ -1385,7 +1439,7 @@ async function loadPageForTab(tab) {
   setPendingTimestamp(null);
   setStatus(els.jotStatus, "");
   setStatus(els.promoteStatus, "");
-  setStatus(els.notesStatus, "");
+  setStatus(els.notesStatus, t("auto_saved"));
 
   els.pageTitle.textContent = state.title || t("untitled_tab");
   els.pageUrl.textContent = state.rawUrl;

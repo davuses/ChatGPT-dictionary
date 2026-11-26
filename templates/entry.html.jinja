@@ -58,8 +58,10 @@
 
             <div class="word-meta">
                 <div class="word-meta-stats">
+                    {% if visit_count > 0 %}
                     <span>{{ t('entry.visit_one' if visit_count == 1 else 'entry.visit_many', n=visit_count) }}</span>
                     <span aria-hidden="true">&middot;</span>
+                    {% endif %}
                     <span>{{ t('entry.last_visit', elapsed=last_visit_elapsed) }}</span>
                 </div>
                 <span class="word-meta-bookmark">
@@ -77,6 +79,7 @@
         <section class="content-section">
             <div class="section-header">
                 <h2>{{ t('entry.context') }}</h2>
+                <button class="button button-ghost" id="toggle-context-edit" type="button">{{ t('entry.edit') }}</button>
             </div>
             <p class="entry-context">{{ context_text }}</p>
         </section>
@@ -138,13 +141,17 @@
             </form>
         </section>
 
-        <details class="content-section entry-synonyms-details" id="entry-synonyms-details">
-            <summary class="section-header entry-synonyms-summary">
-                <h2>{{ t('entry.synonyms_title') }}</h2>
-                <a class="button button-ghost" href="/show_synonyms/{{ entry_id }}" onclick="event.stopPropagation()">{{ t('entry.synonyms_open_full') }}</a>
-            </summary>
-            <div id="entry-synonyms-panel" class="synonym-panel"></div>
-        </details>
+        <section class="content-section">
+            <div class="section-header">
+                <details class="entry-synonyms-details" id="entry-synonyms-details">
+                    <summary class="entry-synonyms-summary">
+                        <h2>{{ t('entry.synonyms_title') }}</h2>
+                    </summary>
+                    <div id="entry-synonyms-panel" class="synonym-panel"></div>
+                </details>
+                <a class="button button-ghost entry-synonyms-full-link" href="/show_synonyms/{{ entry_id }}">{{ t('entry.synonyms_open_full') }}</a>
+            </div>
+        </section>
 
         <div class="entry-shortcuts-hint">
             <button type="button" class="button button-ghost" id="open-entry-shortcuts">{{ t('entry.shortcuts_btn') }}</button>
@@ -224,21 +231,32 @@
 
             // Inline Word/Context edit toggle
             const toggleEntryBtn = document.getElementById("toggle-entry-edit");
+            const toggleContextBtn = document.getElementById("toggle-context-edit");
             const inlineEntryForm = document.getElementById("inline-entry-form");
             const cancelEntryBtn = document.getElementById("cancel-entry-edit");
+            function setEntryEditOpen(open, focusFieldId) {
+                if (!inlineEntryForm) return;
+                inlineEntryForm.hidden = !open;
+                if (toggleEntryBtn) toggleEntryBtn.classList.toggle("active", open);
+                if (toggleContextBtn) toggleContextBtn.classList.toggle("active", open);
+                if (open) {
+                    inlineEntryForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                    const input = document.getElementById(focusFieldId || "inline-word-input");
+                    if (input) input.focus();
+                }
+            }
             if (toggleEntryBtn && inlineEntryForm) {
                 toggleEntryBtn.addEventListener("click", () => {
-                    inlineEntryForm.hidden = !inlineEntryForm.hidden;
-                    if (!inlineEntryForm.hidden) {
-                        const input = document.getElementById("inline-word-input");
-                        if (input) input.focus();
-                    }
+                    setEntryEditOpen(inlineEntryForm.hidden, "inline-word-input");
+                });
+            }
+            if (toggleContextBtn && inlineEntryForm) {
+                toggleContextBtn.addEventListener("click", () => {
+                    setEntryEditOpen(true, "inline-context-input");
                 });
             }
             if (cancelEntryBtn && inlineEntryForm) {
-                cancelEntryBtn.addEventListener("click", () => {
-                    inlineEntryForm.hidden = true;
-                });
+                cancelEntryBtn.addEventListener("click", () => setEntryEditOpen(false));
             }
 
             let rawCache = null;

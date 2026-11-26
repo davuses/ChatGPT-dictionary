@@ -143,11 +143,19 @@ function mountMarkdownEditor(textarea, { autofocus = false } = {}) {
     view.focus();
   }
 
-  function addBtn(label, title, onClick) {
+  const formatButtons = [];
+
+  function addBtn(label, title, onClick, { extraClass = "", isFormat = false, strike = false } = {}) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "cm-md-btn";
-    btn.textContent = label;
+    btn.className = "cm-md-btn" + (extraClass ? " " + extraClass : "");
+    if (strike) {
+      const s = document.createElement("s");
+      s.textContent = label;
+      btn.appendChild(s);
+    } else {
+      btn.textContent = label;
+    }
     btn.title = title;
     btn.setAttribute("aria-label", title);
     btn.addEventListener("click", (e) => {
@@ -155,6 +163,7 @@ function mountMarkdownEditor(textarea, { autofocus = false } = {}) {
       onClick(btn);
     });
     toolbar.appendChild(btn);
+    if (isFormat) formatButtons.push(btn);
     return btn;
   }
 
@@ -165,15 +174,15 @@ function mountMarkdownEditor(textarea, { autofocus = false } = {}) {
     toolbar.appendChild(sep);
   }
 
-  addBtn("B", "Bold", () => wrapSelection(view, "**", "**", "bold"));
-  addBtn("I", "Italic", () => wrapSelection(view, "*", "*", "italic"));
-  addBtn("S", "Strikethrough", () => wrapSelection(view, "~~", "~~", "text"));
-  addBtn("“", "Blockquote", () => prefixLines(view, "> "));
+  addBtn("B", "Bold", () => wrapSelection(view, "**", "**", "bold"), { isFormat: true });
+  addBtn("I", "Italic", () => wrapSelection(view, "*", "*", "italic"), { extraClass: "cm-md-btn--italic", isFormat: true });
+  addBtn("S", "Strikethrough", () => wrapSelection(view, "~~", "~~", "text"), { strike: true, isFormat: true });
+  addBtn("“", "Blockquote", () => prefixLines(view, "> "), { isFormat: true });
   addSep();
-  addBtn("•", "Bullet list", () => prefixLines(view, "- "));
-  addBtn("1.", "Numbered list", () => prefixLines(view, "1. "));
-  addBtn("H", "Heading", () => prefixLines(view, "## "));
-  addBtn("Link", "Insert link", () => wrapSelection(view, "[", "](https://)", "text"));
+  addBtn("•", "Bullet list", () => prefixLines(view, "- "), { isFormat: true });
+  addBtn("1.", "Numbered list", () => prefixLines(view, "1. "), { isFormat: true });
+  addBtn("H", "Heading", () => prefixLines(view, "## "), { isFormat: true });
+  addBtn("Link", "Insert link", () => wrapSelection(view, "[", "](https://)", "text"), { isFormat: true });
 
   const spacer = document.createElement("span");
   spacer.className = "cm-md-spacer";
@@ -183,6 +192,9 @@ function mountMarkdownEditor(textarea, { autofocus = false } = {}) {
   addBtn("Preview", "Toggle preview", (btn) => {
     previewActive = !previewActive;
     btn.classList.toggle("is-active", previewActive);
+    formatButtons.forEach((fb) => {
+      fb.disabled = previewActive;
+    });
     if (!previewActive) {
       preview.hidden = true;
       host.hidden = false;

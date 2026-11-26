@@ -40,14 +40,35 @@
 {% endblock dashboard_widgets %}
 
 {% if not has_api_token %}
-<section class="card extension-promo-card">
-    <h2>{{ t('dash.ext_title') }}</h2>
-    <p>{{ t('dash.ext_desc') }}</p>
-    <div class="quiz-actions">
-        <a class="button button-primary" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('dash.ext_download') }}</a>
-        <a class="button button-ghost" href="/account#extension">{{ t('dash.ext_setup') }}</a>
+<aside class="extension-promo-card extension-nudge" id="extension-nudge">
+    <p class="extension-nudge-text">
+        <strong>{{ t('dash.ext_nudge_lead') }}</strong> {{ t('dash.ext_nudge_body') }}
+    </p>
+    <div class="extension-nudge-actions">
+        <a class="button button-ghost" href="/account#extension">{{ t('dash.ext_nudge_cta') }}</a>
+        <a class="extension-nudge-dl" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('dash.ext_download') }}</a>
+        <button type="button" class="extension-nudge-close" id="dismiss-ext-nudge" aria-label="{{ t('entry.close') }}" title="{{ t('entry.close') }}">&times;</button>
     </div>
-</section>
+</aside>
+<script>
+(function () {
+    try {
+        var el = document.getElementById("extension-nudge");
+        if (!el) return;
+        if (localStorage.getItem("glossbook_ext_nudge_dismissed") === "1") {
+            el.hidden = true;
+            return;
+        }
+        var btn = document.getElementById("dismiss-ext-nudge");
+        if (btn) {
+            btn.addEventListener("click", function () {
+                el.hidden = true;
+                try { localStorage.setItem("glossbook_ext_nudge_dismissed", "1"); } catch (_) {}
+            });
+        }
+    } catch (_) {}
+})();
+</script>
 {% endif %}
 
 {% if review_bookmark_entry_id %}

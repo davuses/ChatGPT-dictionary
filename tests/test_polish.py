@@ -714,15 +714,13 @@ async def test_extension_visibility_update_guide_and_version_parity(client, admi
 
     dash = await client.get("/")
     assert dash.status_code == 200
-    assert f"Chrome extension (v{utils.EXTENSION_VERSION})" in dash.text
+    assert ">Chrome extension<" in dash.text
     assert 'href="/account#extension"' in dash.text
-
-    inbox = await client.get("/inbox")
-    assert inbox.status_code == 200
-    assert f"Chrome extension (v{utils.EXTENSION_VERSION})" in inbox.text
 
     account = await client.get("/account")
     assert account.status_code == 200
+    assert "Chrome Side Panel Extension" in account.text
+    assert "Alt+Shift+D" in account.text
     assert "Updating an existing install?" in account.text
     assert "do not click Remove" in account.text
 

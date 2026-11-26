@@ -40,7 +40,7 @@
             </summary>
             <div class="nav-account-dropdown">
                 <a class="nav-menu-item{% if active == 'account' %} active{% endif %}" href="/account"{% if active == 'account' %} aria-current="page"{% endif %}>{{ t('nav.account') }}</a>
-                <a class="nav-menu-item" href="/account#extension">{{ t('nav.extension', version=extension_version) }}</a>
+                <a class="nav-menu-item" href="/account#extension">{{ t('nav.extension') }}</a>
                 {% if is_admin %}
                 <a class="nav-menu-item{% if active == 'admin' %} active{% endif %}" href="/admin"{% if active == 'admin' %} aria-current="page"{% endif %}>{{ t('nav.admin') }}</a>
                 {% endif %}

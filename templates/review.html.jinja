@@ -65,7 +65,10 @@
         </div>
 
         <p class="review-shortcuts">
-            <kbd>Space</kbd> {{ t('review.shortcuts_reveal') }} &middot; <kbd>a</kbd> {{ t('review.shortcuts_again') }} &middot; <kbd>p</kbd> {{ t('review.shortcuts_audio') }} &middot; <kbd>s</kbd> {{ t('review.shortcuts_skip') }} &middot; <kbd>o</kbd> {{ t('review.shortcuts_open') }}
+            <kbd>Space</kbd> {{ t('review.shortcuts_reveal') }}
+            <span id="review-hint-unrevealed">&middot; <kbd>s</kbd> {{ t('review.shortcuts_skip') }}</span>
+            <span id="review-hint-revealed" hidden>&middot; <kbd>a</kbd> {{ t('review.shortcuts_again') }} &middot; <kbd>p</kbd> {{ t('review.shortcuts_audio') }}</span>
+            &middot; <kbd>o</kbd> {{ t('review.shortcuts_open') }}
         </p>
     </section>
 
@@ -102,6 +105,8 @@
         const addDefinitionEl = document.getElementById("review-add-definition");
         const againBtn = document.getElementById("review-again-btn");
         const nextBtn = document.getElementById("review-next-btn");
+        const hintUnrevealed = document.getElementById("review-hint-unrevealed");
+        const hintRevealed = document.getElementById("review-hint-revealed");
         const summarySectionEl = document.getElementById("review-summary");
         const summaryStatsEl = document.getElementById("review-summary-stats");
         const anotherBtn = document.getElementById("review-another-btn");
@@ -128,6 +133,8 @@
             sentenceEl.textContent = card.blanked_sentence;
             promptActionsEl.hidden = false;
             answerPanelEl.hidden = true;
+            if (hintUnrevealed) hintUnrevealed.hidden = false;
+            if (hintRevealed) hintRevealed.hidden = true;
         }
 
         function revealCurrentCard() {
@@ -162,6 +169,8 @@
                     : uiText("review_got_it", null, "Got it");
             promptActionsEl.hidden = true;
             answerPanelEl.hidden = false;
+            if (hintUnrevealed) hintUnrevealed.hidden = true;
+            if (hintRevealed) hintRevealed.hidden = false;
         }
 
         function markCurrentCardSeen(card) {

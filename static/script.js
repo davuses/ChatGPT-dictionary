@@ -324,6 +324,7 @@ function initQuickSearch() {
   let activeIndex = -1;
   let debounceTimer = null;
   let abortController = null;
+  let ignoreNextSlash = false;
 
   function setActive(index) {
     const items = list.querySelectorAll(".quick-search-item");
@@ -407,16 +408,22 @@ function initQuickSearch() {
       });
   }
 
-  function openQuickSearch() {
+  function openQuickSearch({ fromSlash = false } = {}) {
     if (dialog.open) return;
+    ignoreNextSlash = Boolean(fromSlash);
     input.value = "";
     dialog.showModal();
     input.focus();
     runQuery();
+    if (ignoreNextSlash) {
+      setTimeout(() => {
+        ignoreNextSlash = false;
+      }, 250);
+    }
   }
 
   if (openBtn) {
-    openBtn.addEventListener("click", openQuickSearch);
+    openBtn.addEventListener("click", () => openQuickSearch());
   }
 
   dialog.addEventListener("click", function (event) {
@@ -426,11 +433,20 @@ function initQuickSearch() {
   });
 
   input.addEventListener("input", function () {
+    if (ignoreNextSlash && input.value.startsWith("/")) {
+      input.value = input.value.slice(1);
+      ignoreNextSlash = false;
+    }
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(runQuery, 150);
   });
 
   input.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      dialog.close();
+      return;
+    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActive(activeIndex + 1);
@@ -458,7 +474,7 @@ function initQuickSearch() {
     }
     if (event.key === "/" && !shouldIgnoreShortcut(event)) {
       event.preventDefault();
-      openQuickSearch();
+      openQuickSearch({ fromSlash: true });
     }
   });
 }

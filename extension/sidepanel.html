@@ -89,10 +89,10 @@
     <section class="sp-card">
       <div class="sp-section-head">
         <h2><span data-i18n="captured_words">Captured words</span> <span id="items-count" class="sp-count"></span></h2>
-        <div class="sp-row">
-          <button id="toggle-select-all-btn" class="sp-link-btn" type="button" hidden data-i18n="select_all">Select all</button>
-          <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden data-i18n="add_selected">Add selected</button>
-        </div>
+      </div>
+      <div id="items-toolbar" class="sp-items-toolbar" hidden>
+        <button id="toggle-select-all-btn" class="sp-link-btn" type="button" data-i18n="select_all">Select all</button>
+        <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden data-i18n="add_selected">Add selected</button>
       </div>
       <p id="items-empty" class="sp-empty" data-i18n="items_empty">No words jotted for this page yet.</p>
       <ul id="items-list" class="sp-items"></ul>
@@ -102,7 +102,7 @@
     <section class="sp-card">
       <div class="sp-section-head">
         <h2 data-i18n="scratchpad">Page scratchpad</h2>
-        <span id="notes-status" class="sp-status"></span>
+        <span id="notes-status" class="sp-status" data-i18n="auto_saved">Auto-saved</span>
       </div>
       <textarea id="notes-textarea" class="sp-textarea" rows="6" placeholder="Freeform Markdown notes for this video or article&hellip;" data-i18n-placeholder="scratchpad_placeholder"></textarea>
     </section>

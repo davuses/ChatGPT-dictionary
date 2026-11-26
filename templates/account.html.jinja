@@ -35,8 +35,15 @@
     </section>
 
     <section class="card" id="extension">
-        <h2>{{ t('account.tokens_title') }}</h2>
-        <p class="page-subtitle">{{ t('account.tokens_desc') }}</p>
+        <h2>{{ t('account.ext_section_title') }} <span class="field-hint">v{{ extension_version }}</span></h2>
+        <p class="page-subtitle">{{ t('account.ext_section_intro') }}</p>
+
+        <ul class="extension-features">
+            <li><strong>{{ t('account.ext_feat_web_title') }}</strong> {{ t('account.ext_feat_web_desc') }}</li>
+            <li><strong>{{ t('account.ext_feat_yt_title') }}</strong> {{ t('account.ext_feat_yt_desc') }}</li>
+            <li><strong>{{ t('account.ext_feat_lookup_title') }}</strong> {{ t('account.ext_feat_lookup_desc') }}</li>
+            <li><strong>{{ t('account.ext_feat_notes_title') }}</strong> {{ t('account.ext_feat_notes_desc') }}</li>
+        </ul>
 
         <details class="extension-guide"{% if not api_tokens %} open{% endif %}>
             <summary>{{ t('account.ext_guide_summary', version=extension_version) }}</summary>
@@ -48,6 +55,11 @@
             </ol>
             <p class="field-hint"><strong>{{ t('account.ext_update_tip_title') }}</strong> {{ t('account.ext_update_tip_body') }}</p>
         </details>
+
+        <hr class="account-divider">
+
+        <h3 class="account-subheading">{{ t('account.tokens_title') }}</h3>
+        <p class="page-subtitle">{{ t('account.tokens_desc') }}</p>
 
         {% if new_token %}
         <div class="secret-box" role="status">

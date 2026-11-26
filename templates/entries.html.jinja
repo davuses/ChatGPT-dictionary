@@ -24,7 +24,8 @@
 {%- endmacro %}
 
 {% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>{{ t('dash.resume_link') }}</a>{% endset %}
-{{ page_header(subtitle=t('entries.count_matching' if search_query else 'entries.count_plain', n=entries_count), active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
+{% set count_key = ('entries.count_matching_one' if entries_count == 1 else 'entries.count_matching') if search_query else ('entries.count_plain_one' if entries_count == 1 else 'entries.count_plain') %}
+{{ page_header(subtitle=t(count_key, n=entries_count), active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
 
 <main class="page-content">
 <form class="search-form" id="entries-search-form" role="search" action="/entries" method="get">
@@ -146,7 +147,26 @@
             }
         });
 
-        initLiveSearch(results);
+        function syncOverflowToggles() {
+            results.querySelectorAll(".definition-preview.is-clamped").forEach((preview) => {
+                const cell = preview.closest("td");
+                const btn = cell ? cell.querySelector(".definition-toggle") : null;
+                const actuallyClamped = preview.scrollHeight > preview.clientHeight + 2;
+                preview.classList.toggle("is-expandable", actuallyClamped);
+                if (btn) {
+                    btn.hidden = !actuallyClamped;
+                }
+            });
+        }
+
+        let resizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(syncOverflowToggles, 120);
+        });
+
+        initLiveSearch(results, syncOverflowToggles);
+        syncOverflowToggles();
         initBackToTop();
         refreshReviewBookmarkLink();
         flashIncomingHashTarget();
@@ -176,7 +196,7 @@
     // route with a header that asks for a JSON fragment instead of the
     // full page, and swap in the new table/pagination/count. Falls back
     // to the plain <form> GET submit (full page reload) if JS is off.
-    function initLiveSearch(results) {
+    function initLiveSearch(results, onSwapped) {
         const form = document.querySelector(".search-form");
         const input = form && form.querySelector('input[name="q"]');
         if (!form || !input) return;
@@ -238,11 +258,15 @@
 
         function applyResults(data, url, sortVal) {
             results.innerHTML = data.results_html;
+            if (typeof onSwapped === "function") onSwapped();
             if (countEl) {
+                const countKey = data.matching
+                    ? (data.count === 1 ? "entries_count_matching_one" : "entries_count_matching")
+                    : (data.count === 1 ? "entries_count_plain_one" : "entries_count_plain");
                 countEl.textContent = uiText(
-                    data.matching ? "entries_count_matching" : "entries_count_plain",
+                    countKey,
                     { n: data.count },
-                    data.count + (data.matching ? " matching entries" : " entries")
+                    data.count + (data.matching ? (data.count === 1 ? " matching entry" : " matching entries") : (data.count === 1 ? " entry" : " entries"))
                 );
             }
             if (clearLink) {
