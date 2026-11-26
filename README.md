@@ -4,8 +4,9 @@
 
 A private, personal English vocabulary builder and active-recall web app, built with FastAPI and SQLite. Add words and phrases, curate your own definitions in Markdown, attach real-world usage examples, and reinforce them with fill-in-the-blank quizzes, phonetic transcription, cross-linked thesaurus lookups, and a built-in Markdown study notes browser.
 
-![Entry list](docs/screenshot-list.png)
-![Word detail](docs/screenshot-entry.png)
+![Lexicon split workbench](docs/screenshot-list.png)
+![Entry reading sheet](docs/screenshot-entry.png)
+![Zen review session](docs/screenshot-review.png)
 
 ## Features
 
@@ -16,10 +17,10 @@ A private, personal English vocabulary builder and active-recall web app, built 
 - **Thesaurus lookup** — pull synonyms and sense definitions from the Merriam-Webster Thesaurus API, cross-linked to words already in your dictionary
 - **Review bookmark** — mark your place in the entry list and jump back to it later
 - **Visit tracking** — each entry tracks visit count and last-visited time
-- **Multiple views** — browse all entries, entries-only, entries with examples, or the **Needs Definition** backlog for newly captured words
+- **Multiple views** — browse words in a desktop Master–Detail split workbench (with inline editing & `j`/`k` navigation) or full-width Ledger tables (`All`, `Words Only`, `Examples`, `Definitions`, and `Needs Definition`)
 - **Study notes** — browse and edit a folder of personal English study Markdown notes with a generated table of contents (admin-only)
-- **Invite-only multi-user** — generate one-time invite links and password reset links from `/admin`; each user gets a completely isolated dictionary, quiz, `/inbox`, 1-click JSON/Markdown export & JSON import, and per-device Chrome extension API tokens under `/account`
-- **Markdown editing** — definitions, examples, and study notes are edited with [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) (sanitized with `nh3` on render), while entries use quick plain-text word and context fields
+- **Invite-only multi-user** — generate one-time invite links and password reset links from `/admin`; each user gets a completely isolated dictionary, quiz, `/inbox`, 1-click JSON/Markdown export & drag-and-drop JSON import, and per-device Chrome extension API tokens under `/account`
+- **Markdown editing** — definitions, examples, and study notes are edited with a self-hosted [CodeMirror 6](https://codemirror.net/) Markdown editor (sanitized with `nh3` on render), while entries use quick plain-text word and context fields
 
 ## Tech stack
 
@@ -27,7 +28,7 @@ A private, personal English vocabulary builder and active-recall web app, built 
 - [SQLAlchemy](https://www.sqlalchemy.org/) ORM over SQLite
 - [markdown2](https://github.com/trentm/python-markdown2) for rendering Markdown content
 - [phonemizer](https://github.com/bootphon/phonemizer) for IPA transcription
-- Vanilla JS + [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) on the frontend
+- Vanilla JS + self-hosted [CodeMirror 6](https://codemirror.net/) on the frontend
 
 ## Setup
 
@@ -143,6 +144,8 @@ Requires Python 3.12+.
 ## Chrome Side Panel extension (optional)
 
 An unpacked Manifest V3 Chrome extension lives in [`extension/`](extension/) for taking per-page Markdown scratchpad notes and batch-capturing words/phrases (with YouTube playback timestamps + full-sentence captions or article sentence selection) directly into your dictionary:
+
+<img src="docs/screenshot-extension.png" alt="Chrome Side Panel extension" width="360">
 
 1. Sign in to the web app, open **Account** (`/account`), and generate a per-device API token (each user can create separate tokens for laptop/desktop and revoke them individually).
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the `extension/` folder.

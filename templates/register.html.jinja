@@ -6,26 +6,47 @@
 
 {% block body %}
 {{ page_header(standalone=True) }}
-<main class="form-page auth-card card">
-    <h1>{{ t('auth.register_heading') }}</h1>
-    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
-    {% if invite_valid %}
-    <form class="login-form" method="post" action="/register">
-        <input type="hidden" name="csrf_token" value="{{ form_csrf_token }}">
-        <input type="hidden" name="code" value="{{ code }}">
-        <label for="username">{{ t('auth.username') }}</label>
-        <input id="username" name="username" type="text" value="{{ username }}" autocomplete="username" minlength="2" maxlength="32" required autofocus>
-        <label for="password">{{ t('auth.password_bounds') }}</label>
-        <input id="password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
-        <label for="confirm_password">{{ t('auth.confirm_password') }}</label>
-        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
-        <div class="form-actions">
-            <button class="button button-primary" type="submit">{{ t('auth.register_btn') }}</button>
-            <a class="button button-ghost" href="/login">{{ t('auth.back_to_login') }}</a>
-        </div>
-    </form>
-    {% else %}
-    <p><a class="button button-ghost" href="/login">{{ t('auth.back_to_login') }}</a></p>
-    {% endif %}
-</main>
+<div class="auth-split">
+    <section class="auth-intro" aria-label="Glossbook overview">
+        <p class="auth-intro-lead">{{ t('auth.intro_tagline') }}</p>
+        <ul class="auth-intro-list">
+            <li>
+                <strong>{{ t('auth.intro_feat1_title') }}</strong>
+                <span>{{ t('auth.intro_feat1_desc') }}</span>
+            </li>
+            <li>
+                <strong>{{ t('auth.intro_feat2_title') }}</strong>
+                <span>{{ t('auth.intro_feat2_desc') }}</span>
+            </li>
+            <li>
+                <strong>{{ t('auth.intro_feat3_title') }}</strong>
+                <span>{{ t('auth.intro_feat3_desc') }}</span>
+            </li>
+        </ul>
+        <p class="auth-intro-footnote">{{ t('auth.intro_register_note') }}</p>
+    </section>
+
+    <main class="form-page auth-card card">
+        <h1>{{ t('auth.register_heading') }}</h1>
+        {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+        {% if invite_valid %}
+        <form class="login-form" method="post" action="/register">
+            <input type="hidden" name="csrf_token" value="{{ form_csrf_token }}">
+            <input type="hidden" name="code" value="{{ code }}">
+            <label for="username">{{ t('auth.username') }}</label>
+            <input id="username" name="username" type="text" value="{{ username }}" autocomplete="username" minlength="2" maxlength="32" required autofocus>
+            <label for="password">{{ t('auth.password_bounds') }}</label>
+            <input id="password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+            <label for="confirm_password">{{ t('auth.confirm_password') }}</label>
+            <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+            <div class="form-actions">
+                <button class="button button-primary" type="submit">{{ t('auth.register_btn') }}</button>
+                <a class="button button-ghost" href="/login">{{ t('auth.back_to_login') }}</a>
+            </div>
+        </form>
+        {% else %}
+        <p><a class="button button-ghost" href="/login">{{ t('auth.back_to_login') }}</a></p>
+        {% endif %}
+    </main>
+</div>
 {% endblock body %}

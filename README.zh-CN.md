@@ -4,8 +4,9 @@
 
 [English README](README.md)
 
-![词条列表](docs/screenshot-list.png)
-![词条详情](docs/screenshot-entry.png)
+![词库分栏工作台](docs/screenshot-list.png)
+![词条详情页](docs/screenshot-entry.png)
+![专注复习模式](docs/screenshot-review.png)
 
 ## 功能特性
 
@@ -16,10 +17,10 @@
 - **同义词查询** — 从 Merriam-Webster Thesaurus API 获取同义词及释义，并自动关联你词典中已收录的词条
 - **复习书签** — 标记当前复习进度，方便下次从断点继续
 - **访问记录** — 每个词条自动记录访问次数和最近访问时间
-- **多种视图** — 支持查看全部词条、仅词条列表、带例句列表，以及筛选尚未填写释义词条的 **Needs Definition** 视图
+- **多种视图** — 支持桌面端左右分栏工作台（`j`/`k` 键盘切换与行内编辑）及完整列表模式（全部、仅词条、含例句、释义、待补释义）
 - **学习笔记** — 浏览并编辑个人英语学习 Markdown 笔记文件夹，自动生成目录（仅管理员可见）
-- **邀请制多用户** — 管理员可在 `/admin` 生成一次性邀请链接与密码重置链接；每位用户拥有完全隔离的个人词典、测验、`/inbox`，并可在 `/account` 一键导出/导入个人 JSON 备份（及导出 Markdown）与管理多设备 Chrome 扩展 API Token
-- **Markdown 编辑** — 释义、例句和学习笔记使用 [EasyMDE](https://github.com/Ionaru/easy-markdown-editor) 进行编辑（渲染时经 `nh3` 安全过滤），词条本身使用简洁的纯文本单词与语境输入框
+- **邀请制多用户** — 管理员可在 `/admin` 生成一次性邀请链接与密码重置链接；每位用户拥有完全隔离的个人词典、测验、`/inbox`，并可在 `/account` 一键导出/拖拽导入个人 JSON 备份（及导出 Markdown）与管理多设备 Chrome 扩展 API Token
+- **Markdown 编辑** — 释义、例句和学习笔记使用自托管的 [CodeMirror 6](https://codemirror.net/) Markdown 编辑器进行编辑（渲染时经 `nh3` 安全过滤），词条本身使用简洁的纯文本单词与语境输入框
 
 ## 技术栈
 
@@ -27,7 +28,7 @@
 - [SQLAlchemy](https://www.sqlalchemy.org/) ORM，配合 SQLite 数据库
 - [markdown2](https://github.com/trentm/python-markdown2) 用于渲染 Markdown 内容
 - [phonemizer](https://github.com/bootphon/phonemizer) 用于音标转写
-- 前端使用原生 JS 与 [EasyMDE](https://github.com/Ionaru/easy-markdown-editor)
+- 前端使用原生 JS 与自托管 [CodeMirror 6](https://codemirror.net/)
 
 ## 安装与运行
 
@@ -122,6 +123,8 @@
 ## Chrome 侧边栏扩展（可选）
 
 [`extension/`](extension/) 目录包含一个可本地加载的 Manifest V3 Chrome 扩展，用于在任意网页记录按页面归档的 Markdown 随手笔记，并批量记录生词/短语（支持自动提取 YouTube 播放时间戳与完整字幕句，或抓取文章选中句子），统一导入个人词典：
+
+<img src="docs/screenshot-extension.png" alt="Chrome 侧边栏扩展" width="360">
 
 1. 登录网页后打开 **Account**（`/account`），为当前设备生成一个 API Token（可为多台电脑分别生成并单独吊销）。
 2. 打开 `chrome://extensions`，开启**开发者模式**，点击**加载已解压的扩展程序**，选择 `extension/` 目录。

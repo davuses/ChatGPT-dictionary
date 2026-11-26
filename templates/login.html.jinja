@@ -6,20 +6,41 @@
 
 {% block body %}
 {{ page_header(standalone=True) }}
-<main class="form-page auth-card card">
-    <h1>{{ t('auth.login_title') }}</h1>
-    {% if notice %}<p class="form-notice" role="status">{{ notice }}</p>{% endif %}
-    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
-    <form class="login-form" method="post" action="/login">
-        <input type="hidden" name="csrf_token" value="{{ login_csrf_token }}">
-        <input type="hidden" name="next_path" value="{{ next_path }}">
-        <label for="username">{{ t('auth.username') }}</label>
-        <input id="username" name="username" type="text" autocomplete="username" required autofocus>
-        <label for="password">{{ t('auth.password') }}</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required>
-        <div class="form-actions">
-            <button class="button button-primary" type="submit">{{ t('auth.login_btn') }}</button>
-        </div>
-    </form>
-</main>
+<div class="auth-split">
+    <section class="auth-intro" aria-label="Glossbook overview">
+        <p class="auth-intro-lead">{{ t('auth.intro_tagline') }}</p>
+        <ul class="auth-intro-list">
+            <li>
+                <strong>{{ t('auth.intro_feat1_title') }}</strong>
+                <span>{{ t('auth.intro_feat1_desc') }}</span>
+            </li>
+            <li>
+                <strong>{{ t('auth.intro_feat2_title') }}</strong>
+                <span>{{ t('auth.intro_feat2_desc') }}</span>
+            </li>
+            <li>
+                <strong>{{ t('auth.intro_feat3_title') }}</strong>
+                <span>{{ t('auth.intro_feat3_desc') }}</span>
+            </li>
+        </ul>
+        <p class="auth-intro-footnote">{{ t('auth.intro_invite_note') }}</p>
+    </section>
+
+    <main class="form-page auth-card card">
+        <h1>{{ t('auth.login_title') }}</h1>
+        {% if notice %}<p class="form-notice" role="status">{{ notice }}</p>{% endif %}
+        {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+        <form class="login-form" method="post" action="/login">
+            <input type="hidden" name="csrf_token" value="{{ login_csrf_token }}">
+            <input type="hidden" name="next_path" value="{{ next_path }}">
+            <label for="username">{{ t('auth.username') }}</label>
+            <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+            <label for="password">{{ t('auth.password') }}</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <div class="form-actions">
+                <button class="button button-primary" type="submit">{{ t('auth.login_btn') }}</button>
+            </div>
+        </form>
+    </main>
+</div>
 {% endblock body %}
