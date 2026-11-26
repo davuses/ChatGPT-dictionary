@@ -21,7 +21,7 @@
                     <svg class="icon-pause" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
                 </button>
             </span>
-            <a class="quiz-answer-link" href="/entry/{{ question.entry_id }}">{{ t('quiz.view_entry') }}</a>
+            <a class="quiz-answer-link" href="/entry/{{ question.entry_id }}">{{ t('quiz.view_entry') }} &rarr;</a>
         </div>
         <p class="quiz-answer-def"{% if not question.definition_preview %} hidden{% endif %}>{{ question.definition_preview }}</p>
     </div>

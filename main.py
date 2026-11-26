@@ -1140,13 +1140,14 @@ def entries_page(
 def entry_page(
     entry_id: int,
     request: Request,
+    partial: bool = Query(False),
     current_user: UserRecord = Depends(require_user),
 ):
     entry = db_get_entry_by_id(current_user.id, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
     visit_count = entry.visit_count or 0
-    if db_record_entry_visit(current_user.id, entry.id):
+    if not partial and db_record_entry_visit(current_user.id, entry.id):
         visit_count += 1
     definition_exists = bool(entry.definitions)
     definition_html = None
@@ -1191,7 +1192,15 @@ def entry_page(
         "example_html": example_html,
         "example_exists": bool(example_raw),
         "needs_markdown_css": True,
+        "is_partial": partial,
     }
+    if partial:
+        return templates.TemplateResponse(
+            request=request,
+            name="_entry_sheet.html.jinja",
+            context=context,
+            headers={"Cache-Control": "no-store"},
+        )
     return templates.TemplateResponse(
         request=request, name="entry.html.jinja", context=context
     )
@@ -1318,8 +1327,16 @@ def edit_entry(
 ):
     verify_csrf_value(request, form_data.csrf_token)
     lang = get_request_lang(request)
+    wants_json = _wants_json_error(request)
     updated_text, error = validate_entry_fields(form_data.word, form_data.context)
     if error or not updated_text:
+        localized = _localize_validation_error(lang, error)
+        if wants_json:
+            return JSONResponse(
+                {"detail": localized, "existing_entry_id": None},
+                status_code=400,
+                headers={"Cache-Control": "no-store"},
+            )
         return templates.TemplateResponse(
             request=request,
             name="edit_entry.html.jinja",
@@ -1327,7 +1344,7 @@ def edit_entry(
                 "entry_id": entry_id,
                 "word": form_data.word,
                 "context": form_data.context,
-                "error": _localize_validation_error(lang, error),
+                "error": localized,
                 "existing_entry_id": None,
             },
             status_code=400,
@@ -1336,9 +1353,30 @@ def edit_entry(
         if e_id := db_update_entry_text(current_user.id, entry_id, updated_text):
             invalidate_words_cache(current_user.id)
             invalidate_quiz_pool_cache(current_user.id)
+            if wants_json:
+                parsed_ctx, parsed_word = parse_entry_text(updated_text)
+                return JSONResponse(
+                    {
+                        "ok": True,
+                        "entry_id": e_id,
+                        "word": parsed_word,
+                        "context": normalize_pronoun_casing(parsed_ctx),
+                    },
+                    headers={"Cache-Control": "no-store"},
+                )
             return RedirectResponse(url=f"/entry/{e_id}", status_code=303)
     except IntegrityError:
         existing = db_get_entry_by_text(current_user.id, updated_text)
+        err_msg = translate(lang, "val.entry_exists")
+        if wants_json:
+            return JSONResponse(
+                {
+                    "detail": err_msg,
+                    "existing_entry_id": existing.id if existing else None,
+                },
+                status_code=409,
+                headers={"Cache-Control": "no-store"},
+            )
         return templates.TemplateResponse(
             request=request,
             name="edit_entry.html.jinja",
@@ -1346,7 +1384,7 @@ def edit_entry(
                 "entry_id": entry_id,
                 "word": form_data.word,
                 "context": form_data.context,
-                "error": translate(lang, "val.entry_exists"),
+                "error": err_msg,
                 "existing_entry_id": existing.id if existing else None,
             },
             status_code=409,
@@ -1368,6 +1406,11 @@ def edit_definition(
     if entry_id := db_update_definition_text(
         current_user.id, definition_id, updated_text
     ):
+        if _wants_json_error(request):
+            return JSONResponse(
+                {"ok": True, "entry_id": entry_id, "definition_id": definition_id},
+                headers={"Cache-Control": "no-store"},
+            )
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
     raise HTTPException(status_code=404, detail="Definition not found")
 
@@ -1384,6 +1427,11 @@ def edit_example(
         updated_text = ""
     if updated_eid := db_update_example(current_user.id, entry_id, updated_text):
         invalidate_quiz_pool_cache(current_user.id)
+        if _wants_json_error(request):
+            return JSONResponse(
+                {"ok": True, "entry_id": updated_eid},
+                headers={"Cache-Control": "no-store"},
+            )
         return RedirectResponse(url=f"/entry/{updated_eid}", status_code=303)
     raise HTTPException(status_code=404, detail="Entry not found")
 
@@ -1473,7 +1521,13 @@ def add_definition(
     if not updated_text:
         raise HTTPException(status_code=400, detail="Definition cannot be empty")
     entry_id = form_data.entry_id
-    if db_add_definition(current_user.id, entry_id, updated_text) is not None:
+    def_id = db_add_definition(current_user.id, entry_id, updated_text)
+    if def_id is not None:
+        if _wants_json_error(request):
+            return JSONResponse(
+                {"ok": True, "entry_id": entry_id, "definition_id": def_id},
+                headers={"Cache-Control": "no-store"},
+            )
         return RedirectResponse(url=f"/entry/{entry_id}", status_code=303)
     raise HTTPException(status_code=404, detail="Entry not found")
 

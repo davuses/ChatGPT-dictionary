@@ -42,6 +42,8 @@ const STRINGS = {
     jot_word: "Jot word",
     lookup: "Lookup",
     captured_words: "Captured words",
+    tab_words: "Words",
+    tab_notes: "Notes",
     select_all: "Select all",
     select_none: "Select none",
     add_selected: "Add selected",
@@ -136,6 +138,8 @@ const STRINGS = {
     jot_word: "记下词条",
     lookup: "查词",
     captured_words: "本页已收集",
+    tab_words: "词条",
+    tab_notes: "笔记",
     select_all: "全选",
     select_none: "取消全选",
     add_selected: "入库选中项",
@@ -195,6 +199,7 @@ const state = {
   themePref: "auto",
   langPref: "auto",
   lang: "en",
+  activeTab: "words",
   settingsOpen: false,
   workspaceShouldShow: false,
   noticeVisible: false,
@@ -259,6 +264,11 @@ const els = {
   promoteStatus: document.getElementById("promote-status"),
   notesTextarea: document.getElementById("notes-textarea"),
   notesStatus: document.getElementById("notes-status"),
+  tabBtnWords: document.getElementById("tab-btn-words"),
+  tabBtnNotes: document.getElementById("tab-btn-notes"),
+  tabPanelWords: document.getElementById("tab-panel-words"),
+  tabPanelNotes: document.getElementById("tab-panel-notes"),
+  notesTabDot: document.getElementById("notes-tab-dot"),
 };
 
 function resolveLang(pref) {
@@ -362,6 +372,27 @@ function syncViewVisibility() {
 function setSettingsOpen(open) {
   state.settingsOpen = Boolean(open);
   syncViewVisibility();
+}
+
+function setActiveTab(tabName) {
+  const next = tabName === "notes" ? "notes" : "words";
+  state.activeTab = next;
+  if (els.tabBtnWords) els.tabBtnWords.setAttribute("aria-selected", String(next === "words"));
+  if (els.tabBtnNotes) els.tabBtnNotes.setAttribute("aria-selected", String(next === "notes"));
+  if (els.tabPanelWords) els.tabPanelWords.hidden = next !== "words";
+  if (els.tabPanelNotes) els.tabPanelNotes.hidden = next !== "notes";
+}
+
+function syncNotesDot() {
+  if (!els.notesTabDot || !els.notesTextarea) return;
+  els.notesTabDot.hidden = !els.notesTextarea.value.trim();
+}
+
+function autoResizeJotContext() {
+  if (!els.jotContext) return;
+  els.jotContext.style.height = "auto";
+  const nextH = Math.min(88, Math.max(32, els.jotContext.scrollHeight));
+  els.jotContext.style.height = nextH + "px";
 }
 
 function syncServerLinks() {
@@ -1484,6 +1515,7 @@ async function loadPageForTab(tab) {
     els.pageUrl.textContent = state.canonicalUrl;
     state.items = data.items || [];
     els.notesTextarea.value = data.notes_md || "";
+    syncNotesDot();
     state.notesDirty = false;
     state.pendingSavePayload = null;
     renderItems();
@@ -1509,7 +1541,10 @@ function applyCapturedPayload(captured, { verifyTabUrl = false } = {}) {
     return;
   }
   if (captured.word) els.jotWord.value = captured.word;
-  if (captured.context) els.jotContext.value = captured.context;
+  if (captured.context) {
+    els.jotContext.value = captured.context;
+    autoResizeJotContext();
+  }
   setPendingTimestamp(captured.timestampSeconds);
   if (captured.source === "transcript") {
     setStatus(els.jotStatus, t("src_transcript"));
@@ -1671,9 +1706,11 @@ els.jotForm.addEventListener("submit", async (event) => {
       state.items.push(resp.item);
       state.selectedIds.add(resp.item.id);
       renderItems();
+      setActiveTab("words");
     }
     els.jotWord.value = "";
     els.jotContext.value = "";
+    autoResizeJotContext();
     closeJotLookupBox();
     setPendingTimestamp(null);
     setStatus(els.jotStatus, t("saved"), false, { autoClearMs: 2500 });
@@ -1738,7 +1775,29 @@ els.promoteSelectedBtn.addEventListener("click", async () => {
   }
 });
 
-els.notesTextarea.addEventListener("input", scheduleNotesSave);
+els.notesTextarea.addEventListener("input", () => {
+  syncNotesDot();
+  scheduleNotesSave();
+});
+
+if (els.jotContext) {
+  els.jotContext.addEventListener("input", autoResizeJotContext);
+}
+
+if (els.tabBtnWords && els.tabBtnNotes) {
+  els.tabBtnWords.addEventListener("click", () => setActiveTab("words"));
+  els.tabBtnNotes.addEventListener("click", () => setActiveTab("notes"));
+  [els.tabBtnWords, els.tabBtnNotes].forEach((btn) => {
+    btn.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        const next = state.activeTab === "words" ? "notes" : "words";
+        setActiveTab(next);
+        (next === "words" ? els.tabBtnWords : els.tabBtnNotes).focus();
+      }
+    });
+  });
+}
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {

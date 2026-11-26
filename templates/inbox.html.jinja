@@ -2,6 +2,7 @@
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('inbox.title') }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
+{% block nav_active %}inbox{% endblock nav_active %}
 
 {% macro format_ts(sec) -%}
 {%- set h = sec // 3600 -%}
@@ -11,18 +12,21 @@
 {%- endmacro %}
 
 {% block body %}
-{{ page_header(subtitle=t('inbox.subtitle'), active="inbox", show_add=True) }}
+{{ page_header(title=t('inbox.title'), subtitle=t('inbox.subtitle'), active="inbox", show_add=True) }}
 
 <main class="inbox-page" id="inbox-main">
-    <div class="inbox-toolbar" id="inbox-toolbar"{% if not promoted_count %} hidden{% endif %}>
-        <button type="button" class="button button-ghost" id="inbox-clear-promoted">
-            {{ t('inbox.clear_promoted', n=promoted_count) }}
-        </button>
+    <div class="inbox-top-bar">
+        <p class="inbox-shortcuts-hint"{% if not page_notes %} hidden{% endif %} id="inbox-shortcuts-hint">{{ t('inbox.shortcuts_hint') }}</p>
+        <div class="inbox-toolbar" id="inbox-toolbar"{% if not promoted_count %} hidden{% endif %}>
+            <button type="button" class="button button-ghost button-sm" id="inbox-clear-promoted">
+                {{ t('inbox.clear_promoted', n=promoted_count) }}
+            </button>
+        </div>
     </div>
 
     <section class="card" id="inbox-empty-card"{% if page_notes %} hidden{% endif %}>
         <h2>{{ t('inbox.empty_title') }}</h2>
-        <p>{{ t('inbox.empty_desc') }}</p>
+        <p class="section-desc">{{ t('inbox.empty_desc') }}</p>
         <div class="form-actions">
             <a class="button button-primary" href="/account#extension">{{ t('inbox.install_ext') }}</a>
             <a class="button button-ghost" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('inbox.download_zip') }}</a>
@@ -31,7 +35,7 @@
 
     {% for note in page_notes %}
     {% set unpromoted = note.items | selectattr("promoted_entry_id", "none") | list %}
-    <section class="card inbox-note-card"
+    <section class="inbox-note-card"
         data-note-id="{{ note.id }}"
         data-note-url="{{ note.url }}"
         data-note-title="{{ note.title }}">
@@ -44,18 +48,18 @@
             </div>
             <div class="inbox-note-actions">
                 <button type="button"
-                    class="button button-ghost inbox-collapse-btn"
+                    class="button button-ghost button-sm inbox-collapse-btn"
                     aria-expanded="true"
                     aria-controls="inbox-note-body-{{ note.id }}">
                     {{ t('inbox.collapse') }}
                 </button>
                 <button type="button"
-                    class="button button-primary inbox-promote-all"
+                    class="button button-primary button-sm inbox-promote-all"
                     data-item-ids="{{ unpromoted | map(attribute='id') | join(',') }}"{% if not unpromoted %} hidden{% endif %}>
                     {{ t('inbox.add_all', n=unpromoted | length) }}
                 </button>
                 <button type="button"
-                    class="button button-danger inbox-delete-note"
+                    class="button button-danger button-sm inbox-delete-note"
                     data-note-id="{{ note.id }}">
                     {{ t('inbox.delete_page') }}
                 </button>
@@ -72,7 +76,7 @@
                 data-word="{{ item.word }}"
                 data-context="{{ item.context }}"
                 data-definition="{{ item.definition_text }}">
-                <div class="inbox-item-main">
+                <div class="inbox-item-top">
                     <div class="inbox-item-head">
                         <strong class="inbox-item-word">{{ item.word }}</strong>
                         {% set item_ipa = item_ipas.get(item.word, "") %}
@@ -99,6 +103,16 @@
                         {% endfor %}
                         {% endif %}
                     </div>
+                    <div class="inbox-item-actions">
+                        {% if not item.promoted_entry_id %}
+                        <button type="button" class="button button-ghost button-sm inbox-lookup-toggle">{{ t('inbox.lookup') }}</button>
+                        <button type="button" class="button button-ghost button-sm inbox-edit-toggle">{{ t('entry.edit') }}</button>
+                        <button type="button" class="button button-ghost button-sm inbox-promote-one" data-item-id="{{ item.id }}">{{ t('inbox.add_one') }}</button>
+                        {% endif %}
+                        <button type="button" class="button button-danger button-sm inbox-delete-one" data-item-id="{{ item.id }}">{{ t('entry.delete') }}</button>
+                    </div>
+                </div>
+                <div class="inbox-item-main">
                     <p class="inbox-item-context"{% if not item.context %} hidden{% endif %}>{{ item.context }}</p>
                     <p class="inbox-item-def"{% if not item.definition_text %} hidden{% endif %}>{{ item.definition_text }}</p>
                     <div class="inbox-dict-links">
@@ -123,18 +137,10 @@
                             <textarea name="definition_text" rows="2" placeholder="{{ t('inbox.def_placeholder') }}">{{ item.definition_text }}</textarea>
                         </label>
                         <div class="inbox-edit-actions">
-                            <button type="submit" class="button button-primary">{{ t('inbox.save') }}</button>
-                            <button type="button" class="button button-ghost inbox-edit-cancel">{{ t('inbox.cancel') }}</button>
+                            <button type="submit" class="button button-primary button-sm">{{ t('inbox.save') }}</button>
+                            <button type="button" class="button button-ghost button-sm inbox-edit-cancel">{{ t('inbox.cancel') }}</button>
                         </div>
                     </form>
-                </div>
-                <div class="inbox-item-actions">
-                    {% if not item.promoted_entry_id %}
-                    <button type="button" class="button button-ghost inbox-lookup-toggle">{{ t('inbox.lookup') }}</button>
-                    <button type="button" class="button button-ghost inbox-edit-toggle">{{ t('entry.edit') }}</button>
-                    <button type="button" class="button button-ghost inbox-promote-one" data-item-id="{{ item.id }}">{{ t('inbox.add_one') }}</button>
-                    {% endif %}
-                    <button type="button" class="button button-danger inbox-delete-one" data-item-id="{{ item.id }}">{{ t('entry.delete') }}</button>
                 </div>
             </li>
             {% endfor %}
@@ -146,7 +152,7 @@
             <div class="inbox-scratchpad-editor">
                 <textarea class="inbox-scratchpad-input" rows="4" placeholder="{{ t('inbox.scratchpad_placeholder') }}">{{ note.notes_md }}</textarea>
                 <div class="inbox-scratchpad-actions">
-                    <button type="button" class="button button-ghost inbox-save-notes">{{ t('inbox.save_notes') }}</button>
+                    <button type="button" class="button button-ghost button-sm inbox-save-notes">{{ t('inbox.save_notes') }}</button>
                     <span class="inbox-scratchpad-status" aria-live="polite"></span>
                 </div>
             </div>
@@ -159,12 +165,50 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const emptyCard = document.getElementById("inbox-empty-card");
+    const shortcutsHint = document.getElementById("inbox-shortcuts-hint");
     const toolbar = document.getElementById("inbox-toolbar");
     const clearPromotedBtn = document.getElementById("inbox-clear-promoted");
+    let focusedItem = null;
+
+    function getVisibleItems() {
+        return Array.from(document.querySelectorAll(".inbox-note-body:not([hidden]) .inbox-item"));
+    }
+
+    function setFocusedItem(li, { scroll = true } = {}) {
+        if (focusedItem && focusedItem !== li) {
+            focusedItem.classList.remove("is-focused");
+        }
+        focusedItem = li || null;
+        if (focusedItem) {
+            focusedItem.classList.add("is-focused");
+            if (scroll) focusedItem.scrollIntoView({ block: "nearest" });
+        }
+    }
+
+    function moveFocus(delta) {
+        const items = getVisibleItems();
+        if (!items.length) {
+            setFocusedItem(null, { scroll: false });
+            return;
+        }
+        const idx = focusedItem ? items.indexOf(focusedItem) : -1;
+        let nextIdx;
+        if (idx === -1) {
+            nextIdx = delta > 0 ? 0 : items.length - 1;
+        } else {
+            nextIdx = (idx + delta + items.length) % items.length;
+        }
+        setFocusedItem(items[nextIdx]);
+    }
+
+    document.querySelectorAll(".inbox-item").forEach((li) => {
+        li.addEventListener("click", () => setFocusedItem(li, { scroll: false }));
+    });
 
     function syncInboxCounters() {
         const cards = document.querySelectorAll(".inbox-note-card");
         if (emptyCard) emptyCard.hidden = cards.length > 0;
+        if (shortcutsHint) shortcutsHint.hidden = cards.length === 0;
 
         let totalPending = 0;
         let totalPromoted = 0;
@@ -199,15 +243,14 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
 
-        const navBadge = document.getElementById("nav-inbox-badge");
-        if (navBadge) {
+        document.querySelectorAll(".js-inbox-badge").forEach((badge) => {
             if (totalPending > 0) {
-                navBadge.textContent = String(totalPending);
-                navBadge.hidden = false;
+                badge.textContent = String(totalPending);
+                badge.hidden = false;
             } else {
-                navBadge.remove();
+                badge.remove();
             }
-        }
+        });
     }
 
     function showItemError(itemId, message) {
@@ -262,6 +305,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
                 if (okCount > 0) {
                     showToast(uiText("inbox_promoted_toast", null, "Added to dictionary"));
+                    if (focusedItem && focusedItem.classList.contains("is-promoted")) {
+                        const items = getVisibleItems();
+                        const nextPending = items.find((el) => !el.classList.contains("is-promoted"));
+                        if (nextPending) setFocusedItem(nextPending);
+                    }
                 }
                 syncInboxCounters();
             })
@@ -305,6 +353,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const expanded = btn.getAttribute("aria-expanded") === "true";
             btn.setAttribute("aria-expanded", String(!expanded));
             body.hidden = expanded;
+            if (expanded && focusedItem && body.contains(focusedItem)) {
+                setFocusedItem(null, { scroll: false });
+            }
             btn.textContent = expanded
                 ? uiText("inbox_expand", null, "Expand")
                 : uiText("inbox_collapse", null, "Collapse");
@@ -363,8 +414,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         if (sense.meaning && !li.classList.contains("is-promoted")) {
                             const useBtn = document.createElement("button");
                             useBtn.type = "button";
-                            useBtn.className = "button button-ghost";
-                            useBtn.style.marginLeft = "8px";
+                            useBtn.className = "button button-ghost button-sm";
                             useBtn.textContent = uiText("inbox_use_sense", null, "+ Use");
                             useBtn.addEventListener("click", () => {
                                 useBtn.disabled = true;
@@ -471,6 +521,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (!ok) return;
                 const li = btn.closest(".inbox-item");
                 const card = btn.closest(".inbox-note-card");
+                const itemsBefore = getVisibleItems();
+                const idx = li ? itemsBefore.indexOf(li) : -1;
                 fetchJson("/api/v1/page-note/items/" + encodeURIComponent(btn.dataset.itemId), {
                     method: "DELETE",
                     headers: csrfHeaders(),
@@ -480,6 +532,10 @@ document.addEventListener("DOMContentLoaded", function () {
                             card.remove();
                         } else if (li) {
                             li.remove();
+                        }
+                        if (focusedItem === li || (card && card.contains(focusedItem))) {
+                            const remaining = getVisibleItems();
+                            setFocusedItem(remaining[Math.min(idx, remaining.length - 1)] || null);
                         }
                         syncInboxCounters();
                         showToast(uiText("inbox_deleted_toast", null, "Removed"));
@@ -504,6 +560,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     .then(handleProtectedResponse)
                     .then((resp) => {
                         if (resp.ok && card) {
+                            if (focusedItem && card.contains(focusedItem)) {
+                                setFocusedItem(null, { scroll: false });
+                            }
                             card.remove();
                             syncInboxCounters();
                             showToast(uiText("inbox_deleted_toast", null, "Removed"));
@@ -528,7 +587,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     body: JSON.stringify({}),
                 })
                     .then(() => {
-                        document.querySelectorAll(".inbox-item.is-promoted").forEach((li) => li.remove());
+                        document.querySelectorAll(".inbox-item.is-promoted").forEach((li) => {
+                            if (focusedItem === li) focusedItem = null;
+                            li.remove();
+                        });
                         document.querySelectorAll(".inbox-note-card").forEach((card) => {
                             const hasItems = card.querySelector(".inbox-item") !== null;
                             const ta = card.querySelector(".inbox-scratchpad-input");
@@ -579,6 +641,44 @@ document.addEventListener("DOMContentLoaded", function () {
                     btn.disabled = false;
                 });
         });
+    });
+
+    // Keyboard triage (j/k move, a add, l lookup, e edit, p play)
+    document.addEventListener("keydown", (event) => {
+        if (shouldIgnoreShortcut(event)) return;
+        if (event.key === "j") {
+            event.preventDefault();
+            moveFocus(1);
+        } else if (event.key === "k") {
+            event.preventDefault();
+            moveFocus(-1);
+        } else if (focusedItem && document.body.contains(focusedItem)) {
+            if (event.key === "a" && !focusedItem.classList.contains("is-promoted")) {
+                const btn = focusedItem.querySelector(".inbox-promote-one");
+                if (btn) {
+                    event.preventDefault();
+                    btn.click();
+                }
+            } else if (event.key === "l") {
+                const btn = focusedItem.querySelector(".inbox-lookup-toggle");
+                if (btn) {
+                    event.preventDefault();
+                    btn.click();
+                }
+            } else if (event.key === "e") {
+                const btn = focusedItem.querySelector(".inbox-edit-toggle");
+                if (btn) {
+                    event.preventDefault();
+                    btn.click();
+                }
+            } else if (event.key === "p") {
+                const btn = focusedItem.querySelector(".inbox-audio-btn");
+                if (btn) {
+                    event.preventDefault();
+                    btn.click();
+                }
+            }
+        }
     });
 });
 </script>

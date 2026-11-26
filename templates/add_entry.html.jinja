@@ -2,11 +2,11 @@
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('form.add_entry_title') }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
+{% block nav_active %}add{% endblock nav_active %}
 
 {% block body %}
-{{ page_header() }}
+{{ page_header(title=t('form.add_entry_title')) }}
 <main class="form-page">
-<h1>{{ t('form.add_entry_title') }}</h1>
 {% if error %}
 <p class="form-error" role="alert">
     {{ error }}

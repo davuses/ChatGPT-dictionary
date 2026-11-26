@@ -3,10 +3,9 @@
 
 <head>
     <title>{% block title %}{% endblock title %}</title>
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}">{% endif %}
-    <meta name="theme-color" content="#f8f9fa" id="theme-color-meta">
+    <meta name="theme-color" content="#F6F6F4" id="theme-color-meta">
     <script>
         (function () {
             try {
@@ -16,31 +15,31 @@
                 }
                 var isDark = saved === "dark" || (!saved && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
                 var meta = document.getElementById("theme-color-meta");
-                if (meta) meta.setAttribute("content", isDark ? "#0f171c" : "#f8f9fa");
+                if (meta) meta.setAttribute("content", isDark ? "#0A0D0C" : "#F6F6F4");
+                if (localStorage.getItem("glossbook_rail") === "collapsed") {
+                    document.documentElement.setAttribute("data-rail", "collapsed");
+                }
             } catch (_) {}
         })();
     </script>
-    <link rel="stylesheet"
-        href="{{ static_url('style.css') }}" />
+    <link rel="stylesheet" href="{{ static_url('style.css') }}" />
     <script src="{{ static_url('script.js') }}" defer></script>
-    <link rel="icon"
-        type="image/svg+xml"
-        href="{{ static_url('favicon.svg') }}">
-    <link rel="icon"
-        type="image/x-icon"
-        href="{{ static_url('favicon.ico') }}">
-    <link rel="apple-touch-icon"
-        href="{{ static_url('apple-touch-icon.png') }}">
-    <link rel="manifest"
-        href="{{ static_url('manifest.json') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ static_url('favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ static_url('favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ static_url('apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ static_url('manifest.json') }}">
     {% if needs_editor %}
     <script src="{{ static_url('cm6-editor.js') }}" defer></script>
     {% endif %}
     {% block head %}{% endblock head %}
 </head>
 
+{% set _chrome_mode %}{% block chrome_mode %}{% if is_authenticated %}app{% else %}standalone{% endif %}{% endblock chrome_mode %}{% endset %}
+{% set _chrome = _chrome_mode.strip() %}
+{% set _nav_active_raw %}{% block nav_active %}{% endblock nav_active %}{% endset %}
+{% set _nav_active = _nav_active_raw.strip() %}
 {% set _body_class %}{% block body_class %}{% endblock body_class %}{% endset %}
-<body{% if _body_class.strip() %} class="{{ _body_class.strip() }}"{% endif %}>
+<body{% if _body_class.strip() %} class="{{ _body_class.strip() }}"{% endif %} data-chrome="{{ _chrome }}">
     <svg class="svg-sprite" aria-hidden="true" hidden>
         <symbol id="icon-audio-play" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -51,11 +50,161 @@
             <rect x="9" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
             <rect x="12.6" y="8" width="2.4" height="8" rx="0.6" fill="currentColor" />
         </symbol>
+        <symbol id="icon-today" viewBox="0 0 20 20">
+            <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3h9A1.5 1.5 0 0 1 16 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 15.5v-11Z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 7.5h6M7 10.5h6M7 13.5h3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="icon-review" viewBox="0 0 20 20">
+            <rect x="3" y="4.5" width="14" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6.5 10h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="icon-words" viewBox="0 0 20 20">
+            <path d="M4.5 3.5h9.5A1.5 1.5 0 0 1 15.5 5v11.5h-11V3.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M7 7h5.5M7 10h5.5M7 13h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="icon-inbox" viewBox="0 0 20 20">
+            <path d="M3.5 11.5 5.2 4.5h9.6l1.7 7v4A1.5 1.5 0 0 1 15 17H5a1.5 1.5 0 0 1-1.5-1.5v-4Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M3.5 11.5h3.8l1.2 2h3l1.2-2h3.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </symbol>
+        <symbol id="icon-notes" viewBox="0 0 20 20">
+            <path d="M5 3.5h7.5L15.5 6.5V16.5H5V3.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M12.5 3.5v3h3M7.5 10h5M7.5 13h4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="icon-search" viewBox="0 0 20 20">
+            <circle cx="9" cy="9" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <path d="m13 13 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="icon-rail" viewBox="0 0 20 20">
+            <rect x="2.75" y="3.5" width="14.5" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7.5 3.5v13" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </symbol>
+        <symbol id="icon-more" viewBox="0 0 20 20">
+            <circle cx="4.5" cy="10" r="1.4" fill="currentColor"/>
+            <circle cx="10" cy="10" r="1.4" fill="currentColor"/>
+            <circle cx="15.5" cy="10" r="1.4" fill="currentColor"/>
+        </symbol>
     </svg>
     <script type="application/json" id="i18n-data">{{ js_i18n | default({}) | tojson }}</script>
-    {% block body%}
 
-    {% endblock body %}
+    {% if _chrome == "app" and is_authenticated %}
+    <div class="app-shell">
+        <div class="app-rail-backdrop" id="app-rail-backdrop" hidden></div>
+        <aside class="app-rail" id="app-rail" aria-label="{{ t('nav.main_aria') }}">
+            <div class="rail-head">
+                <a class="rail-brand" href="/">
+                    <span class="rail-brand-mark" aria-hidden="true"></span>
+                    <span class="rail-brand-name">Glossbook</span>
+                </a>
+                <button type="button" class="rail-icon-btn" id="rail-collapse-btn" aria-label="{{ t('nav.rail_collapse') }}" title="{{ t('nav.rail_collapse') }} ([)">
+                    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><use href="#icon-rail"/></svg>
+                </button>
+            </div>
+
+            <div class="rail-utilities">
+                <button type="button" class="rail-search-btn" id="open-quick-search" aria-label="{{ t('nav.search_aria') }}">
+                    <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><use href="#icon-search"/></svg>
+                    <span>{{ t('nav.search_btn') }}</span>
+                    <kbd>/</kbd>
+                </button>
+                <a class="button button-primary rail-add-btn{% if _nav_active == 'add' %} active{% endif %}" href="/add_entry"><span>{{ t('nav.add') }}</span></a>
+            </div>
+
+            <nav class="rail-nav" aria-label="{{ t('nav.main_aria') }}">
+                <a class="rail-link{% if _nav_active == 'today' %} active{% endif %}" href="/"{% if _nav_active == 'today' %} aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><use href="#icon-today"/></svg>
+                    <span>{{ t('nav.today') }}</span>
+                </a>
+                <a class="rail-link{% if _nav_active == 'review' %} active{% endif %}" href="/review"{% if _nav_active == 'review' %} aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><use href="#icon-review"/></svg>
+                    <span>{{ t('nav.review') }}</span>
+                </a>
+                <a class="rail-link{% if _nav_active == 'browse' %} active{% endif %}" href="/entries"{% if _nav_active == 'browse' %} aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><use href="#icon-words"/></svg>
+                    <span>{{ t('nav.words') }}</span>
+                </a>
+                <a class="rail-link{% if _nav_active == 'inbox' %} active{% endif %}" href="/inbox"{% if _nav_active == 'inbox' %} aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><use href="#icon-inbox"/></svg>
+                    <span>{{ t('nav.inbox') }}</span>{% if inbox_pending_count %}<span class="nav-badge js-inbox-badge" id="nav-inbox-badge">{{ inbox_pending_count }}</span>{% endif %}
+                </a>
+                {% if is_admin %}
+                <a class="rail-link{% if _nav_active == 'notes' %} active{% endif %}" href="/notes/"{% if _nav_active == 'notes' %} aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><use href="#icon-notes"/></svg>
+                    <span>{{ t('nav.notes') }}</span>
+                </a>
+                {% endif %}
+            </nav>
+
+            <div class="rail-footer">
+                <div class="theme-segmented" role="radiogroup" aria-label="{{ t('nav.theme_aria') }}">
+                    <button type="button" class="theme-seg-btn" role="radio" aria-checked="true" data-theme-value="auto">{{ t('nav.theme_auto_short') }}</button>
+                    <button type="button" class="theme-seg-btn" role="radio" aria-checked="false" data-theme-value="light">{{ t('nav.theme_light_short') }}</button>
+                    <button type="button" class="theme-seg-btn" role="radio" aria-checked="false" data-theme-value="dark">{{ t('nav.theme_dark_short') }}</button>
+                </div>
+                <details class="nav-account-menu">
+                    <summary class="rail-account-trigger{% if _nav_active in ('account', 'admin') %} active{% endif %}" aria-label="{{ t('nav.account_menu_aria') }}">
+                        <span class="rail-account-avatar" aria-hidden="true">{{ (current_user.username[:1] | upper) if current_user else 'G' }}</span>
+                        <span class="nav-account-name">{{ current_user.username if current_user else t('nav.account') }}</span>
+                        <svg class="nav-caret" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                            <path d="M2.5 7.75L6 4.25l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </summary>
+                    <div class="nav-account-dropdown">
+                        <a class="nav-menu-item{% if _nav_active == 'account' %} active{% endif %}" href="/account"{% if _nav_active == 'account' %} aria-current="page"{% endif %}><span>{{ t('nav.account') }}</span></a>
+                        <a class="nav-menu-item" href="/account#extension"><span>{{ t('nav.extension') }}</span></a>
+                        {% if is_admin %}
+                        <a class="nav-menu-item{% if _nav_active == 'admin' %} active{% endif %}" href="/admin"{% if _nav_active == 'admin' %} aria-current="page"{% endif %}><span>{{ t('nav.admin') }}</span></a>
+                        {% endif %}
+                        <form class="nav-menu-form" method="post" action="/language">
+                            <input type="hidden" name="lang" value="{{ other_lang }}">
+                            <input type="hidden" name="next_path" value="{{ current_next_path }}">
+                            <button class="nav-menu-item" type="submit" aria-label="{{ t('nav.switch_lang_aria') }}">{{ t('nav.switch_lang_label') }}</button>
+                        </form>
+                        <hr class="nav-menu-divider">
+                        <form class="nav-menu-form" method="post" action="/logout">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button class="nav-menu-item nav-menu-danger" type="submit">{{ t('nav.logout') }}</button>
+                        </form>
+                    </div>
+                </details>
+            </div>
+        </aside>
+
+        <div class="app-main" id="app-main">
+            {% block body %}{% endblock body %}
+        </div>
+
+        <nav class="mobile-tabbar" aria-label="{{ t('nav.main_aria') }}">
+            <a class="mobile-tab{% if _nav_active == 'today' %} active{% endif %}" href="/"{% if _nav_active == 'today' %} aria-current="page"{% endif %}>
+                <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true"><use href="#icon-today"/></svg>
+                <span>{{ t('nav.today') }}</span>
+            </a>
+            <a class="mobile-tab{% if _nav_active == 'review' %} active{% endif %}" href="/review"{% if _nav_active == 'review' %} aria-current="page"{% endif %}>
+                <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true"><use href="#icon-review"/></svg>
+                <span>{{ t('nav.review') }}</span>
+            </a>
+            <a class="mobile-tab{% if _nav_active == 'browse' %} active{% endif %}" href="/entries"{% if _nav_active == 'browse' %} aria-current="page"{% endif %}>
+                <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true"><use href="#icon-words"/></svg>
+                <span>{{ t('nav.words') }}</span>
+            </a>
+            <a class="mobile-tab{% if _nav_active == 'inbox' %} active{% endif %}" href="/inbox"{% if _nav_active == 'inbox' %} aria-current="page"{% endif %}>
+                <span class="mobile-tab-icon-wrap">
+                    <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true"><use href="#icon-inbox"/></svg>
+                    {% if inbox_pending_count %}<span class="mobile-tab-badge js-inbox-badge">{{ inbox_pending_count }}</span>{% endif %}
+                </span>
+                <span>{{ t('nav.inbox') }}</span>
+            </a>
+            <button type="button" class="mobile-tab" id="mobile-more-btn" aria-expanded="false" aria-controls="app-rail">
+                <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true"><use href="#icon-more"/></svg>
+                <span>{{ t('nav.more') }}</span>
+            </button>
+        </nav>
+    </div>
+    {% else %}
+    <div class="{% if _chrome == 'zen' %}zen-shell{% else %}standalone-shell{% endif %}">
+        {{ self.body() }}
+    </div>
+    {% endif %}
+
     <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
     <dialog id="confirm-dialog" class="app-dialog">
         <div class="app-dialog-body">
@@ -70,7 +219,9 @@
     {% if is_authenticated %}
     <dialog id="quick-search-dialog" class="app-dialog app-dialog--search" aria-label="{{ t('nav.search_btn') }}">
         <div class="quick-search-header">
+            <svg viewBox="0 0 20 20" width="17" height="17" class="quick-search-icon" aria-hidden="true"><use href="#icon-search"/></svg>
             <input type="search" id="quick-search-input" class="quick-search-input" placeholder="{{ t('quick_search.placeholder') }}" autocomplete="off" spellcheck="false">
+            <kbd class="quick-search-esc">Esc</kbd>
         </div>
         <ul id="quick-search-list" class="quick-search-list" role="listbox"></ul>
     </dialog>

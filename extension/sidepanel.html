@@ -10,7 +10,12 @@
 <body>
   <header class="sp-header">
     <div class="sp-brand-row">
-      <h1 class="sp-brand"><a id="brand-link" class="sp-brand-link" href="#" target="_blank" rel="noopener noreferrer">Glossbook</a></h1>
+      <h1 class="sp-brand">
+        <a id="brand-link" class="sp-brand-link" href="#" target="_blank" rel="noopener noreferrer">
+          <span class="sp-brand-mark" aria-hidden="true"></span>
+          <span>Glossbook</span>
+        </a>
+      </h1>
       <div class="sp-header-actions">
         <a id="open-inbox-link" class="sp-btn sp-btn-ghost" href="#" target="_blank" rel="noopener noreferrer" hidden data-i18n="inbox">Inbox</a>
         <button id="toggle-settings-btn" class="sp-btn sp-btn-ghost" type="button" aria-expanded="false" aria-controls="settings-panel" data-i18n="settings">Settings</button>
@@ -64,20 +69,19 @@
 
   <div id="global-notice" class="sp-notice" hidden></div>
 
-  <main id="workspace" hidden>
-    <section class="sp-card">
-      <div class="sp-section-head">
-        <h2 data-i18n="quick_jot">Quick jot</h2>
-        <button id="grab-page-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="grab_from_page">Grab from page</button>
-      </div>
+  <main id="workspace" class="sp-workspace" hidden>
+    <section class="sp-composer">
       <form id="jot-form">
-        <input id="jot-word" class="sp-input" type="text" placeholder="Word or phrase (e.g. finances)" data-i18n-placeholder="jot_word_placeholder" autocomplete="off" required>
-        <textarea id="jot-context" class="sp-textarea sp-context-input" rows="3" placeholder="Context sentence (optional — Ctrl+Enter to save)" data-i18n-placeholder="jot_context_placeholder"></textarea>
+        <div class="sp-composer-word-row">
+          <input id="jot-word" class="sp-input sp-word-input" type="text" placeholder="Word or phrase (e.g. finances)" data-i18n-placeholder="jot_word_placeholder" autocomplete="off" required>
+          <button id="grab-page-btn" class="sp-btn sp-btn-ghost sp-grab-btn" type="button" data-i18n="grab_from_page">Grab</button>
+        </div>
+        <textarea id="jot-context" class="sp-textarea sp-context-input" rows="1" placeholder="Context sentence (optional — Ctrl+Enter to save)" data-i18n-placeholder="jot_context_placeholder"></textarea>
         <div id="jot-ts-row" class="sp-ts-row" hidden>
           <span id="jot-ts-label" class="sp-pill"></span>
           <button id="clear-ts-btn" class="sp-link-btn" type="button" data-i18n="clear_ts">Clear timestamp</button>
         </div>
-        <div class="sp-row">
+        <div class="sp-row sp-composer-actions">
           <button id="jot-submit-btn" class="sp-btn sp-btn-primary" type="submit" data-i18n="jot_word">Jot word</button>
           <button id="jot-lookup-btn" class="sp-btn sp-btn-ghost" type="button" data-i18n="lookup">Lookup</button>
           <span id="jot-status" class="sp-status"></span>
@@ -86,10 +90,18 @@
       </form>
     </section>
 
-    <section class="sp-card">
-      <div class="sp-section-head">
-        <h2><span data-i18n="captured_words">Captured words</span> <span id="items-count" class="sp-count"></span></h2>
-      </div>
+    <div class="sp-tabs" role="tablist" aria-label="Workspace views">
+      <button type="button" class="sp-tab-btn" id="tab-btn-words" role="tab" aria-selected="true" aria-controls="tab-panel-words" data-sp-tab="words">
+        <span data-i18n="tab_words">Words</span>
+        <span id="items-count" class="sp-count"></span>
+      </button>
+      <button type="button" class="sp-tab-btn" id="tab-btn-notes" role="tab" aria-selected="false" aria-controls="tab-panel-notes" data-sp-tab="notes">
+        <span data-i18n="tab_notes">Notes</span>
+        <span id="notes-tab-dot" class="sp-tab-dot" hidden aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <section id="tab-panel-words" class="sp-tab-panel" role="tabpanel" aria-labelledby="tab-btn-words">
       <div id="items-toolbar" class="sp-items-toolbar" hidden>
         <button id="toggle-select-all-btn" class="sp-link-btn" type="button" data-i18n="select_all">Select all</button>
         <button id="promote-selected-btn" class="sp-btn sp-btn-primary" type="button" hidden data-i18n="add_selected">Add selected</button>
@@ -99,12 +111,12 @@
       <div id="promote-status" class="sp-status"></div>
     </section>
 
-    <section class="sp-card">
-      <div class="sp-section-head">
-        <h2 data-i18n="scratchpad">Page scratchpad</h2>
+    <section id="tab-panel-notes" class="sp-tab-panel sp-tab-panel--notes" role="tabpanel" aria-labelledby="tab-btn-notes" hidden>
+      <div class="sp-notes-head">
+        <span class="sp-notes-label" data-i18n="scratchpad">Page scratchpad</span>
         <span id="notes-status" class="sp-status" data-i18n="auto_saved">Auto-saved</span>
       </div>
-      <textarea id="notes-textarea" class="sp-textarea" rows="6" placeholder="Freeform Markdown notes for this video or article&hellip;" data-i18n-placeholder="scratchpad_placeholder"></textarea>
+      <textarea id="notes-textarea" class="sp-textarea sp-notes-textarea" placeholder="Freeform Markdown notes for this video or article&hellip;" data-i18n-placeholder="scratchpad_placeholder"></textarea>
     </section>
   </main>
 

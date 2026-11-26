@@ -1,6 +1,7 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('syn.title', word=word) }}{% endblock title %}
+{% block nav_active %}browse{% endblock nav_active %}
 
 {% block body %}
 {% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">{{ t('nav.entry') }}</a>{% endset %}

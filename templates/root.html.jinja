@@ -3,80 +3,88 @@
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}Glossbook{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
+{% block nav_active %}today{% endblock nav_active %}
 
 {% block body %}
 
 {% set dash_subtitle %}<a class="subtitle-link" href="/entries">{{ t('dash.entries_one' if entries_count == 1 else 'dash.entries_many', n=entries_count) }}</a> &middot; {{ t('dash.visited_7d', n=visited_last_7_days) }}{% endset %}
-{{ page_header(subtitle=dash_subtitle, brand_as_h1=True, show_add=True) }}
+{{ page_header(title=t('nav.today'), subtitle=dash_subtitle, brand_as_h1=True, show_add=True) }}
 
-<main class="page-content">
-<form class="search-form dashboard-search" role="search" action="/entries" method="get">
-    <input type="search"
-        name="q"
-        placeholder="{{ t('dash.search_placeholder') }}"
-        aria-label="{{ t('dash.search_aria') }}">
-    <button class="button button-primary" type="submit">{{ t('dash.search_btn') }}</button>
-</form>
+<main class="page-content today-desk">
+    <form class="search-form dashboard-search" role="search" action="/entries" method="get">
+        <input type="search"
+            name="q"
+            placeholder="{{ t('dash.search_placeholder') }}"
+            aria-label="{{ t('dash.search_aria') }}">
+        <button class="button button-primary" type="submit">{{ t('dash.search_btn') }}</button>
+    </form>
 
-{% if pending_inbox_count > 0 or undefined_count > 0 %}
-<div class="dashboard-stats">
-    {% if pending_inbox_count > 0 %}
-    <a class="stat-pill stat-pill--accent" href="/inbox">{{ t('dash.pill_inbox_one' if pending_inbox_count == 1 else 'dash.pill_inbox_many', n=pending_inbox_count) }}</a>
-    {% endif %}
-    {% if undefined_count > 0 %}
-    <a class="stat-pill" href="/entries?needs_definition=true">{{ t('dash.pill_needs_def_one' if undefined_count == 1 else 'dash.pill_needs_def_many', n=undefined_count) }}</a>
-    {% endif %}
-</div>
-{% endif %}
-
-{% block dashboard_widgets %}
-<section class="card">
-    <div class="section-header">
-        <h2>{{ t('dash.quiz_title') }}</h2>
-        <a class="button button-ghost" href="/review">{{ t('dash.review_session') }}</a>
+    {% if pending_inbox_count > 0 or undefined_count > 0 %}
+    <div class="today-queues">
+        {% if pending_inbox_count > 0 %}
+        <a class="today-queue-link today-queue-link--accent" href="/inbox">
+            <span class="queue-dot" aria-hidden="true"></span>
+            <span>{{ t('dash.pill_inbox_one' if pending_inbox_count == 1 else 'dash.pill_inbox_many', n=pending_inbox_count) }}</span>
+            <span class="queue-arrow" aria-hidden="true">&rarr;</span>
+        </a>
+        {% endif %}
+        {% if undefined_count > 0 %}
+        <a class="today-queue-link" href="/entries?needs_definition=true">
+            <span>{{ t('dash.pill_needs_def_one' if undefined_count == 1 else 'dash.pill_needs_def_many', n=undefined_count) }}</span>
+            <span class="queue-arrow" aria-hidden="true">&rarr;</span>
+        </a>
+        {% endif %}
     </div>
-    {{ quiz_card(question, action_exclude=next_exclude, action_label=t('quiz.try_another'), action_id="quiz-next-btn") }}
-</section>
-{% endblock dashboard_widgets %}
+    {% endif %}
 
-{% if not has_api_token %}
-<aside class="extension-promo-card extension-nudge" id="extension-nudge">
-    <p class="extension-nudge-text">
-        <strong>{{ t('dash.ext_nudge_lead') }}</strong> {{ t('dash.ext_nudge_body') }}
-    </p>
-    <div class="extension-nudge-actions">
-        <a class="button button-ghost" href="/account#extension">{{ t('dash.ext_nudge_cta') }}</a>
-        <a class="extension-nudge-dl" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('dash.ext_download') }}</a>
-        <button type="button" class="extension-nudge-close" id="dismiss-ext-nudge" aria-label="{{ t('entry.close') }}" title="{{ t('entry.close') }}">&times;</button>
+    {% block dashboard_widgets %}
+    <section class="today-study-stage">
+        <div class="stage-header">
+            <h2>{{ t('dash.quiz_title') }}</h2>
+            <a class="text-action-link" href="/review">{{ t('dash.review_session') }} &rarr;</a>
+        </div>
+        {{ quiz_card(question, action_exclude=next_exclude, action_label=t('quiz.try_another'), action_id="quiz-next-btn") }}
+    </section>
+    {% endblock dashboard_widgets %}
+
+    {% if review_bookmark_entry_id %}
+    <div class="today-footnote">
+        <p class="today-footnote-text">{% if bookmark_word %}{{ t('dash.resume_word', word=bookmark_word) }}{% else %}{{ t('dash.resume_prefix') }}{% endif %}</p>
+        <a class="text-action-link" href="/resume_review">{{ t('dash.resume_link') }} &rarr;</a>
     </div>
-</aside>
-<script>
-(function () {
-    try {
-        var el = document.getElementById("extension-nudge");
-        if (!el) return;
-        if (localStorage.getItem("glossbook_ext_nudge_dismissed") === "1") {
-            el.hidden = true;
-            return;
-        }
-        var btn = document.getElementById("dismiss-ext-nudge");
-        if (btn) {
-            btn.addEventListener("click", function () {
+    {% endif %}
+
+    {% if not has_api_token %}
+    <aside class="extension-promo-card extension-nudge" id="extension-nudge">
+        <p class="extension-nudge-text">
+            <strong>{{ t('dash.ext_nudge_lead') }}</strong> {{ t('dash.ext_nudge_body') }}
+        </p>
+        <div class="extension-nudge-actions">
+            <a class="button button-ghost" href="/account#extension">{{ t('dash.ext_nudge_cta') }}</a>
+            <a class="extension-nudge-dl" href="{{ extension_download_url }}" target="_blank" rel="noopener noreferrer">{{ t('dash.ext_download') }}</a>
+            <button type="button" class="extension-nudge-close" id="dismiss-ext-nudge" aria-label="{{ t('entry.close') }}" title="{{ t('entry.close') }}">&times;</button>
+        </div>
+    </aside>
+    <script>
+    (function () {
+        try {
+            var el = document.getElementById("extension-nudge");
+            if (!el) return;
+            if (localStorage.getItem("glossbook_ext_nudge_dismissed") === "1") {
                 el.hidden = true;
-                try { localStorage.setItem("glossbook_ext_nudge_dismissed", "1"); } catch (_) {}
-            });
-        }
-    } catch (_) {}
-})();
-</script>
-{% endif %}
-
-{% if review_bookmark_entry_id %}
-<section class="card dashboard-resume-card">
-    <p>{% if bookmark_word %}{{ t('dash.resume_word', word=bookmark_word) }}{% else %}{{ t('dash.resume_prefix') }}{% endif %}</p>
-    <a class="button button-ghost" href="/resume_review">{{ t('dash.resume_link') }}</a>
-</section>
-{% endif %}
+                return;
+            }
+            var btn = document.getElementById("dismiss-ext-nudge");
+            if (btn) {
+                btn.addEventListener("click", function () {
+                    el.hidden = true;
+                    try { localStorage.setItem("glossbook_ext_nudge_dismissed", "1"); } catch (_) {}
+                });
+            }
+        } catch (_) {}
+    })();
+    </script>
+    {% endif %}
 </main>
 
 {% endblock body %}

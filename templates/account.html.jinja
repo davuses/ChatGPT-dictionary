@@ -2,14 +2,15 @@
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('account.title') }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
+{% block nav_active %}account{% endblock nav_active %}
 
 {% block body %}
-{{ page_header(subtitle=t('account.subtitle_admin' if is_admin else 'account.subtitle_user', username=current_user.username), active="account") }}
+{{ page_header(title=t('account.title'), subtitle=t('account.subtitle_admin' if is_admin else 'account.subtitle_user', username=current_user.username), active="account") }}
 
 <main class="account-page">
-    <section class="card">
+    <section class="editorial-section">
         <h2>{{ t('account.export_import_title') }}</h2>
-        <p class="page-subtitle">{{ t('account.export_desc_one' if entry_count == 1 else 'account.export_desc_many', n=entry_count) }}</p>
+        <p class="section-desc">{{ t('account.export_desc_one' if entry_count == 1 else 'account.export_desc_many', n=entry_count) }}</p>
         <div class="form-actions">
             <a class="button button-primary" href="/account/export.json">{{ t('account.download_json') }}</a>
             <a class="button button-ghost" href="/account/export.md">{{ t('account.download_md') }}</a>
@@ -18,7 +19,7 @@
         <hr class="account-divider">
 
         <h3 class="account-subheading">{{ t('account.import_title') }}</h3>
-        <p class="page-subtitle">{{ t('account.import_desc') }}</p>
+        <p class="section-desc">{{ t('account.import_desc') }}</p>
         {% if import_notice %}<p class="form-notice" role="status">{{ import_notice }}</p>{% endif %}
         {% if import_error %}<p class="form-error" role="alert">{{ import_error }}</p>{% endif %}
         <form class="import-form" method="post" action="/account/import" enctype="multipart/form-data">
@@ -34,9 +35,9 @@
         </form>
     </section>
 
-    <section class="card" id="extension">
+    <section class="editorial-section" id="extension">
         <h2>{{ t('account.ext_section_title') }} <span class="field-hint">v{{ extension_version }}</span></h2>
-        <p class="page-subtitle">{{ t('account.ext_section_intro') }}</p>
+        <p class="section-desc">{{ t('account.ext_section_intro') }}</p>
 
         <ul class="extension-features">
             <li><strong>{{ t('account.ext_feat_web_title') }}</strong> {{ t('account.ext_feat_web_desc') }}</li>
@@ -59,7 +60,7 @@
         <hr class="account-divider">
 
         <h3 class="account-subheading">{{ t('account.tokens_title') }}</h3>
-        <p class="page-subtitle">{{ t('account.tokens_desc') }}</p>
+        <p class="section-desc">{{ t('account.tokens_desc') }}</p>
 
         {% if new_token %}
         <div class="secret-box" role="status">
@@ -92,8 +93,8 @@
                 {% for token in api_tokens %}
                 <tr>
                     <td>{{ token.label }}</td>
-                    <td>{{ how_long_ago(token.created_at) }}</td>
-                    <td>{{ how_long_ago(token.last_used_at) }}</td>
+                    <td class="num-cell">{{ how_long_ago(token.created_at) }}</td>
+                    <td class="num-cell">{{ how_long_ago(token.last_used_at) }}</td>
                     <td>
                         <form class="inline-form" method="post" action="/account/tokens/{{ token.id }}/revoke" data-confirm-key="confirm_revoke_token" data-confirm-danger="true">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -106,11 +107,11 @@
         </table>
         </div>
         {% else %}
-        <p class="page-subtitle">{{ t('account.no_tokens') }}</p>
+        <p class="section-desc">{{ t('account.no_tokens') }}</p>
         {% endif %}
     </section>
 
-    <section class="card">
+    <section class="editorial-section">
         <h2>{{ t('account.pw_title') }}</h2>
         {% if password_notice %}<p class="form-notice" role="status">{{ password_notice }}</p>{% endif %}
         {% if password_error %}<p class="form-error" role="alert">{{ password_error }}</p>{% endif %}

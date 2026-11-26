@@ -729,6 +729,88 @@ async def test_extension_visibility_update_guide_and_version_parity(client, admi
     assert note_resp.json()["latest_extension_version"] == utils.EXTENSION_VERSION
 
 
+async def test_entry_partial_readonly_and_xhr_inline_saves(client, admin_user):
+    await _login(client)
+    csrf = _csrf_from_html((await client.get("/")).text)
+
+    eid = database.db_add_entry(
+        admin_user.id,
+        "A candid remark - candid",
+        definition_text='Safe **bold** <script>alert("xss")</script>',
+        example_text='She was candid. <img src=x onerror="boom()">',
+    )
+    eid2 = database.db_add_entry(admin_user.id, "duplicate word")
+
+    # Partial entry sheet is a fragment, read-only (does NOT increment visit_count),
+    # has Cache-Control: no-store, and omits raw unsanitized XSS payloads.
+    partial = await client.get(f"/entry/{eid}?partial=1")
+    assert partial.status_code == 200
+    assert "<!DOCTYPE html>" not in partial.text
+    assert partial.headers.get("cache-control") == "no-store"
+    assert 'id="entry-article"' in partial.text
+    assert 'alert("xss")' not in partial.text
+    assert "boom()" not in partial.text
+    entry_after_partial = database.db_get_entry_by_id(admin_user.id, eid)
+    assert entry_after_partial.visit_count == 0
+
+    # XHR inline edit returns compact JSON without 303 redirect
+    xhr_headers = {"X-Requested-With": "XMLHttpRequest", "Accept": "application/json"}
+    ok_edit = await client.post(
+        f"/edit_entry/{eid}",
+        data={"csrf_token": csrf, "word": "candidly", "context": "She spoke candidly."},
+        headers=xhr_headers,
+    )
+    assert ok_edit.status_code == 200
+    assert ok_edit.json()["ok"] is True
+    assert ok_edit.json()["word"] == "candidly"
+
+    # Conflict returns 409 JSON
+    conflict = await client.post(
+        f"/edit_entry/{eid}",
+        data={"csrf_token": csrf, "word": "duplicate word", "context": ""},
+        headers=xhr_headers,
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["existing_entry_id"] == eid2
+
+    # XHR definition & example saves return 200 JSON
+    add_def = await client.post(
+        "/add_definition",
+        data={"csrf_token": csrf, "entry_id": str(eid2), "definition_text": "A copy"},
+        headers=xhr_headers,
+    )
+    assert add_def.status_code == 200
+    def_id = add_def.json()["definition_id"]
+
+    edit_def = await client.post(
+        f"/edit_definition/{def_id}",
+        data={"csrf_token": csrf, "definition_text": "An exact copy"},
+        headers=xhr_headers,
+    )
+    assert edit_def.status_code == 200
+    assert edit_def.json()["ok"] is True
+
+    edit_ex = await client.post(
+        f"/edit_example/{eid2}",
+        data={"csrf_token": csrf, "example_text": "Keep a duplicate word handy."},
+        headers=xhr_headers,
+    )
+    assert edit_ex.status_code == 200
+    assert edit_ex.json()["ok"] is True
+
+    # Shell & Zen Review markers
+    entries_page = await client.get("/entries")
+    assert entries_page.status_code == 200
+    assert 'id="app-rail"' in entries_page.text
+    assert 'id="lexicon-detail-pane"' in entries_page.text
+
+    review_page = await client.get("/review")
+    assert review_page.status_code == 200
+    assert 'data-chrome="zen"' in review_page.text
+    assert 'id="app-rail"' not in review_page.text
+
+
+
 
 
 

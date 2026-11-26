@@ -1,11 +1,12 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ title }}{% endblock title %}
+{% block nav_active %}notes{% endblock nav_active %}
 
 {% block body %}
 
 {% set edit_link %}{% if not is_dir %}<a class="button button-ghost" href="/edit_note/{{ note_url_path }}" id="edit-note">{{ t('nav.edit') }}</a>{% endif %}{% endset %}
-{{ page_header(active="notes", extra_nav=edit_link) }}
+{{ page_header(title=title, active="notes", extra_nav=edit_link) }}
 
 <main class="notes-shell">
     {% if toc_exist %}
@@ -21,7 +22,7 @@
         {% endif %}
         <article class="notes-article">
             {% if is_dir %}
-            <div class="tree-markdown">
+            <div class="tree-markdown markdown-body">
                 {{ note_html | safe }}
             </div>
             {% else %}

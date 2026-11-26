@@ -2,9 +2,10 @@
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('admin.title') }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
+{% block nav_active %}admin{% endblock nav_active %}
 
 {% block body %}
-{{ page_header(subtitle=t('admin.subtitle'), active="admin") }}
+{{ page_header(title=t('admin.title'), subtitle=t('admin.subtitle'), active="admin") }}
 
 <main class="admin-page">
     {% if admin_error %}
@@ -12,7 +13,7 @@
     {% endif %}
 
     {% if created_invite_url %}
-    <section class="card secret-box" role="status">
+    <section class="secret-box" role="status">
         <p><strong>{{ t('admin.invite_created') }}{% if created_invite_note %}{{ t('admin.invite_for', note=created_invite_note) }}{% endif %}</strong> {{ t('admin.invite_valid_hint') }}</p>
         <div class="secret-box-row">
             <input type="text" class="secret-input" id="created-invite-url" value="{{ created_invite_url }}" readonly>
@@ -22,7 +23,7 @@
     {% endif %}
 
     {% if created_reset_url %}
-    <section class="card secret-box" role="status">
+    <section class="secret-box" role="status">
         <p><strong>{{ t('admin.reset_created', username=created_reset_username) }}</strong> {{ t('admin.reset_valid_hint') }}</p>
         <div class="secret-box-row">
             <input type="text" class="secret-input" id="created-reset-url" value="{{ created_reset_url }}" readonly>
@@ -31,9 +32,9 @@
     </section>
     {% endif %}
 
-    <section class="card">
+    <section class="editorial-section">
         <h2>{{ t('admin.invites_title') }}</h2>
-        <p class="page-subtitle">{{ t('admin.invites_desc') }}</p>
+        <p class="section-desc">{{ t('admin.invites_desc') }}</p>
 
         <form class="inline-create-form" method="post" action="/admin/invites">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -65,7 +66,7 @@
                         <span class="status-pill status-active">{{ t('admin.status_pending') }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ how_long_ago(inv.created_at) }}</td>
+                    <td class="num-cell">{{ how_long_ago(inv.created_at) }}</td>
                     <td>
                         {% if not inv.used_at %}
                         <form class="inline-form" method="post" action="/admin/invites/{{ inv.id }}/revoke" data-confirm-key="confirm_revoke_invite" data-confirm-danger="true">
@@ -82,11 +83,11 @@
         </table>
         </div>
         {% else %}
-        <p class="page-subtitle">{{ t('admin.no_invites') }}</p>
+        <p class="section-desc">{{ t('admin.no_invites') }}</p>
         {% endif %}
     </section>
 
-    <section class="card">
+    <section class="editorial-section">
         <h2>{{ t('admin.users_title', n=users | length) }}</h2>
         <div class="table-scroll">
         <table class="data-table admin-table">
@@ -104,7 +105,7 @@
                 <tr>
                     <td><strong>{{ u.username }}</strong>{% if u.id == current_user.id %}{{ t('admin.you_tag') }}{% endif %}</td>
                     <td>{{ t('admin.role_admin' if u.is_admin else 'admin.role_member') }}</td>
-                    <td>{{ u.entry_count }}</td>
+                    <td class="num-cell">{{ u.entry_count }}</td>
                     <td>
                         {% if u.is_active %}
                         <span class="status-pill status-active">{{ t('admin.status_active') }}</span>

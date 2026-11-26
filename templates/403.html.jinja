@@ -1,14 +1,14 @@
 {% extends "base.html.jinja" %}
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('err.403_title') }}{% endblock title %}
+{% block chrome_mode %}standalone{% endblock chrome_mode %}
 
 {% block body %}
-{{ page_header() }}
+{{ page_header(standalone=True) }}
 <main class="error-page">
-<h1>{{ t('err.403_heading') }}</h1>
-
-<p>{{ detail or t('err.403_default') }}</p>
-<p><a class="button button-ghost" href="/">{{ t('review.back_dashboard') }}</a></p>
+    <p class="error-code">403</p>
+    <h1>{{ t('err.403_heading') }}</h1>
+    <p class="error-detail">{{ detail or t('err.403_default') }}</p>
+    <p><a class="button button-primary" href="/">{{ t('review.back_dashboard') }}</a></p>
 </main>
-
 {% endblock body %}

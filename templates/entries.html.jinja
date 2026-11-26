@@ -13,6 +13,7 @@
 {{ t('nav.words') }}
 {%- endif -%}
 {%- endblock title %}
+{% block nav_active %}browse{% endblock nav_active %}
 
 {% block body %}
 
@@ -23,9 +24,11 @@
 {%- if parts %}{{ extra }}{{ parts | join('&') }}{% endif -%}
 {%- endmacro %}
 
+{% set can_split = (not entries_only) and (not show_definition) and (not show_example) %}
+{% set page_heading = t('entries.title_only') if entries_only else (t('entries.title_definitions') if show_definition else (t('entries.title_examples') if show_example else (t('entries.title_needs_def') if needs_definition else t('nav.words')))) %}
 {% set resume_link %}<a class="button button-ghost" id="resume-bookmark-link" href="/resume_review"{% if not review_bookmark_entry_id %} hidden{% endif %}>{{ t('dash.resume_link') }}</a>{% endset %}
 {% set count_key = ('entries.count_matching_one' if entries_count == 1 else 'entries.count_matching') if search_query else ('entries.count_plain_one' if entries_count == 1 else 'entries.count_plain') %}
-{{ page_header(subtitle=t(count_key, n=entries_count), active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
+{{ page_header(title=page_heading, subtitle=t(count_key, n=entries_count), active="browse", id="top", extra_nav=resume_link, subtitle_id="results-count", show_add=True) }}
 
 <main class="page-content">
 <form class="search-form" id="entries-search-form" role="search" action="/entries" method="get">
@@ -66,37 +69,327 @@
             id="tab-needs-definition"
             href="/entries?needs_definition=true{{ view_qs('&') }}">{{ t('entries.tab_needs_def') }}{% if undefined_count > 0 %}<span id="undefined-count-badge" data-count="{{ undefined_count }}"{% if search_query %} hidden{% endif %}> ({{ undefined_count }})</span>{% endif %}</a>
     </nav>
-    <label class="sort-control" for="entries-sort-select">
-        <span>{{ t('entries.sort_label') }}</span>
-        <select class="sort-select" id="entries-sort-select" name="sort" form="entries-search-form">
-            <option value="newest"{% if sort == 'newest' %} selected{% endif %}>{{ t('entries.sort_newest') }}</option>
-            <option value="unvisited"{% if sort == 'unvisited' %} selected{% endif %}>{{ t('entries.sort_unvisited') }}</option>
-            <option value="most_visited"{% if sort == 'most_visited' %} selected{% endif %}>{{ t('entries.sort_most_visited') }}</option>
-        </select>
-    </label>
+    <div class="entries-toolbar-right">
+        <label class="sort-control" for="entries-sort-select">
+            <span>{{ t('entries.sort_label') }}</span>
+            <select class="sort-select" id="entries-sort-select" name="sort" form="entries-search-form">
+                <option value="newest"{% if sort == 'newest' %} selected{% endif %}>{{ t('entries.sort_newest') }}</option>
+                <option value="unvisited"{% if sort == 'unvisited' %} selected{% endif %}>{{ t('entries.sort_unvisited') }}</option>
+                <option value="most_visited"{% if sort == 'most_visited' %} selected{% endif %}>{{ t('entries.sort_most_visited') }}</option>
+            </select>
+        </label>
+        {% if can_split %}
+        <div class="layout-segmented" id="lexicon-mode-toggle" role="radiogroup" aria-label="{{ t('entries.mode_aria') }}">
+            <button type="button" class="layout-seg-btn is-active" role="radio" aria-checked="true" data-layout-mode="split">{{ t('entries.mode_split') }}</button>
+            <button type="button" class="layout-seg-btn" role="radio" aria-checked="false" data-layout-mode="ledger">{{ t('entries.mode_ledger') }}</button>
+        </div>
+        {% endif %}
+    </div>
 </div>
 
-<div id="results">
-    {% include "_entries_results.html.jinja" %}
+<div class="lexicon-workbench{% if can_split %} is-split{% endif %}" id="lexicon-workbench" data-can-split="{{ 'true' if can_split else 'false' }}">
+    <div class="lexicon-list-pane" id="results">
+        {% include "_entries_results.html.jinja" %}
+    </div>
+    {% if can_split %}
+    <aside class="lexicon-detail-pane" id="lexicon-detail-pane" aria-live="polite">
+        <p class="lexicon-detail-placeholder">{{ t('entries.select_prompt') }}</p>
+    </aside>
+    {% endif %}
 </div>
 </main>
 
 <button type="button" class="back-to-top" id="back-to-top" aria-label="{{ t('entries.back_to_top') }}" hidden>&uarr;</button>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const results = document.getElementById("results");
+        const workbench = document.getElementById("lexicon-workbench");
+        const detailPane = document.getElementById("lexicon-detail-pane");
+        const modeToggle = document.getElementById("lexicon-mode-toggle");
+        if (!results) return;
+
+        const canSplit = workbench && workbench.dataset.canSplit === "true" && Boolean(detailPane);
+        let activeEntryId = null;
+        let partialFetchController = null;
+        let sheetListenersController = null;
+        let dwellTimer = null;
+        const visitedInSession = new Set();
+
+        function getPreferredMode() {
+            if (!canSplit) return "ledger";
+            try {
+                return localStorage.getItem("glossbook_lexicon_mode") === "ledger" ? "ledger" : "split";
+            } catch (_) {
+                return "split";
+            }
+        }
+
+        function isSplitVisible() {
+            if (!canSplit || !detailPane || !workbench.classList.contains("is-split")) return false;
+            return window.getComputedStyle(detailPane).display !== "none";
+        }
+
+        function cancelDwellTimer() {
+            if (dwellTimer) {
+                clearTimeout(dwellTimer);
+                dwellTimer = null;
+            }
+        }
+
+        function scheduleDwellVisit(entryId) {
+            cancelDwellTimer();
+            if (!entryId || visitedInSession.has(String(entryId))) return;
+            dwellTimer = setTimeout(() => {
+                dwellTimer = null;
+                if (document.visibilityState !== "visible" || String(activeEntryId) !== String(entryId)) return;
+                visitedInSession.add(String(entryId));
+                fetch("/quiz/" + encodeURIComponent(entryId) + "/seen", {
+                    method: "POST",
+                    headers: Object.assign({ Accept: "application/json" }, csrfHeaders()),
+                })
+                    .then(handleProtectedResponse)
+                    .then((resp) => (resp.ok ? resp.json() : null))
+                    .then((data) => {
+                        if (data && data.recorded) {
+                            const row = document.getElementById(String(entryId));
+                            const vcCell = row ? row.querySelector(".visit-col") : null;
+                            if (vcCell) {
+                                const next = (Number(vcCell.textContent.trim()) || 0) + 1;
+                                vcCell.textContent = String(next);
+                                vcCell.classList.remove("visit-0", "visit-low", "visit-mid", "visit-high");
+                                vcCell.classList.add(next === 0 ? "visit-0" : next <= 2 ? "visit-low" : next <= 4 ? "visit-mid" : "visit-high");
+                            }
+                        }
+                    })
+                    .catch(() => {});
+            }, 3000);
+        }
+
+        function clearDetailPane(message) {
+            cancelDwellTimer();
+            if (partialFetchController) {
+                partialFetchController.abort();
+                partialFetchController = null;
+            }
+            if (sheetListenersController) {
+                sheetListenersController.abort();
+                sheetListenersController = null;
+            }
+            activeEntryId = null;
+            if (!detailPane) return;
+            detailPane.textContent = "";
+            const p = document.createElement("p");
+            p.className = "lexicon-detail-placeholder";
+            p.textContent = message || uiText("select_prompt", null, "{{ t('entries.select_prompt') }}");
+            detailPane.appendChild(p);
+        }
+
+        function decrementResultCounters({ definedAdded = false } = {}) {
+            const countEl = document.getElementById("results-count");
+            if (countEl) {
+                const match = countEl.textContent.match(/^(\d+)(.*)$/);
+                if (match) {
+                    countEl.textContent = Math.max(0, Number(match[1]) - 1) + match[2];
+                }
+            }
+            if (definedAdded || document.querySelector('input[name="needs_definition"]')) {
+                const badge = document.getElementById("undefined-count-badge");
+                if (badge) {
+                    const nextUndef = Math.max(0, Number(badge.dataset.count || 0) - 1);
+                    badge.dataset.count = String(nextUndef);
+                    if (nextUndef > 0) {
+                        badge.textContent = " (" + nextUndef + ")";
+                    } else {
+                        badge.remove();
+                    }
+                }
+            }
+        }
+
+        function selectRow(row, { loadDetail = true, scrollIntoView = false } = {}) {
+            if (!row) return;
+            const prev = results.querySelector("tr.selected");
+            if (prev && prev !== row) prev.classList.remove("selected");
+            row.classList.add("selected");
+            if (scrollIntoView) {
+                row.scrollIntoView({ block: "nearest" });
+            }
+            if (loadDetail && isSplitVisible()) {
+                loadEntryPartial(row.id);
+            }
+        }
+
+        function loadEntryPartial(entryId, { force = false } = {}) {
+            if (!isSplitVisible() || !entryId) return;
+            if (!force && String(activeEntryId) === String(entryId)) return;
+
+            cancelDwellTimer();
+            stopWordPronunciation();
+            if (partialFetchController) partialFetchController.abort();
+            if (sheetListenersController) {
+                sheetListenersController.abort();
+                sheetListenersController = null;
+            }
+
+            activeEntryId = String(entryId);
+            partialFetchController = new AbortController();
+            const currentFetch = partialFetchController;
+
+            detailPane.textContent = "";
+            const loading = document.createElement("p");
+            loading.className = "lexicon-detail-placeholder";
+            loading.textContent = uiText("loading_sheet", null, "Loading entry…");
+            detailPane.appendChild(loading);
+
+            fetch("/entry/" + encodeURIComponent(entryId) + "?partial=1", {
+                cache: "no-store",
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                signal: currentFetch.signal,
+            })
+                .then(handleProtectedResponse)
+                .then((resp) => {
+                    if (!resp.ok) throw new Error("HTTP " + resp.status);
+                    return resp.text();
+                })
+                .then((html) => {
+                    if (currentFetch.signal.aborted || String(activeEntryId) !== String(entryId)) return;
+                    detailPane.innerHTML = html;
+                    detailPane.scrollTop = 0;
+                    const article = detailPane.querySelector("#entry-article");
+                    if (article && typeof initEntrySheet === "function") {
+                        sheetListenersController = new AbortController();
+                        initEntrySheet(article, {
+                            mode: "split",
+                            signal: sheetListenersController.signal,
+                            onUpdated: (meta) => {
+                                const row = document.getElementById(String(entryId));
+                                if (meta && meta.action === "edit-entry" && row) {
+                                    const link = row.querySelector(".entry-col a");
+                                    const audio = row.querySelector(".audio-btn");
+                                    const ctx = row.querySelector(".context-col");
+                                    if (link && typeof meta.word === "string") link.textContent = meta.word;
+                                    if (audio && typeof meta.word === "string") audio.dataset.word = meta.word;
+                                    if (ctx && typeof meta.context === "string") ctx.textContent = meta.context;
+                                }
+                                if (meta && meta.action === "add-definition" && document.querySelector('input[name="needs_definition"]')) {
+                                    if (row) {
+                                        const nextRow = row.nextElementSibling || row.previousElementSibling;
+                                        row.remove();
+                                        decrementResultCounters({ definedAdded: true });
+                                        if (nextRow && nextRow.id) {
+                                            selectRow(nextRow, { loadDetail: true });
+                                        } else {
+                                            clearDetailPane();
+                                        }
+                                        return;
+                                    }
+                                }
+                                if (meta && meta.action === "bookmark") {
+                                    refreshReviewBookmarkLink();
+                                }
+                                loadEntryPartial(entryId, { force: true });
+                            },
+                            onDeleted: (deletedId) => {
+                                const row = document.getElementById(String(deletedId));
+                                const nextRow = row ? (row.nextElementSibling || row.previousElementSibling) : null;
+                                if (row) row.remove();
+                                decrementResultCounters();
+                                if (nextRow && nextRow.id) {
+                                    selectRow(nextRow, { loadDetail: true });
+                                } else {
+                                    clearDetailPane();
+                                }
+                            },
+                        });
+                    }
+                    scheduleDwellVisit(entryId);
+                })
+                .catch((err) => {
+                    if (err && err.name === "AbortError") return;
+                    clearDetailPane(uiText("load_sheet_error", null, "Could not load entry."));
+                });
+        }
+
+        function ensureInitialSelection() {
+            if (!isSplitVisible()) return;
+            const hashId = window.location.hash ? window.location.hash.slice(1) : "";
+            const hashRow = hashId ? document.getElementById(hashId) : null;
+            const existingRow = activeEntryId ? document.getElementById(String(activeEntryId)) : null;
+            const targetRow = (hashRow && results.contains(hashRow))
+                ? hashRow
+                : (existingRow && results.contains(existingRow))
+                ? existingRow
+                : results.querySelector("tbody tr[id]");
+            if (targetRow) {
+                selectRow(targetRow, { loadDetail: true });
+            } else {
+                clearDetailPane();
+            }
+        }
+
+        function applyLayoutMode(mode) {
+            if (!canSplit) return;
+            const isSplit = mode !== "ledger";
+            workbench.classList.toggle("is-split", isSplit);
+            try {
+                if (isSplit) localStorage.removeItem("glossbook_lexicon_mode");
+                else localStorage.setItem("glossbook_lexicon_mode", "ledger");
+            } catch (_) {}
+            if (modeToggle) {
+                modeToggle.querySelectorAll(".layout-seg-btn").forEach((btn) => {
+                    const active = btn.dataset.layoutMode === (isSplit ? "split" : "ledger");
+                    btn.classList.toggle("is-active", active);
+                    btn.setAttribute("aria-checked", String(active));
+                });
+            }
+            if (isSplit) {
+                ensureInitialSelection();
+            } else {
+                clearDetailPane();
+            }
+        }
+
+        if (modeToggle) {
+            modeToggle.querySelectorAll(".layout-seg-btn").forEach((btn) => {
+                btn.addEventListener("click", () => applyLayoutMode(btn.dataset.layoutMode));
+            });
+            applyLayoutMode(getPreferredMode());
+        }
+
+        if (canSplit && typeof ResizeObserver === "function") {
+            const appMain = document.getElementById("app-main");
+            if (appMain) {
+                let wasVisible = isSplitVisible();
+                new ResizeObserver(() => {
+                    const nowVisible = isSplitVisible();
+                    if (nowVisible && !wasVisible) {
+                        ensureInitialSelection();
+                    } else if (!nowVisible && wasVisible) {
+                        clearDetailPane();
+                    }
+                    wasVisible = nowVisible;
+                }).observe(appMain);
+            }
+        }
+
         document.addEventListener("keydown", (event) => {
             if (shouldIgnoreShortcut(event)) return;
             if (event.key === "D") {
                 delete_selected_entry();
+            } else if (event.key === "j" || event.key === "k") {
+                const rows = Array.from(results.querySelectorAll("tbody tr[id]"));
+                if (!rows.length) return;
+                event.preventDefault();
+                const current = results.querySelector("tbody tr.selected");
+                let idx = current ? rows.indexOf(current) : -1;
+                if (event.key === "j") {
+                    idx = idx < rows.length - 1 ? idx + 1 : 0;
+                } else {
+                    idx = idx > 0 ? idx - 1 : rows.length - 1;
+                }
+                selectRow(rows[idx], { loadDetail: true, scrollIntoView: true });
             }
         });
-        // Bound to the #results wrapper, not .entries-table directly: live
-        // search (below) replaces the table's HTML on every keystroke, and
-        // a listener on the table node itself would be destroyed along with
-        // it. #results is never replaced, only its contents, so delegating
-        // here survives every swap.
-        const results = document.getElementById("results");
-        if (!results) return;
 
         function toggleDefinitionCell(cell) {
             const preview = cell.querySelector(".definition-preview.is-expandable");
@@ -137,14 +430,16 @@
             const row = event.target.closest("tr[id]");
             if (!row) return;
 
-            const previouslySelectedRow = document.querySelector("tr.selected");
-            if (previouslySelectedRow && previouslySelectedRow !== row) {
-                previouslySelectedRow.classList.remove("selected");
+            const link = event.target.closest("a");
+            if (link && isSplitVisible()) {
+                if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) {
+                    event.preventDefault();
+                    selectRow(row, { loadDetail: true });
+                }
+                return;
             }
 
-            if (!previouslySelectedRow || previouslySelectedRow !== row) {
-                row.classList.add("selected");
-            }
+            selectRow(row, { loadDetail: true });
         });
 
         function syncOverflowToggles() {
@@ -165,11 +460,51 @@
             resizeTimer = setTimeout(syncOverflowToggles, 120);
         });
 
-        initLiveSearch(results, syncOverflowToggles);
+        initLiveSearch(results, () => {
+            syncOverflowToggles();
+            activeEntryId = null;
+            ensureInitialSelection();
+        });
         syncOverflowToggles();
         initBackToTop();
         refreshReviewBookmarkLink();
         flashIncomingHashTarget();
+        ensureInitialSelection();
+
+        window.delete_selected_entry = function delete_selected_entry() {
+            const selectedRow = results.querySelector("tr.selected");
+            if (!selectedRow) return;
+            const selectedEntryId = selectedRow.id;
+            const entryLink = selectedRow.querySelector(".entry-col a");
+            const entryText = entryLink ? entryLink.textContent.trim() : selectedRow.firstElementChild.textContent.trim();
+            confirmDialog(
+                uiText(
+                    "confirm_delete_entry_detail",
+                    { id: selectedEntryId, entry: entryText },
+                    "Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText
+                ),
+                { danger: true }
+            ).then((confirmed) => {
+                if (!confirmed) return;
+                fetch("/delete_entry/" + selectedEntryId, {
+                    method: "DELETE",
+                    headers: csrfHeaders()
+                }).then(handleProtectedResponse).then((resp) => {
+                    if (resp.ok) {
+                        const nextRow = selectedRow.nextElementSibling || selectedRow.previousElementSibling;
+                        selectedRow.remove();
+                        decrementResultCounters();
+                        if (String(activeEntryId) === String(selectedEntryId)) {
+                            if (nextRow && nextRow.id && isSplitVisible()) {
+                                selectRow(nextRow, { loadDetail: true });
+                            } else {
+                                clearDetailPane();
+                            }
+                        }
+                    }
+                });
+            });
+        };
     });
 
     function initBackToTop() {
@@ -192,10 +527,6 @@
         }
     }
 
-    // Search-as-you-type: debounce keystrokes, fetch the same /entries
-    // route with a header that asks for a JSON fragment instead of the
-    // full page, and swap in the new table/pagination/count. Falls back
-    // to the plain <form> GET submit (full page reload) if JS is off.
     function initLiveSearch(results, onSwapped) {
         const form = document.querySelector(".search-form");
         const input = form && form.querySelector('input[name="q"]');
@@ -334,10 +665,6 @@
         }, 1900);
     }
 
-    // Arriving here via a cross-page link (e.g. the dashboard's "Resume
-    // from last mark" card) lands with the hash already set, so the
-    // browser's native anchor-jump happens with no flash. Replicate the
-    // in-page click behavior once the table is in the DOM.
     function flashIncomingHashTarget() {
         const hash = window.location.hash;
         if (!hash) return;
@@ -345,53 +672,6 @@
         if (!entryId || !document.getElementById(entryId)) return;
         flashResumeTarget(entryId);
     }
-
-    function delete_selected_entry() {
-        const selectedRow = document.querySelector("tr.selected")
-        if (!selectedRow) {
-            return;
-        }
-        const selectedEntryId = selectedRow.id;
-        const entryLink = selectedRow.querySelector(".entry-col a");
-        const entryText = entryLink ? entryLink.textContent.trim() : selectedRow.firstElementChild.textContent.trim();
-        confirmDialog(
-            uiText(
-                "confirm_delete_entry_detail",
-                { id: selectedEntryId, entry: entryText },
-                "Delete this entry?\n\nID: " + selectedEntryId + "\nEntry: " + entryText
-            ),
-            { danger: true }
-        ).then((confirmed) => {
-            if (!confirmed) return;
-            fetch("/delete_entry/" + selectedEntryId, {
-                method: "DELETE",
-                headers: csrfHeaders()
-            }).then(handleProtectedResponse).then((Response) => {
-                if (Response.ok) {
-                    selectedRow.parentNode.removeChild(selectedRow);
-                    const countEl = document.getElementById("results-count");
-                    if (countEl) {
-                        const match = countEl.textContent.match(/^(\d+)(.*)$/);
-                        if (match) {
-                            countEl.textContent = Math.max(0, Number(match[1]) - 1) + match[2];
-                        }
-                    }
-                    if (document.querySelector('input[name="needs_definition"]')) {
-                        const badge = document.getElementById("undefined-count-badge");
-                        if (badge) {
-                            const nextUndef = Math.max(0, Number(badge.dataset.count || 0) - 1);
-                            badge.dataset.count = String(nextUndef);
-                            if (nextUndef > 0) {
-                                badge.textContent = " (" + nextUndef + ")";
-                            } else {
-                                badge.remove();
-                            }
-                        }
-                    }
-                }
-            });
-        });
-    };
 </script>
 
 {% endblock body %}

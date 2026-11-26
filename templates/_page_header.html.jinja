@@ -1,73 +1,56 @@
 {#
-  Shared global header, used by every page so nav items, order, and labels
-  stay consistent across the entire app.
-  - Primary navigation (`Browse`, `Inbox`, and admin-only `Notes`) is rendered
-    as borderless links on every authenticated page.
-  - Contextual page actions (`extra_nav` and hub-page `+ Add`) sit between
-    primary navigation and the user account menu.
-  - The right-aligned user menu (`<details class="nav-account-menu">`) keeps
-    `Account`, admin-only `Admin`, and `Log out` consistently reachable from
-    every authenticated page without cramming 7 boxed buttons onto 2 rows.
+  Editorial page masthead used inside .app-main (authenticated app shell)
+  and compact top bar on standalone pages (login, register, reset, error).
 #}
-{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", subtitle_id=None, show_add=False) %}
-<header class="page-header"{% if id %} id="{{ id }}"{% endif %}>
-  <div class="page-header-inner">
-    <div class="page-header-brand">
-        {% if brand_as_h1 %}
-        <h1><a href="/">Glossbook</a></h1>
-        {% else %}
-        <p class="brand-title"><a href="/">Glossbook</a></p>
-        {% endif %}
-        {% if subtitle %}<p class="page-subtitle"{% if subtitle_id %} id="{{ subtitle_id }}"{% endif %}>{{ subtitle }}</p>{% endif %}
-    </div>
-    {% if is_authenticated %}
-    <nav class="page-nav" aria-label="{{ t('nav.main_aria') }}">
-        <a class="nav-link{% if active == 'review' %} active{% endif %}" href="/review"{% if active == 'review' %} aria-current="page"{% endif %}>{{ t('nav.review') }}</a>
-        <a class="nav-link{% if active == 'browse' %} active{% endif %}" href="/entries"{% if active == 'browse' %} aria-current="page"{% endif %}>{{ t('nav.words') }}</a>
-        <a class="nav-link{% if active == 'inbox' %} active{% endif %}" href="/inbox"{% if active == 'inbox' %} aria-current="page"{% endif %}>{{ t('nav.inbox') }}{% if inbox_pending_count %}<span class="nav-badge" id="nav-inbox-badge">{{ inbox_pending_count }}</span>{% endif %}</a>
-        {% if is_admin %}
-        <a class="nav-link{% if active == 'notes' %} active{% endif %}" href="/notes/"{% if active == 'notes' %} aria-current="page"{% endif %}>{{ t('nav.notes') }}</a>
-        {% endif %}
-        <button type="button" class="button button-ghost nav-search-btn" id="open-quick-search" aria-label="{{ t('nav.search_aria') }}"><span>{{ t('nav.search_btn') }}</span><kbd>/</kbd></button>
-        {{ extra_nav | safe }}
-        {% if show_add %}<a class="button button-primary nav-add-btn{% if active == 'add' %} active{% endif %}" href="/add_entry">{{ t('nav.add') }}</a>{% endif %}
-        <details class="nav-account-menu">
-            <summary class="button button-ghost nav-account-trigger{% if active in ('account', 'admin') %} active{% endif %}" aria-label="{{ t('nav.account_menu_aria') }}">
-                <span class="nav-account-name">{{ current_user.username if current_user else t('nav.account') }}</span>
-                <svg class="nav-caret" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-                    <path d="M2.5 4.25L6 7.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            </summary>
-            <div class="nav-account-dropdown">
-                <a class="nav-menu-item{% if active == 'account' %} active{% endif %}" href="/account"{% if active == 'account' %} aria-current="page"{% endif %}>{{ t('nav.account') }}</a>
-                <a class="nav-menu-item" href="/account#extension">{{ t('nav.extension') }}</a>
-                {% if is_admin %}
-                <a class="nav-menu-item{% if active == 'admin' %} active{% endif %}" href="/admin"{% if active == 'admin' %} aria-current="page"{% endif %}>{{ t('nav.admin') }}</a>
-                {% endif %}
-                <button class="nav-menu-item theme-toggle-btn" type="button" aria-label="{{ t('nav.theme_aria') }}">{{ t('nav.theme_auto') }}</button>
-                <form class="nav-menu-form" method="post" action="/language">
-                    <input type="hidden" name="lang" value="{{ other_lang }}">
-                    <input type="hidden" name="next_path" value="{{ current_next_path }}">
-                    <button class="nav-menu-item" type="submit" aria-label="{{ t('nav.switch_lang_aria') }}">{{ t('nav.switch_lang_label') }}</button>
-                </form>
-                <hr class="nav-menu-divider">
-                <form class="nav-menu-form" method="post" action="/logout">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button class="nav-menu-item nav-menu-danger" type="submit">{{ t('nav.logout') }}</button>
-                </form>
-            </div>
-        </details>
-    </nav>
-    {% else %}
-    <nav class="page-nav" aria-label="{{ t('nav.main_aria') }}">
-        <button class="button button-ghost theme-toggle-btn" type="button" aria-label="{{ t('nav.theme_aria') }}">{{ t('nav.theme_auto') }}</button>
+{% macro page_header(subtitle=None, active=None, brand_as_h1=False, id=None, extra_nav="", subtitle_id=None, show_add=False, title=None, standalone=False, back_href=None, back_label=None) %}
+{% if standalone or not is_authenticated %}
+<header class="standalone-header"{% if id %} id="{{ id }}"{% endif %}>
+    <a class="rail-brand" href="/">
+        <span class="rail-brand-mark" aria-hidden="true"></span>
+        <span class="rail-brand-name">Glossbook</span>
+    </a>
+    <div class="standalone-header-actions">
+        <div class="theme-segmented" role="radiogroup" aria-label="{{ t('nav.theme_aria') }}">
+            <button type="button" class="theme-seg-btn" role="radio" aria-checked="true" data-theme-value="auto">{{ t('nav.theme_auto_short') }}</button>
+            <button type="button" class="theme-seg-btn" role="radio" aria-checked="false" data-theme-value="light">{{ t('nav.theme_light_short') }}</button>
+            <button type="button" class="theme-seg-btn" role="radio" aria-checked="false" data-theme-value="dark">{{ t('nav.theme_dark_short') }}</button>
+        </div>
         <form class="inline-form" method="post" action="/language">
             <input type="hidden" name="lang" value="{{ other_lang }}">
             <input type="hidden" name="next_path" value="{{ current_next_path }}">
             <button class="button button-ghost" type="submit" aria-label="{{ t('nav.switch_lang_aria') }}">{{ t('nav.switch_lang_label') }}</button>
         </form>
-    </nav>
-    {% endif %}
-  </div>
+    </div>
 </header>
+{% else %}
+<header class="page-masthead"{% if id %} id="{{ id }}"{% endif %}>
+    <div class="masthead-left">
+        <button type="button" class="rail-icon-btn rail-expand-btn" id="rail-expand-btn" aria-label="{{ t('nav.rail_expand') }}" title="{{ t('nav.rail_expand') }} ([)">
+            <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><use href="#icon-rail"/></svg>
+        </button>
+        <div class="masthead-heading">
+            {% if back_href and back_label %}
+            <a class="masthead-back-link" href="{{ back_href }}">&larr; {{ back_label }}</a>
+            {% endif %}
+            {% if brand_as_h1 %}
+            <h1 class="masthead-title">{{ title or t('nav.today') }}</h1>
+            {% elif title %}
+            <h1 class="masthead-title">{{ title }}</h1>
+            {% endif %}
+            {% if subtitle %}
+            <p class="page-subtitle"{% if subtitle_id %} id="{{ subtitle_id }}"{% endif %}>{{ subtitle }}</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="masthead-actions">
+        {{ extra_nav | safe }}
+        <button type="button" class="button button-ghost masthead-mobile-search" data-open-quick-search aria-label="{{ t('nav.search_aria') }}">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><use href="#icon-search"/></svg>
+        </button>
+        {% if show_add %}
+        <a class="button button-primary masthead-mobile-add" href="/add_entry">{{ t('nav.add') }}</a>
+        {% endif %}
+    </div>
+</header>
+{% endif %}
 {% endmacro %}

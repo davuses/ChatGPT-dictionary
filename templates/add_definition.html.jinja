@@ -2,16 +2,16 @@
 {% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('form.add_def_title') }}{% endblock title %}
 {% block body_class %}page-narrow{% endblock body_class %}
+{% block nav_active %}browse{% endblock nav_active %}
 
 {% block body %}
 {% set entry_link %}<a class="button button-ghost" href="/entry/{{ entry_id }}">{{ t('nav.entry') }}</a>{% endset %}
-{{ page_header(extra_nav=entry_link) }}
+{{ page_header(title=t('form.add_def_title'), extra_nav=entry_link) }}
 <main class="form-page">
-<h1>{{ t('form.add_def_title') }}</h1>
 <form method="post"
     action="/add_definition">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <textarea class="markdown-editor" name="definition_text"></textarea><br>
+    <textarea class="markdown-editor" name="definition_text"></textarea>
     <input value="{{ entry_id }}"
         name="entry_id"
         type="hidden">

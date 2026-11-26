@@ -1,0 +1,174 @@
+{#
+  Shared Entry Reading Sheet fragment.
+  Rendered inside standalone entry.html.jinja AND fetched lazily by
+  /entries Master-Detail split workbench via GET /entry/{id}?partial=1.
+  Never embeds raw unsanitized markdown (fetched on demand via /entry/{id}/raw).
+#}
+<article class="entry-page"
+    id="entry-article"
+    data-entry-id="{{ entry_id }}"
+    data-definition-id="{{ definition_id if definition_id is not none else '' }}"
+    data-entry-text="{{ entry_text }}"
+    data-word="{{ word }}">
+    <header class="word-hero">
+        <div class="word-hero-top">
+            {% if is_partial %}
+            <h2 class="word-title">{{ word }}</h2>
+            {% else %}
+            <h1 class="word-title">{{ word }}</h1>
+            {% endif %}
+            <div class="section-actions">
+                {% if is_partial %}
+                <a class="button button-ghost button-sm" href="/entry/{{ entry_id }}">{{ t('entries.open_full') }}</a>
+                {% endif %}
+                <button class="button button-ghost button-sm" id="toggle-entry-edit" type="button">{{ t('entry.edit') }}</button>
+                <button class="button button-danger button-sm"
+                    data-action="delete-entry"
+                    data-entry-id="{{ entry_id }}"
+                    type="button"
+                    id="dbt">{{ t('entry.delete') }}</button>
+            </div>
+        </div>
+
+        <div class="pronunciation-row IPA-player">
+            {% if IPA_transcript %}
+            <span class="ipa-text">/{{ IPA_transcript }}/</span>
+            {% endif %}
+            <button type="button"
+                class="audio-btn"
+                id="entry-audio-btn"
+                data-word="{{ word }}"
+                aria-label="{{ t('entry.play') }}"
+                title="{{ t('entry.play') }}">
+                <svg class="icon-play" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><use href="#icon-audio-play"/></svg>
+                <svg class="icon-pause" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
+            </button>
+            <div class="inbox-dict-links">
+                <a class="inbox-dict-link" href="https://www.google.com/search?q={{ ('define ' ~ word) | urlencode }}" target="_blank" rel="noopener noreferrer">Google</a>
+                <a class="inbox-dict-link" href="https://www.oxfordlearnersdictionaries.com/search/english/?q={{ word | urlencode }}" target="_blank" rel="noopener noreferrer">Oxford</a>
+                <a class="inbox-dict-link" href="https://www.ldoceonline.com/search/english/direct/?q={{ word | urlencode }}" target="_blank" rel="noopener noreferrer">Longman</a>
+                <a class="inbox-dict-link" href="https://www.merriam-webster.com/dictionary/{{ word | urlencode }}" target="_blank" rel="noopener noreferrer">MW</a>
+            </div>
+        </div>
+
+        <form class="entry-inline-form form-page" id="inline-entry-form" method="post" action="/edit_entry/{{ entry_id }}" hidden>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <p class="form-error" id="inline-entry-error" role="alert" hidden></p>
+            <div class="form-field">
+                <label for="inline-word-input">{{ t('form.word_label') }}</label>
+                <input type="text" id="inline-word-input" name="word" value="{{ word }}" required>
+            </div>
+            <div class="form-field">
+                <label for="inline-context-input">{{ t('form.context_label') }} <span class="field-hint">{{ t('form.optional_hint') }}</span></label>
+                <input type="text" id="inline-context-input" name="context" value="{{ raw_context_text }}">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="button button-primary">{{ t('form.save_changes') }}</button>
+                <button type="button" class="button button-ghost" id="cancel-entry-edit">{{ t('form.cancel') }}</button>
+            </div>
+        </form>
+
+        <div class="word-meta">
+            <div class="word-meta-stats">
+                {% if visit_count > 0 %}
+                <span>{{ t('entry.visit_one' if visit_count == 1 else 'entry.visit_many', n=visit_count) }}</span>
+                <span aria-hidden="true">&middot;</span>
+                {% endif %}
+                <span>{{ t('entry.last_visit', elapsed=last_visit_elapsed) }}</span>
+            </div>
+            <span class="word-meta-bookmark">
+                {% if is_review_bookmark %}
+                <span class="bookmark-badge">{{ t('entry.resume_point') }}</span>
+                <button class="button button-danger button-sm" id="clear-review-bookmark" data-action="clear-bookmark" type="button">{{ t('entry.clear') }}</button>
+                {% else %}
+                <button class="button button-ghost button-sm" id="set-review-bookmark" data-action="set-bookmark" type="button">{{ t('entry.mark_here') }}</button>
+                {% endif %}
+            </span>
+        </div>
+    </header>
+
+    {% if context_text %}
+    <section class="content-section">
+        <div class="section-header">
+            <h2>{{ t('entry.context') }}</h2>
+            <button class="button button-ghost button-sm" id="toggle-context-edit" type="button">{{ t('entry.edit') }}</button>
+        </div>
+        <p class="entry-context">{{ context_text }}</p>
+    </section>
+    {% endif %}
+
+    <section class="content-section">
+        <div class="section-header">
+            <h2>{{ t('entry.definition') }}</h2>
+            {% if definition_exists %}
+            <div class="section-actions">
+                <button class="button button-ghost button-sm" id="toggle-def-edit" type="button">{{ t('entry.edit') }}</button>
+                <a class="button button-ghost button-sm" href="/edit_definition/{{ definition_id }}">{{ t('entry.full_editor') }}</a>
+                <button class="button button-danger button-sm"
+                    data-action="delete-definition"
+                    data-definition-id="{{ definition_id }}"
+                    type="button">{{ t('entry.delete') }}</button>
+            </div>
+            {% endif %}
+        </div>
+        {% if not definition_exists %}
+        <div class="section-actions" id="add-def-actions">
+            <button class="button button-ghost button-sm" id="toggle-def-edit" type="button">{{ t('entry.add_definition') }}</button>
+            <a class="button button-ghost button-sm" href="/add_definition?entry_id={{ entry_id }}">{{ t('entry.full_editor') }}</a>
+        </div>
+        {% else %}
+        <div id="definition-div" class="markdown-body">
+            {{ definition_html | safe }}
+        </div>
+        {% endif %}
+        <form class="entry-inline-form form-page" id="inline-def-form" hidden>
+            <div class="form-field">
+                <label for="inline-def-textarea">{{ t('entry.definition') }} <span class="field-hint">{{ t('form.md_hint') }}</span></label>
+                <textarea id="inline-def-textarea" name="definition_text" rows="6" required></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="button button-primary">{{ t('form.save_changes') }}</button>
+                <button type="button" class="button button-ghost" id="cancel-def-edit">{{ t('form.cancel') }}</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="content-section">
+        <div class="section-header">
+            <h2>{{ t('entry.example') }}</h2>
+            <div class="section-actions">
+                <button class="button button-ghost button-sm" id="edit-example" type="button">{{ t('entry.edit') if example_exists else t('entry.add_example') }}</button>
+                <a class="button button-ghost button-sm" href="/edit_example/{{ entry_id }}">{{ t('entry.full_editor') }}</a>
+            </div>
+        </div>
+        <div id="example-div" class="markdown-body">{{ example_html | safe }}</div>
+        <form class="entry-inline-form form-page" id="inline-example-form" hidden>
+            <div class="form-field">
+                <label for="inline-example-textarea">{{ t('entry.example') }} <span class="field-hint">{{ t('form.md_hint') }}</span></label>
+                <textarea id="inline-example-textarea" name="example_text" rows="6"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="button button-primary">{{ t('form.save_changes') }}</button>
+                <button type="button" class="button button-ghost" id="cancel-example-edit">{{ t('form.cancel') }}</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="content-section">
+        <div class="section-header">
+            <details class="entry-synonyms-details" id="entry-synonyms-details">
+                <summary class="entry-synonyms-summary">
+                    <h2>{{ t('entry.synonyms_title') }}</h2>
+                </summary>
+                <div id="entry-synonyms-panel" class="synonym-panel"></div>
+            </details>
+            <a class="button button-ghost button-sm entry-synonyms-full-link" href="/show_synonyms/{{ entry_id }}">{{ t('entry.synonyms_open_full') }}</a>
+        </div>
+    </section>
+
+    {% if not is_partial %}
+    <div class="entry-shortcuts-hint">
+        <button type="button" class="button button-ghost button-sm" id="open-entry-shortcuts">{{ t('entry.shortcuts_btn') }}</button>
+    </div>
+    {% endif %}
+</article>

@@ -1,38 +1,40 @@
 {% extends "base.html.jinja" %}
-{% from "_page_header.html.jinja" import page_header with context %}
 {% block title %}{{ t('review.title') }}{% endblock title %}
+{% block chrome_mode %}zen{% endblock chrome_mode %}
 {% block body_class %}page-narrow{% endblock body_class %}
 
 {% block body %}
-{{ page_header(subtitle=t('review.subtitle_one' if total_quizzable == 1 else 'review.subtitle_many', n=total_quizzable), active="review") }}
+{% if card_count > 0 %}
+<div class="zen-progress-track" aria-hidden="true">
+    <div class="zen-progress-fill" id="review-progress-fill" style="width: {{ (100 / card_count) | round(2) }}%"></div>
+</div>
+{% endif %}
 
-<main class="review-page">
-    <div class="review-header-row">
-        <h1 class="review-title">{{ t('review.title') }}</h1>
-        <div class="section-actions">
-            {% if total_quizzable > 0 %}
-            <div class="review-size-pills" role="group" aria-label="{{ t('review.size_label') }}">
-                {% for sz in (10, 20, 30) %}
-                <a class="button button-ghost{% if session_size == sz %} active{% endif %}" href="/review?size={{ sz }}">{{ sz }}</a>
-                {% endfor %}
-            </div>
-            {% endif %}
-            {% if card_count > 0 %}
-            <span class="review-counter" id="review-counter">{{ t('review.card_counter', i=1, n=card_count) }}</span>
-            {% endif %}
+<header class="zen-topbar">
+    <a class="button button-ghost" href="/">&larr; {{ t('review.exit') }}</a>
+    <h1 class="sr-only">{{ t('review.title') }}</h1>
+    <div class="zen-topbar-right">
+        {% if total_quizzable > 0 %}
+        <div class="zen-size-segmented" role="group" aria-label="{{ t('review.size_label') }}">
+            {% for sz in (10, 20, 30) %}
+            <a class="zen-size-link{% if session_size == sz %} active{% endif %}" href="/review?size={{ sz }}">{{ sz }}</a>
+            {% endfor %}
         </div>
+        {% endif %}
+        {% if card_count > 0 %}
+        <span class="review-counter" id="review-counter">{{ t('review.card_counter', i=1, n=card_count) }}</span>
+        {% endif %}
     </div>
+</header>
 
+<main class="zen-stage review-page">
     {% if card_count == 0 %}
-    <section class="card">
+    <section>
+        <h2>{{ t('review.title') }}</h2>
         <p class="quiz-empty">{{ t('review.empty_prefix') }} <a href="/entries">{{ t('review.empty_entries') }}</a> {{ t('review.empty_or') }} <a href="/add_entry">{{ t('review.empty_add') }}</a> {{ t('review.empty_suffix') }}</p>
     </section>
     {% else %}
-    <section class="card" id="review-card">
-        <div class="review-progress" aria-hidden="true">
-            <div class="review-progress-fill" id="review-progress-fill" style="width: {{ (100 / card_count) | round(2) }}%"></div>
-        </div>
-
+    <section id="review-card">
         <p class="quiz-sentence" id="review-sentence">{{ cards_json[0].blanked_sentence }}</p>
 
         <div class="quiz-actions" id="review-prompt-actions">
@@ -50,7 +52,7 @@
                         <svg class="icon-pause" aria-hidden="true"><use href="#icon-audio-pause"/></svg>
                     </button>
                 </div>
-                <a class="button button-ghost" id="review-open-entry" href="#" target="_blank" rel="noopener">{{ t('review.open_entry') }}</a>
+                <a class="button button-ghost button-sm" id="review-open-entry" href="#" target="_blank" rel="noopener">{{ t('review.open_entry') }}</a>
             </div>
 
             <div class="markdown-body review-definition" id="review-definition" hidden></div>
@@ -59,22 +61,23 @@
             </p>
 
             <div class="quiz-actions">
-                <button type="button" class="button button-ghost" id="review-again-btn">{{ t('review.again') }}</button>
-                <button type="button" class="button button-primary" id="review-next-btn">{{ t('review.got_it') }}</button>
+                <button type="button" class="button button-ghost" id="review-again-btn">{{ t('review.again') }} <kbd>1</kbd></button>
+                <button type="button" class="button button-primary" id="review-next-btn"><span id="review-next-label">{{ t('review.got_it') }}</span> <kbd>2</kbd></button>
             </div>
         </div>
 
         <p class="review-shortcuts">
             <kbd>Space</kbd> {{ t('review.shortcuts_reveal') }}
             <span id="review-hint-unrevealed">&middot; <kbd>s</kbd> {{ t('review.shortcuts_skip') }}</span>
-            <span id="review-hint-revealed" hidden>&middot; <kbd>a</kbd> {{ t('review.shortcuts_again') }} &middot; <kbd>p</kbd> {{ t('review.shortcuts_audio') }}</span>
+            <span id="review-hint-revealed" hidden>&middot; <kbd>1</kbd> / <kbd>a</kbd> {{ t('review.shortcuts_again') }} &middot; <kbd>p</kbd> {{ t('review.shortcuts_audio') }}</span>
             &middot; <kbd>o</kbd> {{ t('review.shortcuts_open') }}
         </p>
     </section>
 
-    <section class="card" id="review-summary" hidden>
+    <section id="review-summary" hidden>
         <h2>{{ t('review.round_complete') }}</h2>
-        <p id="review-summary-stats"></p>
+        <p class="section-desc" id="review-summary-stats"></p>
+        <ul class="review-summary-list" id="review-summary-list"></ul>
         <div class="quiz-actions">
             <a class="button button-primary" href="{{ another_round_url }}" id="review-another-btn">{{ t('review.another_round') }}</a>
             <a class="button button-ghost" href="/">{{ t('review.back_dashboard') }}</a>
@@ -105,12 +108,15 @@
         const addDefinitionEl = document.getElementById("review-add-definition");
         const againBtn = document.getElementById("review-again-btn");
         const nextBtn = document.getElementById("review-next-btn");
+        const nextLabelEl = document.getElementById("review-next-label");
         const hintUnrevealed = document.getElementById("review-hint-unrevealed");
         const hintRevealed = document.getElementById("review-hint-revealed");
         const summarySectionEl = document.getElementById("review-summary");
         const summaryStatsEl = document.getElementById("review-summary-stats");
+        const summaryListEl = document.getElementById("review-summary-list");
         const anotherBtn = document.getElementById("review-another-btn");
 
+        const initialCards = deck.slice();
         const initialDeckSize = deck.length;
         let index = 0;
         let isRevealed = false;
@@ -118,6 +124,8 @@
         let skippedCount = 0;
         let retriedCount = 0;
         const seenIds = new Set();
+        const retriedIds = new Set();
+        const skippedIds = new Set();
 
         function showCard(nextIndex) {
             stopWordPronunciation();
@@ -130,7 +138,13 @@
                 "Card " + (index + 1) + " of " + deck.length
             );
             progressFillEl.style.width = (((index + 1) / deck.length) * 100).toFixed(2) + "%";
-            sentenceEl.textContent = card.blanked_sentence;
+            renderClozeSentence(
+                sentenceEl,
+                card.sentence_parts || [],
+                card.sentence_matches || [],
+                false,
+                card.blanked_sentence
+            );
             promptActionsEl.hidden = false;
             answerPanelEl.hidden = true;
             if (hintUnrevealed) hintUnrevealed.hidden = false;
@@ -163,10 +177,12 @@
                 noDefinitionEl.hidden = false;
             }
 
-            nextBtn.textContent =
-                index === deck.length - 1
-                    ? uiText("review_finish", null, "Finish round")
-                    : uiText("review_got_it", null, "Got it");
+            if (nextLabelEl) {
+                nextLabelEl.textContent =
+                    index === deck.length - 1
+                        ? uiText("review_finish", null, "Finish round")
+                        : uiText("review_got_it", null, "Got it");
+            }
             promptActionsEl.hidden = true;
             answerPanelEl.hidden = false;
             if (hintUnrevealed) hintUnrevealed.hidden = true;
@@ -185,6 +201,32 @@
                 .catch((err) => console.error(err));
         }
 
+        function renderSummaryList() {
+            if (!summaryListEl) return;
+            summaryListEl.textContent = "";
+            initialCards.forEach((card) => {
+                const li = document.createElement("li");
+                li.className = "review-summary-item";
+                const link = document.createElement("a");
+                link.className = "review-summary-word";
+                link.href = "/entry/" + encodeURIComponent(card.entry_id);
+                link.textContent = card.headword || card.word || "";
+                li.appendChild(link);
+                if (retriedIds.has(card.entry_id)) {
+                    const tag = document.createElement("span");
+                    tag.className = "review-summary-tag";
+                    tag.textContent = uiText("review_retried_tag", null, "Retried");
+                    li.appendChild(tag);
+                } else if (skippedIds.has(card.entry_id) && !seenIds.has(card.entry_id)) {
+                    const tag = document.createElement("span");
+                    tag.className = "review-summary-tag review-summary-tag--skip";
+                    tag.textContent = uiText("review_skipped_tag", null, "Skipped");
+                    li.appendChild(tag);
+                }
+                summaryListEl.appendChild(li);
+            });
+        }
+
         function advanceCard() {
             stopWordPronunciation();
             if (index + 1 < deck.length) {
@@ -193,6 +235,7 @@
                 index = deck.length;
                 isRevealed = false;
                 cardSectionEl.hidden = true;
+                progressFillEl.style.width = "100%";
                 counterEl.textContent = uiText("review_complete", null, "Complete");
                 const extraBits = [];
                 if (skippedCount > 0) {
@@ -220,6 +263,7 @@
                     },
                     "Reviewed " + reviewedCount + " of " + initialDeckSize + " " + cardsWord + extraBits.join("") + "."
                 );
+                renderSummaryList();
                 summarySectionEl.hidden = false;
             }
         }
@@ -234,6 +278,7 @@
             if (!isRevealed || index >= deck.length) return;
             retriedCount += 1;
             const card = deck[index];
+            retriedIds.add(card.entry_id);
             const insertAt = Math.min(deck.length, index + 3);
             deck.splice(insertAt, 0, card);
             advanceCard();
@@ -242,8 +287,11 @@
         function skipCurrentCard() {
             if (isRevealed || index >= deck.length) return;
             skippedCount += 1;
+            skippedIds.add(deck[index].entry_id);
             advanceCard();
         }
+
+        showCard(0);
 
         if (audioBtn) {
             audioBtn.addEventListener("click", () => {
@@ -260,7 +308,7 @@
             if (event.repeat || shouldIgnoreShortcut(event)) return;
             if (
                 event.target instanceof Element &&
-                event.target.closest("a, .page-header button, .page-header form")
+                event.target.closest("a, .zen-topbar button, .zen-topbar a, .zen-topbar form")
             ) {
                 return;
             }
@@ -290,6 +338,9 @@
             } else if ((event.key === "a" || event.key === "1") && isRevealed) {
                 event.preventDefault();
                 againCurrentCard();
+            } else if (event.key === "2" && isRevealed) {
+                event.preventDefault();
+                gotItCurrentCard();
             } else if (event.key === "p" && isRevealed) {
                 event.preventDefault();
                 if (audioBtn) audioBtn.click();

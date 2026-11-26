@@ -59,7 +59,7 @@ function applyThemePreference(pref) {
       window.matchMedia &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
   const meta = document.getElementById("theme-color-meta");
-  if (meta) meta.setAttribute("content", isDark ? "#0f171c" : "#f8f9fa");
+  if (meta) meta.setAttribute("content", isDark ? "#0A0D0C" : "#F6F6F4");
 
   const labelKey =
     normalized === "dark"
@@ -76,6 +76,87 @@ function applyThemePreference(pref) {
   const label = uiText(labelKey, null, fallback);
   document.querySelectorAll(".theme-toggle-btn").forEach((btn) => {
     btn.textContent = label;
+  });
+  document.querySelectorAll(".theme-seg-btn").forEach((btn) => {
+    const active = btn.dataset.themeValue === normalized;
+    btn.setAttribute("aria-checked", String(active));
+    btn.classList.toggle("is-active", active);
+  });
+}
+
+function setRailCollapsed(collapsed) {
+  if (collapsed) {
+    document.documentElement.setAttribute("data-rail", "collapsed");
+    try {
+      localStorage.setItem("glossbook_rail", "collapsed");
+    } catch (_) {}
+  } else {
+    document.documentElement.removeAttribute("data-rail");
+    try {
+      localStorage.removeItem("glossbook_rail");
+    } catch (_) {}
+  }
+}
+
+function initRailAndDrawer() {
+  const rail = document.getElementById("app-rail");
+  if (!rail) return;
+  const collapseBtn = document.getElementById("rail-collapse-btn");
+  const expandBtn = document.getElementById("rail-expand-btn");
+  const moreBtn = document.getElementById("mobile-more-btn");
+  const backdrop = document.getElementById("app-rail-backdrop");
+
+  function isMobileViewport() {
+    return window.matchMedia && window.matchMedia("(max-width: 959px)").matches;
+  }
+
+  function setDrawerOpen(open) {
+    rail.classList.toggle("is-drawer-open", open);
+    if (backdrop) backdrop.hidden = !open;
+    if (moreBtn) moreBtn.setAttribute("aria-expanded", String(open));
+    document.body.classList.toggle("drawer-open", open);
+    if (!open && moreBtn && rail.contains(document.activeElement)) {
+      moreBtn.focus();
+    }
+  }
+
+  if (collapseBtn) {
+    collapseBtn.addEventListener("click", () => {
+      if (isMobileViewport()) {
+        setDrawerOpen(false);
+      } else {
+        setRailCollapsed(true);
+      }
+    });
+  }
+  if (expandBtn) {
+    expandBtn.addEventListener("click", () => {
+      if (isMobileViewport()) {
+        setDrawerOpen(true);
+      } else {
+        setRailCollapsed(false);
+      }
+    });
+  }
+  if (moreBtn) {
+    moreBtn.addEventListener("click", () => {
+      setDrawerOpen(!rail.classList.contains("is-drawer-open"));
+    });
+  }
+  if (backdrop) {
+    backdrop.addEventListener("click", () => setDrawerOpen(false));
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && rail.classList.contains("is-drawer-open")) {
+      setDrawerOpen(false);
+      return;
+    }
+    if (event.key === "[" && !shouldIgnoreShortcut(event) && !isMobileViewport()) {
+      event.preventDefault();
+      const collapsed = document.documentElement.getAttribute("data-rail") === "collapsed";
+      setRailCollapsed(!collapsed);
+    }
   });
 }
 
@@ -201,17 +282,27 @@ function deleteEntry(entryId) {
 
 function renderClozeSentence(el, parts, matches, filled, blankedFallback) {
   if (!el) return;
-  if (!filled || !Array.isArray(parts) || parts.length === 0) {
+  if (!Array.isArray(parts) || parts.length === 0) {
     el.textContent = blankedFallback || "";
     return;
   }
   el.textContent = "";
+  const matchList = Array.isArray(matches) ? matches : [];
+  const gapCount = Math.max(parts.length - 1, matchList.length);
   parts.forEach((part, idx) => {
     el.appendChild(document.createTextNode(part));
-    if (idx < (matches ? matches.length : 0)) {
-      const strong = document.createElement("strong");
-      strong.textContent = matches[idx];
-      el.appendChild(strong);
+    if (idx < gapCount) {
+      if (filled && idx < matchList.length) {
+        const mark = document.createElement("mark");
+        mark.className = "cloze-fill";
+        mark.textContent = matchList[idx];
+        el.appendChild(mark);
+      } else if (!filled && idx < parts.length - 1) {
+        const blank = document.createElement("span");
+        blank.className = "cloze-blank";
+        blank.textContent = "_____";
+        el.appendChild(blank);
+      }
     }
   });
 }
@@ -284,7 +375,13 @@ document.addEventListener("DOMContentLoaded", function () {
         card.dataset.parts = JSON.stringify(data.sentence_parts || []);
         card.dataset.matches = JSON.stringify(data.sentence_matches || []);
         delete card.dataset.seen;
-        card.querySelector(".quiz-sentence").textContent = data.blanked_sentence;
+        renderClozeSentence(
+          card.querySelector(".quiz-sentence"),
+          data.sentence_parts || [],
+          data.sentence_matches || [],
+          false,
+          data.blanked_sentence
+        );
 
         const answerEl = card.querySelector(".quiz-answer");
         answerEl.hidden = true;
@@ -425,6 +522,9 @@ function initQuickSearch() {
   if (openBtn) {
     openBtn.addEventListener("click", () => openQuickSearch());
   }
+  document.querySelectorAll("[data-open-quick-search]").forEach((btn) => {
+    btn.addEventListener("click", () => openQuickSearch());
+  });
 
   dialog.addEventListener("click", function (event) {
     if (event.target === dialog) {
@@ -596,6 +696,432 @@ function playWordPronunciation(word, button) {
   tryUrl(0);
 }
 
+function getCsrfToken() {
+  const token = document.querySelector('meta[name="csrf-token"]');
+  return token ? token.content : "";
+}
+
+function initEntrySheet(article, { mode = "standalone", onUpdated, onDeleted, onCopy, signal } = {}) {
+  if (!article) return;
+  const entryId = article.dataset.entryId || "";
+  const definitionId = article.dataset.definitionId || "";
+  const csrfToken = getCsrfToken();
+  const isSplit = mode === "split";
+  const listenerOpts = signal ? { signal } : undefined;
+
+  function notifyUpdated(meta) {
+    if (typeof onUpdated === "function") {
+      onUpdated(Object.assign({ entryId }, meta || {}));
+    } else {
+      location.reload();
+    }
+  }
+
+  function notifyDeleted() {
+    if (typeof onDeleted === "function") {
+      onDeleted(entryId);
+    } else {
+      window.location.href = "/entries";
+    }
+  }
+
+  const audioBtn = article.querySelector("#entry-audio-btn");
+  if (audioBtn) {
+    audioBtn.addEventListener("click", () => {
+      playWordPronunciation(audioBtn.dataset.word || "", audioBtn);
+    }, listenerOpts);
+  }
+
+  // Delete entry
+  const delEntryBtn = article.querySelector('[data-action="delete-entry"]');
+  if (delEntryBtn) {
+    delEntryBtn.addEventListener("click", () => {
+      confirmDialog(
+        uiText("confirm_delete_entry", {}, "Are you sure you want to delete this entry?"),
+        { danger: true }
+      ).then((confirmed) => {
+        if (!confirmed) return;
+        fetch("/delete_entry/" + encodeURIComponent(entryId), {
+          method: "DELETE",
+          headers: csrfHeaders(),
+        })
+          .then(handleProtectedResponse)
+          .then((resp) => {
+            if (resp.ok) notifyDeleted();
+          });
+      });
+    }, listenerOpts);
+  }
+
+  // Delete definition
+  const delDefBtn = article.querySelector('[data-action="delete-definition"]');
+  if (delDefBtn) {
+    delDefBtn.addEventListener("click", () => {
+      const defId = delDefBtn.dataset.definitionId || definitionId;
+      if (!defId) return;
+      confirmDialog(
+        uiText("confirm_delete_def", null, "Are you sure you want to delete this definition?"),
+        { danger: true }
+      ).then((confirmed) => {
+        if (!confirmed) return;
+        fetch("/delete_definition/" + encodeURIComponent(defId), {
+          method: "DELETE",
+          headers: csrfHeaders(),
+        })
+          .then(handleProtectedResponse)
+          .then((resp) => {
+            if (resp.ok) notifyUpdated({ action: "delete-definition" });
+          });
+      });
+    }, listenerOpts);
+  }
+
+  // Bookmark set / clear
+  const setBmBtn = article.querySelector('[data-action="set-bookmark"]');
+  if (setBmBtn) {
+    setBmBtn.addEventListener("click", () => {
+      fetch("/entry/" + encodeURIComponent(entryId) + "/set_review_bookmark", {
+        method: "POST",
+        headers: csrfHeaders(),
+      })
+        .then(handleProtectedResponse)
+        .then((resp) => {
+          if (resp.ok) notifyUpdated({ action: "bookmark", bookmarked: true });
+          else showToast(uiText("bookmark_set_failed", null, "Failed to set resume point."), { type: "error" });
+        });
+    }, listenerOpts);
+  }
+
+  const clearBmBtn = article.querySelector('[data-action="clear-bookmark"]');
+  if (clearBmBtn) {
+    clearBmBtn.addEventListener("click", () => {
+      fetch("/entry/" + encodeURIComponent(entryId) + "/clear_review_bookmark", {
+        method: "POST",
+        headers: csrfHeaders(),
+      })
+        .then(handleProtectedResponse)
+        .then((resp) => {
+          if (resp.ok) notifyUpdated({ action: "bookmark", bookmarked: false });
+          else showToast(uiText("bookmark_clear_failed", null, "Failed to clear resume point."), { type: "error" });
+        });
+    }, listenerOpts);
+  }
+
+  // Inline Word/Context edit toggle & XHR submit
+  const toggleEntryBtn = article.querySelector("#toggle-entry-edit");
+  const toggleContextBtn = article.querySelector("#toggle-context-edit");
+  const inlineEntryForm = article.querySelector("#inline-entry-form");
+  const inlineEntryErr = article.querySelector("#inline-entry-error");
+  const cancelEntryBtn = article.querySelector("#cancel-entry-edit");
+
+  function setEntryEditOpen(open, focusFieldId) {
+    if (!inlineEntryForm) return;
+    inlineEntryForm.hidden = !open;
+    if (inlineEntryErr) inlineEntryErr.hidden = true;
+    if (toggleEntryBtn) toggleEntryBtn.classList.toggle("active", open);
+    if (toggleContextBtn) toggleContextBtn.classList.toggle("active", open);
+    if (open) {
+      inlineEntryForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const input = article.querySelector("#" + (focusFieldId || "inline-word-input"));
+      if (input) input.focus();
+    }
+  }
+
+  if (toggleEntryBtn && inlineEntryForm) {
+    toggleEntryBtn.addEventListener("click", () => {
+      setEntryEditOpen(inlineEntryForm.hidden, "inline-word-input");
+    }, listenerOpts);
+  }
+  if (toggleContextBtn && inlineEntryForm) {
+    toggleContextBtn.addEventListener("click", () => {
+      setEntryEditOpen(true, "inline-context-input");
+    }, listenerOpts);
+  }
+  if (cancelEntryBtn && inlineEntryForm) {
+    cancelEntryBtn.addEventListener("click", () => setEntryEditOpen(false), listenerOpts);
+  }
+  if (inlineEntryForm) {
+    inlineEntryForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (inlineEntryErr) inlineEntryErr.hidden = true;
+      const fd = new FormData(inlineEntryForm);
+      if (!fd.get("csrf_token")) fd.set("csrf_token", csrfToken);
+      fetch("/edit_entry/" + encodeURIComponent(entryId), {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" },
+        body: fd,
+      })
+        .then(handleProtectedResponse)
+        .then((resp) =>
+          resp.json().catch(() => ({})).then((data) => ({ ok: resp.ok, data }))
+        )
+        .then(({ ok, data }) => {
+          if (ok) {
+            showToast(uiText("entry_updated_toast", null, "Saved"));
+            notifyUpdated({ action: "edit-entry", word: data.word, context: data.context });
+          } else {
+            const msg = (data && data.detail) || uiText("entry_save_failed", null, "Could not save changes.");
+            if (inlineEntryErr) {
+              inlineEntryErr.textContent = msg;
+              inlineEntryErr.hidden = false;
+            } else {
+              showToast(msg, { type: "error" });
+            }
+          }
+        })
+        .catch(() => {
+          showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+        });
+    }, listenerOpts);
+  }
+
+  let rawCache = null;
+  function ensureRawLoaded() {
+    if (rawCache) return Promise.resolve(rawCache);
+    return fetchJson("/entry/" + encodeURIComponent(entryId) + "/raw").then((data) => {
+      rawCache = data || { definition_text: "", example_text: "" };
+      return rawCache;
+    });
+  }
+
+  // Inline Definition edit/add
+  const toggleDefBtn = article.querySelector("#toggle-def-edit");
+  const inlineDefForm = article.querySelector("#inline-def-form");
+  const cancelDefBtn = article.querySelector("#cancel-def-edit");
+  const defDiv = article.querySelector("#definition-div");
+  if (toggleDefBtn && inlineDefForm) {
+    toggleDefBtn.addEventListener("click", () => {
+      const opening = inlineDefForm.hidden;
+      inlineDefForm.hidden = !opening;
+      if (defDiv) defDiv.hidden = opening;
+      if (opening) {
+        const ta = article.querySelector("#inline-def-textarea");
+        ensureRawLoaded()
+          .then((data) => {
+            if (ta && !ta.value) ta.value = data.definition_text || "";
+            if (ta) ta.focus();
+          })
+          .catch(() => {
+            if (ta) ta.focus();
+          });
+      }
+    }, listenerOpts);
+  }
+  if (cancelDefBtn && inlineDefForm) {
+    cancelDefBtn.addEventListener("click", () => {
+      inlineDefForm.hidden = true;
+      if (defDiv) defDiv.hidden = false;
+    }, listenerOpts);
+  }
+  if (inlineDefForm) {
+    inlineDefForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const ta = article.querySelector("#inline-def-textarea");
+      const text = ta ? ta.value.trim() : "";
+      if (!text) return;
+      const fd = new FormData();
+      fd.append("csrf_token", csrfToken);
+      fd.append("definition_text", text);
+      let url = "/edit_definition/" + encodeURIComponent(definitionId);
+      const isAdd = !definitionId;
+      if (isAdd) {
+        url = "/add_definition";
+        fd.append("entry_id", entryId);
+      }
+      fetch(url, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" },
+        body: fd,
+      })
+        .then(handleProtectedResponse)
+        .then((resp) => {
+          if (resp.ok) {
+            showToast(uiText("entry_updated_toast", null, "Saved"));
+            notifyUpdated({ action: isAdd ? "add-definition" : "edit-definition" });
+          } else {
+            showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+          }
+        })
+        .catch(() => {
+          showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+        });
+    }, listenerOpts);
+  }
+
+  // Inline Example edit
+  const toggleExBtn = article.querySelector("#edit-example");
+  const inlineExForm = article.querySelector("#inline-example-form");
+  const cancelExBtn = article.querySelector("#cancel-example-edit");
+  const exDiv = article.querySelector("#example-div");
+  if (toggleExBtn && inlineExForm) {
+    toggleExBtn.addEventListener("click", () => {
+      const opening = inlineExForm.hidden;
+      inlineExForm.hidden = !opening;
+      if (exDiv) exDiv.hidden = opening;
+      if (opening) {
+        const ta = article.querySelector("#inline-example-textarea");
+        ensureRawLoaded()
+          .then((data) => {
+            if (ta && !ta.value) ta.value = data.example_text || "";
+            if (ta) ta.focus();
+          })
+          .catch(() => {
+            if (ta) ta.focus();
+          });
+      }
+    }, listenerOpts);
+  }
+  if (cancelExBtn && inlineExForm) {
+    cancelExBtn.addEventListener("click", () => {
+      inlineExForm.hidden = true;
+      if (exDiv) exDiv.hidden = false;
+    }, listenerOpts);
+  }
+  if (inlineExForm) {
+    inlineExForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const ta = article.querySelector("#inline-example-textarea");
+      const fd = new FormData();
+      fd.append("csrf_token", csrfToken);
+      fd.append("example_text", ta ? ta.value : "");
+      fetch("/edit_example/" + encodeURIComponent(entryId), {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" },
+        body: fd,
+      })
+        .then(handleProtectedResponse)
+        .then((resp) => {
+          if (resp.ok) {
+            showToast(uiText("entry_updated_toast", null, "Saved"));
+            notifyUpdated({ action: "edit-example" });
+          } else {
+            showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+          }
+        })
+        .catch(() => {
+          showToast(uiText("entry_save_failed", null, "Could not save changes."), { type: "error" });
+        });
+    }, listenerOpts);
+  }
+
+  // Lazy Synonyms section
+  const synDetails = article.querySelector("#entry-synonyms-details");
+  const synPanel = article.querySelector("#entry-synonyms-panel");
+  let synLoaded = false;
+  if (synDetails && synPanel) {
+    synDetails.addEventListener("toggle", () => {
+      if (!synDetails.open || synLoaded) return;
+      synLoaded = true;
+      synPanel.textContent = uiText("synonyms_loading", null, "Loading synonyms…");
+      const word = article.dataset.word || "";
+      fetchJson("/api/v1/lookup?word=" + encodeURIComponent(word) + "&include_synonym_links=true")
+        .then((data) => {
+          synPanel.textContent = "";
+          if (data.thesaurus_error) {
+            const p = document.createElement("p");
+            p.className = "quiz-empty";
+            p.textContent = uiText("synonyms_error", null, "Thesaurus lookup temporarily unavailable.");
+            synPanel.appendChild(p);
+            return;
+          }
+          const senses = Array.isArray(data.senses) ? data.senses : [];
+          if (!senses.length) {
+            const p = document.createElement("p");
+            p.className = "quiz-empty";
+            p.textContent = uiText("synonyms_empty", null, "No synonyms found for this word.");
+            synPanel.appendChild(p);
+            return;
+          }
+          const links = data.synonym_links || {};
+          const table = document.createElement("table");
+          table.className = "synonyms-table";
+          const tbody = document.createElement("tbody");
+          senses.forEach((sense) => {
+            const tr = document.createElement("tr");
+            const tdPos = document.createElement("td");
+            tdPos.textContent = sense.part_of_speech || "";
+            const tdMean = document.createElement("td");
+            tdMean.textContent = sense.meaning || "";
+            const tdSyns = document.createElement("td");
+            const syns = Array.isArray(sense.synonyms) ? sense.synonyms : [];
+            syns.forEach((syn, idx) => {
+              if (idx > 0) tdSyns.appendChild(document.createTextNode(", "));
+              const linkedId = links[String(syn).toLowerCase()];
+              if (linkedId) {
+                const a = document.createElement("a");
+                a.href = "/entry/" + encodeURIComponent(linkedId);
+                a.textContent = syn;
+                tdSyns.appendChild(a);
+              } else {
+                tdSyns.appendChild(document.createTextNode(syn));
+              }
+            });
+            tr.appendChild(tdPos);
+            tr.appendChild(tdMean);
+            tr.appendChild(tdSyns);
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          synPanel.appendChild(table);
+        })
+        .catch(() => {
+          synPanel.textContent = uiText("synonyms_error", null, "Thesaurus lookup temporarily unavailable.");
+        });
+    }, listenerOpts);
+  }
+
+  // Shortcuts dialog (standalone only)
+  const shortcutsDialog = !isSplit ? document.getElementById("entry-shortcuts-dialog") : null;
+  const openShortcutsBtn = !isSplit ? article.querySelector("#open-entry-shortcuts") : null;
+  const closeShortcutsBtn = !isSplit ? document.getElementById("close-entry-shortcuts") : null;
+  if (openShortcutsBtn && shortcutsDialog) {
+    openShortcutsBtn.addEventListener("click", () => shortcutsDialog.showModal(), listenerOpts);
+  }
+  if (closeShortcutsBtn && shortcutsDialog) {
+    closeShortcutsBtn.addEventListener("click", () => shortcutsDialog.close(), listenerOpts);
+  }
+  if (shortcutsDialog) {
+    shortcutsDialog.addEventListener("click", (event) => {
+      if (event.target === shortcutsDialog) shortcutsDialog.close();
+    }, listenerOpts);
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (shouldIgnoreShortcut(event)) return;
+    if (event.key === "p") {
+      if (audioBtn) audioBtn.click();
+    } else if (event.key === "e") {
+      if (toggleExBtn) toggleExBtn.click();
+    } else if (event.key === "Q") {
+      const textToCopy = article.dataset.entryText || "";
+      if (typeof onCopy === "function") {
+        onCopy(textToCopy);
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast(uiText("entry_copied", null, "Copied to clipboard"));
+        }).catch(() => {});
+      }
+    } else if (!isSplit) {
+      if (event.key === "?" && shortcutsDialog) {
+        event.preventDefault();
+        shortcutsDialog.showModal();
+      } else if (event.key === "b") {
+        if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
+          history.back();
+        } else {
+          window.location.href = "/entries";
+        }
+      } else if (event.key === "D" && delEntryBtn) {
+        delEntryBtn.click();
+      } else if (event.key === "a") {
+        window.open("/add_entry", "_blank").focus();
+      } else if (event.key === "A") {
+        window.location.href = "/add_entry";
+      }
+    }
+  }, listenerOpts);
+}
+
 // Close the header account menu on outside click or Escape, restoring focus.
 document.addEventListener("click", function (event) {
   document.querySelectorAll("details.nav-account-menu[open]").forEach((menu) => {
@@ -619,12 +1145,29 @@ document.addEventListener("keydown", function (event) {
 
 document.addEventListener("DOMContentLoaded", function () {
   applyThemePreference(getThemePreference());
+  initRailAndDrawer();
   initQuickSearch();
+  document.querySelectorAll(".quiz-card").forEach((card) => {
+    const sentenceEl = card.querySelector(".quiz-sentence");
+    if (!sentenceEl) return;
+    try {
+      const parts = JSON.parse(card.dataset.parts || "[]");
+      const matches = JSON.parse(card.dataset.matches || "[]");
+      if (parts.length > 1) {
+        renderClozeSentence(sentenceEl, parts, matches, false, card.dataset.blanked || "");
+      }
+    } catch (_) {}
+  });
   document.querySelectorAll(".theme-toggle-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const current = getThemePreference();
       const next = current === "auto" ? "light" : current === "light" ? "dark" : "auto";
       applyThemePreference(next);
+    });
+  });
+  document.querySelectorAll(".theme-seg-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyThemePreference(btn.dataset.themeValue || "auto");
     });
   });
 
