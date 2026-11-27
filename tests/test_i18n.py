@@ -157,7 +157,7 @@ async def test_web_app_english_and_chinese_ui_and_words_nav(client, admin_user):
     assert dash_zh.status_code == 200
     assert '<html lang="zh-CN">' in dash_zh.text
     assert ">词库<" in dash_zh.text
-    assert ">收件箱<" in dash_zh.text
+    assert ">收集箱<" in dash_zh.text
     assert "语境填空" in dash_zh.text
     assert "开始复习" in dash_zh.text
     assert '<a class="subtitle-link" href="/entries">1 个词条</a>' in dash_zh.text
@@ -180,9 +180,9 @@ async def test_web_app_english_and_chinese_ui_and_words_nav(client, admin_user):
     # /review, /inbox, /account, /entry/{id}, /admin all render Chinese cleanly
     for path, expected_snippet in (
         ("/review", "专注复习"),
-        ("/inbox", "收件箱"),
+        ("/inbox", "收集箱"),
         ("/account", "导出与导入词库"),
-        (f"/entry/{entry_id}", "上次访问："),
+        (f"/entry/{entry_id}", "上次查看："),
         ("/admin", "管理邀请链接与用户账户"),
     ):
         resp = await client.get(path)
